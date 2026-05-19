@@ -1,5 +1,11 @@
 package llms
 
+import (
+	"encoding/json"
+
+	"github.com/cockroachdb/errors"
+)
+
 type Role string
 
 const (
@@ -56,3 +62,156 @@ func NewBinaryPart(mediaType string, data []byte) *BinaryPart {
 }
 
 func (BinaryPart) isPart() {}
+
+// ToolCallPart is a tool invocation requested by the model. It appears in an
+// assistant message and is paired with a ToolResultPart by ID. Arguments is
+// the raw JSON arguments string as produced by the provider.
+type ToolCallPart struct {
+	ID        string
+	Name      string
+	Arguments string
+}
+
+func NewToolCallPart(id, name, arguments string) *ToolCallPart {
+	return &ToolCallPart{ID: id, Name: name, Arguments: arguments}
+}
+
+func (ToolCallPart) isPart() {}
+
+// ToolResultPart is the result of a tool invocation. It appears in a user
+// message and is paired with its ToolCallPart by ID. Exactly one of Text or
+// Error is meaningful: Error is non-empty when the call failed, otherwise
+// Text holds the rendered tool result.
+type ToolResultPart struct {
+	ID    string
+	Name  string
+	Text  string
+	Error string
+}
+
+func NewToolResultPart(id, name, text, errText string) *ToolResultPart {
+	return &ToolResultPart{ID: id, Name: name, Text: text, Error: errText}
+}
+
+func (ToolResultPart) isPart() {}
+
+// ThinkingPart carries a model extended-thinking/reasoning block in neutral
+// form. Signature is the provider-opaque cryptographic signature (Anthropic)
+// that must be replayed verbatim alongside tool use; Redacted/Data cover an
+// encrypted redacted_thinking block. It appears in an assistant message,
+// before any text or tool-call parts.
+type ThinkingPart struct {
+	Text      string
+	Signature string
+	Redacted  bool
+	Data      string
+}
+
+func NewThinkingPart(text, signature string) *ThinkingPart {
+	return &ThinkingPart{Text: text, Signature: signature}
+}
+
+func (ThinkingPart) isPart() {}
+
+// --- JSON codec ------------------------------------------------------------
+//
+// MessagePart is a closed interface, so a Message cannot round-trip through
+// encoding/json without a discriminator. MarshalJSON tags each part with a
+// "type" field; UnmarshalJSON dispatches on it. This is the only supported
+// serialization format for the neutral transcript (e.g. for durable jobs).
+
+type messageJSON struct {
+	Role  Role              `json:"role"`
+	Parts []json.RawMessage `json:"parts"`
+	Cache bool              `json:"cache,omitempty"`
+}
+
+type partEnvelope struct {
+	Type string `json:"type"`
+}
+
+func partTypeName(p MessagePart) (string, error) {
+	switch p.(type) {
+	case *TextPart:
+		return "text", nil
+	case *ImagePart:
+		return "image", nil
+	case *BinaryPart:
+		return "binary", nil
+	case *ToolCallPart:
+		return "tool_call", nil
+	case *ToolResultPart:
+		return "tool_result", nil
+	case *ThinkingPart:
+		return "thinking", nil
+	default:
+		return "", errors.Newf("cannot marshal unknown message part type %T", p)
+	}
+}
+
+func (m *Message) MarshalJSON() ([]byte, error) {
+	parts := make([]json.RawMessage, 0, len(m.Parts))
+	for _, p := range m.Parts {
+		typeName, err := partTypeName(p)
+		if err != nil {
+			return nil, err
+		}
+		body, err := json.Marshal(p)
+		if err != nil {
+			return nil, err
+		}
+		// Splice the discriminator into the part object.
+		merged := append([]byte(`{"type":`), mustJSON(typeName)...)
+		if len(body) > 2 {
+			merged = append(merged, ',')
+			merged = append(merged, body[1:]...)
+		} else {
+			merged = append(merged, '}')
+		}
+		parts = append(parts, merged)
+	}
+	return json.Marshal(messageJSON{Role: m.Role, Parts: parts, Cache: m.Cache})
+}
+
+func mustJSON(v any) []byte {
+	b, _ := json.Marshal(v)
+	return b
+}
+
+func (m *Message) UnmarshalJSON(data []byte) error {
+	var raw messageJSON
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	m.Role = raw.Role
+	m.Cache = raw.Cache
+	m.Parts = make([]MessagePart, 0, len(raw.Parts))
+	for _, rp := range raw.Parts {
+		var env partEnvelope
+		if err := json.Unmarshal(rp, &env); err != nil {
+			return err
+		}
+		var part MessagePart
+		switch env.Type {
+		case "text":
+			part = new(TextPart)
+		case "image":
+			part = new(ImagePart)
+		case "binary":
+			part = new(BinaryPart)
+		case "tool_call":
+			part = new(ToolCallPart)
+		case "tool_result":
+			part = new(ToolResultPart)
+		case "thinking":
+			part = new(ThinkingPart)
+		default:
+			return errors.Newf("cannot unmarshal unknown message part type %q", env.Type)
+		}
+		if err := json.Unmarshal(rp, part); err != nil {
+			return err
+		}
+		m.Parts = append(m.Parts, part)
+	}
+	return nil
+}

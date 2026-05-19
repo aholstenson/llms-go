@@ -118,12 +118,13 @@ type generateContentOptions struct {
 	StreamingFunc     StreamingFunc
 	WebSearch         bool
 	ToolCallTimeout   time.Duration
+	ParentExecution   ExecutionContext
 	// Structured output options
-	ResponseSchema                      *ResponseSchema
-	StructuredStreamingFunc             StructuredStreamingFunc
-	StructuredStreamingSchema           *jsonstream.Schema // Optional custom jsonstream schema
-	StructuredStreamingSchemaAuto       bool               // True if schema was auto-generated
-	StructuredStreamingSchemaBuilder    structuredStreamingSchemaBuilder
+	ResponseSchema                   *ResponseSchema
+	StructuredStreamingFunc          StructuredStreamingFunc
+	StructuredStreamingSchema        *jsonstream.Schema // Optional custom jsonstream schema
+	StructuredStreamingSchemaAuto    bool               // True if schema was auto-generated
+	StructuredStreamingSchemaBuilder structuredStreamingSchemaBuilder
 }
 
 // DefaultToolCallTimeout is the timeout applied to a single tool call when no
@@ -195,6 +196,21 @@ func WithMaxSteps(maxSteps int) GenerateOption {
 func WithToolCallTimeout(timeout time.Duration) GenerateOption {
 	return func(opts *generateContentOptions) {
 		opts.ToolCallTimeout = timeout
+	}
+}
+
+// WithParentExecution rolls this generation's token and tool-call totals up
+// to a parent ExecutionContext. Use it for the lightweight sub-agent pattern:
+// a tool's Execute calls another model's GenerateContent with
+// WithParentExecution(GetExecutionContext(ctx)) so child spend accrues to the
+// parent tracker.
+//
+// Step budgets are NOT rolled up: the child runs its own independent
+// WithMaxSteps budget and does not consume the parent's remaining steps. Only
+// token and tool-call accounting accrues to the parent.
+func WithParentExecution(parent ExecutionContext) GenerateOption {
+	return func(opts *generateContentOptions) {
+		opts.ParentExecution = parent
 	}
 }
 

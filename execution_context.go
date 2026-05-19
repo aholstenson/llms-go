@@ -54,6 +54,10 @@ type ExecutionTracker struct {
 	inputTokens  int64
 	outputTokens int64
 	cachedTokens int64
+
+	// parent, when set, receives token and tool-call rollups so a sub-agent's
+	// spend accrues to its caller's budget.
+	parent *ExecutionTracker
 }
 
 // NewExecutionTracker creates a new execution tracker with the given max steps.
@@ -62,6 +66,18 @@ func NewExecutionTracker(maxSteps int) *ExecutionTracker {
 		maxSteps:  maxSteps,
 		toolCalls: make(map[string]int),
 	}
+}
+
+// NewChildTracker creates an execution tracker whose token and tool-call
+// totals also roll up to the given parent. Step counts are deliberately not
+// rolled up: the child keeps its own independent step budget. If parent is
+// not an *ExecutionTracker, the child behaves like a plain tracker.
+func NewChildTracker(maxSteps int, parent ExecutionContext) *ExecutionTracker {
+	t := NewExecutionTracker(maxSteps)
+	if p, ok := parent.(*ExecutionTracker); ok {
+		t.parent = p
+	}
+	return t
 }
 
 // Read methods (implement ExecutionContext)
@@ -132,18 +148,26 @@ func (t *ExecutionTracker) IncrementStep() {
 // RecordToolCall records that a tool was called.
 func (t *ExecutionTracker) RecordToolCall(toolName string) {
 	t.mu.Lock()
-	defer t.mu.Unlock()
 	t.toolCalls[toolName]++
 	t.totalToolCalls++
+	parent := t.parent
+	t.mu.Unlock()
+	if parent != nil {
+		parent.RecordToolCall(toolName)
+	}
 }
 
 // AddTokens adds token counts to the cumulative totals.
 func (t *ExecutionTracker) AddTokens(input, output, cached int64) {
 	t.mu.Lock()
-	defer t.mu.Unlock()
 	t.inputTokens += input
 	t.outputTokens += output
 	t.cachedTokens += cached
+	parent := t.parent
+	t.mu.Unlock()
+	if parent != nil {
+		parent.AddTokens(input, output, cached)
+	}
 }
 
 // Ensure ExecutionTracker implements ExecutionContext

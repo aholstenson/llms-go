@@ -47,6 +47,14 @@ func NewGoogleModel(logger *slog.Logger, metrics *Metrics, apiKey string, model 
 }
 
 func (m *googleModel) GenerateContent(ctx context.Context, options ...GenerateOption) (Result, error) {
+	s, err := m.newSession(options...)
+	if err != nil {
+		return nil, err
+	}
+	return runSession(ctx, s)
+}
+
+func (m *googleModel) newSession(options ...GenerateOption) (*Session, error) {
 	opts := resolveGenerateContentOptions(m.subParserRegistry, options...)
 
 	// Gate request parameters against the model's known capabilities.
@@ -113,244 +121,20 @@ func (m *googleModel) GenerateContent(ctx context.Context, options ...GenerateOp
 		config.ResponseSchema = ConvertToGenaiSchema(opts.ResponseSchema.Schema.(*jsonschema.Schema))
 	}
 
-	maxSteps := opts.MaxSteps
-	if maxSteps == 0 {
-		maxSteps = 10
-	}
-
-	// Create and inject execution tracker
-	tracker := NewExecutionTracker(maxSteps)
-	ctx = WithExecutionContext(ctx, tracker)
-
-	// Set up structured streaming parser if configured
 	var jsParser *jsonstream.Parser
-	var structuredContentBuilder strings.Builder
 	if opts.StructuredStreamingFunc != nil && opts.StructuredStreamingSchema != nil {
 		jsParser = jsonstream.New(opts.StructuredStreamingSchema)
 	}
 
-	// Record a request to the LLM as we begin to generate content
-	m.metrics.RecordGenerateRequest(ctx, GenAISystemGoogle, GenAIOperationChat, GenAIModel(m.model))
-
-	steps := 0
-	for {
-		if ctx.Err() != nil {
-			return nil, ctx.Err()
-		}
-
-		steps++
-		if steps >= maxSteps {
-			return nil, errors.New("max steps reached")
-		}
-
-		// Update execution tracker
-		tracker.IncrementStep()
-
-		start := time.Now()
-		hasRecordedFirstToken := false
-
-		// Each iteration which calls the LLM starts with fresh stats
-		collector := NewCollector()
-		collector.Counter("calls").Add(1)
-		if steps == 1 {
-			// If this is the first step, record a request
-			collector.Counter("requests").Add(1)
-		}
-
-		var response *genai.GenerateContentResponse
-		var err error
-
-		if opts.StreamingFunc != nil {
-			if emitErr := opts.StreamingFunc(ctx, StreamingEventMessageStart{}); emitErr != nil {
-				return nil, emitErr
-			}
-		}
-
-		if opts.StreamingFunc != nil || opts.StructuredStreamingFunc != nil {
-			response, err = m.handleStreaming(ctx, config, messages, opts.StreamingFunc, opts.StructuredStreamingFunc, jsParser, &structuredContentBuilder, start, &hasRecordedFirstToken)
-		} else {
-			response, err = m.client.Models.GenerateContent(ctx, m.model, messages, config)
-		}
-
-		if err != nil {
-			if metrics := GetMetrics(ctx); metrics != nil {
-				metrics.RecordFailure(m.statsModel, collector)
-			}
-
-			var apiErr *genai.APIError
-			if errors.As(err, &apiErr) {
-				if isUnavailableStatusCode(apiErr.Code) {
-					m.metrics.RecordCallDuration(ctx, GenAISystemGoogle, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeUnavailable)
-					return nil, errors.Mark(errors.Wrap(err, "Google model unavailable"), ErrModelUnavailable)
-				}
-
-				m.logger.Error("Google API error", slog.Any("error", err), slog.Any("messages", messages))
-			}
-
-			m.metrics.RecordCallDuration(ctx, GenAISystemGoogle, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeInternal)
-			return nil, err
-		}
-
-		// Record metrics
-		if response.UsageMetadata != nil {
-			collector.Counter("input_tokens").Add(int(response.UsageMetadata.PromptTokenCount))
-			collector.Counter("output_tokens").Add(int(response.UsageMetadata.CandidatesTokenCount))
-			collector.Counter("cached_read_tokens").Add(int(response.UsageMetadata.CachedContentTokenCount))
-			if response.UsageMetadata.ThoughtsTokenCount > 0 {
-				collector.Counter("thinking_tokens").Add(int(response.UsageMetadata.ThoughtsTokenCount))
-			}
-
-			// Update execution tracker with token counts
-			tracker.AddTokens(
-				int64(response.UsageMetadata.PromptTokenCount),
-				int64(response.UsageMetadata.CandidatesTokenCount),
-				int64(response.UsageMetadata.CachedContentTokenCount),
-			)
-
-			m.metrics.RecordCall(
-				ctx,
-				GenAISystemGoogle, GenAIOperationChat, GenAIModel(m.model),
-				int64(response.UsageMetadata.PromptTokenCount),
-				int64(response.UsageMetadata.CandidatesTokenCount),
-				int64(response.UsageMetadata.CachedContentTokenCount),
-				0,
-			)
-		}
-
-		// Check for function calls
-		functionCalls := response.FunctionCalls()
-		if len(functionCalls) == 0 {
-			// Emit a final MessageEnd to signal that the agentic loop is done
-			if opts.StreamingFunc != nil {
-				if emitErr := opts.StreamingFunc(ctx, StreamingEventMessageEnd{Final: true}); emitErr != nil {
-					return nil, emitErr
-				}
-			}
-
-			if metrics := GetMetrics(ctx); metrics != nil {
-				metrics.RecordSuccess(m.statsModel, collector)
-			}
-			m.metrics.RecordCallDuration(ctx, GenAISystemGoogle, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeNoError)
-			finishReason := response.Candidates[0].FinishReason
-			if finishReason != genai.FinishReasonStop {
-				m.logger.Warn("Google API returned a non-stop finish reason", slog.String("finish_reason", string(finishReason)))
-			}
-
-			// Return structured result if ResponseSchema was set
-			if opts.ResponseSchema != nil {
-				content := m.extractText(response)
-				if jsParser != nil {
-					// Use the accumulated content from structured streaming
-					content = structuredContentBuilder.String()
-				}
-				result, err := opts.ResponseSchema.ParseInto([]byte(content))
-				if err != nil {
-					return nil, errors.WithDetail(
-						errors.Wrap(err, "structured output parsing failed"),
-						content,
-					)
-				}
-				return result.(Result), nil
-			}
-
-			return TextResult{Text: m.extractText(response)}, nil
-		}
-
-		// Emit an intermediate MessageEnd to signal that this is not the final reply
-		if opts.StreamingFunc != nil {
-			if emitErr := opts.StreamingFunc(ctx, StreamingEventMessageEnd{Final: false}); emitErr != nil {
-				return nil, emitErr
-			}
-		}
-
-		// Add assistant response to messages
-		assistantMsg := &genai.Content{
-			Role: genai.RoleModel,
-		}
-		if len(response.Candidates) > 0 {
-			for _, p := range response.Candidates[0].Content.Parts {
-				if !m.isPartEmpty(p) {
-					assistantMsg.Parts = append(assistantMsg.Parts, p)
-				}
-			}
-		}
-
-		if len(assistantMsg.Parts) > 0 {
-			messages = append(messages, assistantMsg)
-		}
-
-		// Execute function calls in parallel
-		toolResultChan := make(chan toolResult, len(functionCalls))
-		for _, fc := range functionCalls {
-			tool, ok := toolMap[fc.Name]
-			if !ok {
-				toolResultChan <- toolResult{
-					id:           fc.ID,
-					functionName: fc.Name,
-					errorString:  "Requested tool not found",
-				}
-				continue
-			}
-
-			go func(fc *genai.FunctionCall, tool ToolDef) {
-				argsBytes, _ := json.Marshal(fc.Args)
-				result, err := doToolCall(ctx, m.logger, opts.StreamingFunc, opts.ToolCallTimeout, fc.ID, tool, string(argsBytes))
-				if err != nil {
-					toolResultChan <- toolResult{
-						id:           fc.ID,
-						functionName: fc.Name,
-						errorString:  "Tool call failed",
-					}
-				} else {
-					toolResultChan <- toolResult{
-						id:           fc.ID,
-						functionName: fc.Name,
-						results:      result,
-					}
-				}
-			}(fc, tool)
-		}
-
-		// Collect tool results and add them to the conversation
-		toolResultsMsg := &genai.Content{
-			Role: genai.RoleUser,
-		}
-		for range len(functionCalls) {
-			select {
-			case tr := <-toolResultChan:
-				responseMap := make(map[string]any)
-				if tr.errorString != "" {
-					responseMap["error"] = tr.errorString
-				} else {
-					responseMap["output"] = tr.results
-				}
-
-				toolResultsMsg.Parts = append(toolResultsMsg.Parts, &genai.Part{
-					FunctionResponse: &genai.FunctionResponse{
-						Name:     tr.functionName,
-						ID:       tr.id,
-						Response: responseMap,
-					},
-				})
-			case <-ctx.Done():
-				if metrics := GetMetrics(ctx); metrics != nil {
-					metrics.RecordFailure(m.statsModel, collector)
-				}
-				m.metrics.RecordCallDuration(ctx, GenAISystemGoogle, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeInternal)
-				return nil, ctx.Err()
-			}
-		}
-		messages = append(messages, toolResultsMsg)
-
-		// Record metrics for this call to the LLM as a success
-		if metrics := GetMetrics(ctx); metrics != nil {
-			metrics.RecordSuccess(m.statsModel, collector)
-		}
-
-		m.metrics.RecordCallDuration(ctx, GenAISystemGoogle, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeNoError)
-
-		// Continue the conversation loop
+	turn := &googleTurn{
+		m:        m,
+		opts:     opts,
+		config:   config,
+		messages: messages,
+		jsParser: jsParser,
 	}
+
+	return newSession(turn, newTracker(opts), toolMap, opts, m.logger), nil
 }
 
 func (m *googleModel) handleStreaming(
@@ -510,6 +294,11 @@ func (m *googleModel) convertMessages(messages []*Message) ([]*genai.Content, er
 		for _, part := range message.Parts {
 			var p *genai.Part
 			switch part := part.(type) {
+			case *ThinkingPart:
+				p = &genai.Part{
+					Text:    part.Text,
+					Thought: true,
+				}
 			case *TextPart:
 				p = &genai.Part{
 					Text: part.Text,
@@ -526,6 +315,34 @@ func (m *googleModel) convertMessages(messages []*Message) ([]*genai.Content, er
 				p = &genai.Part{
 					FileData: &genai.FileData{
 						FileURI: part.URL,
+					},
+				}
+			case *ToolCallPart:
+				var args map[string]any
+				if part.Arguments != "" {
+					if err := json.Unmarshal([]byte(part.Arguments), &args); err != nil {
+						return nil, errors.Wrapf(err, "invalid tool call arguments for %s", part.Name)
+					}
+				}
+				p = &genai.Part{
+					FunctionCall: &genai.FunctionCall{
+						ID:   part.ID,
+						Name: part.Name,
+						Args: args,
+					},
+				}
+			case *ToolResultPart:
+				responseMap := make(map[string]any)
+				if part.Error != "" {
+					responseMap["error"] = part.Error
+				} else {
+					responseMap["output"] = part.Text
+				}
+				p = &genai.Part{
+					FunctionResponse: &genai.FunctionResponse{
+						ID:       part.ID,
+						Name:     part.Name,
+						Response: responseMap,
 					},
 				}
 			}
@@ -584,4 +401,224 @@ func (m *googleModel) convertTools(tools []ToolDef) ([]*genai.Tool, map[string]T
 		result = append(result, tool)
 	}
 	return result, toolMap
+}
+
+// googleTurn is the Google-specific Turn. It owns the native []*genai.Content
+// history; stream-merge and empty-part handling stay in
+// googleModel.handleStreaming and are never exposed through neutral types.
+type googleTurn struct {
+	m    *googleModel
+	opts *generateContentOptions
+
+	config   *genai.GenerateContentConfig
+	messages []*genai.Content
+
+	jsParser                 *jsonstream.Parser
+	structuredContentBuilder strings.Builder
+
+	pending []*Message
+
+	started   bool
+	callCount int
+	finalText string
+
+	// lastResponse is stashed by Next for Observe to derive the native
+	// assistant message parts.
+	lastResponse *genai.GenerateContentResponse
+}
+
+func (t *googleTurn) Inject(msgs ...*Message) {
+	t.pending = append(t.pending, msgs...)
+}
+
+func (t *googleTurn) FinalText() string {
+	return t.finalText
+}
+
+func (t *googleTurn) Observe(ctx context.Context, _ TurnOutput, outcomes []ToolOutcome) error {
+	resp := t.lastResponse
+
+	assistantMsg := &genai.Content{Role: genai.RoleModel}
+	if resp != nil && len(resp.Candidates) > 0 && resp.Candidates[0].Content != nil {
+		for _, p := range resp.Candidates[0].Content.Parts {
+			if !t.m.isPartEmpty(p) {
+				assistantMsg.Parts = append(assistantMsg.Parts, p)
+			}
+		}
+	}
+	if len(assistantMsg.Parts) > 0 {
+		t.messages = append(t.messages, assistantMsg)
+	}
+
+	return t.ObserveToolResults(ctx, nil, outcomes)
+}
+
+// ObserveToolResults appends only the function-response message, used when
+// the assistant message is already in native history (reconstructed turn).
+func (t *googleTurn) ObserveToolResults(_ context.Context, _ []ToolCall, outcomes []ToolOutcome) error {
+	toolResultsMsg := &genai.Content{Role: genai.RoleUser}
+	for _, o := range outcomes {
+		responseMap := make(map[string]any)
+		if o.Error != "" {
+			responseMap["error"] = o.Error
+		} else {
+			responseMap["output"] = o.Text
+		}
+		toolResultsMsg.Parts = append(toolResultsMsg.Parts, &genai.Part{
+			FunctionResponse: &genai.FunctionResponse{
+				Name:     o.Name,
+				ID:       o.ID,
+				Response: responseMap,
+			},
+		})
+	}
+	t.messages = append(t.messages, toolResultsMsg)
+	return nil
+}
+
+func (t *googleTurn) Next(ctx context.Context) (TurnOutput, error) {
+	m := t.m
+
+	if !t.started {
+		m.metrics.RecordGenerateRequest(ctx, GenAISystemGoogle, GenAIOperationChat, GenAIModel(m.model))
+		t.started = true
+	}
+
+	if len(t.pending) > 0 {
+		conv, err := m.convertMessages(t.pending)
+		if err != nil {
+			return TurnOutput{}, err
+		}
+		t.messages = append(t.messages, conv...)
+		t.pending = nil
+	}
+
+	t.callCount++
+	start := time.Now()
+	hasRecordedFirstToken := false
+
+	collector := NewCollector()
+	collector.Counter("calls").Add(1)
+	if t.callCount == 1 {
+		collector.Counter("requests").Add(1)
+	}
+
+	var response *genai.GenerateContentResponse
+	var err error
+
+	if t.opts.StreamingFunc != nil || t.opts.StructuredStreamingFunc != nil {
+		response, err = m.handleStreaming(ctx, t.config, t.messages, t.opts.StreamingFunc, t.opts.StructuredStreamingFunc, t.jsParser, &t.structuredContentBuilder, start, &hasRecordedFirstToken)
+	} else {
+		response, err = m.client.Models.GenerateContent(ctx, m.model, t.messages, t.config)
+	}
+
+	if err != nil {
+		if metrics := GetMetrics(ctx); metrics != nil {
+			metrics.RecordFailure(m.statsModel, collector)
+		}
+
+		var apiErr *genai.APIError
+		if errors.As(err, &apiErr) {
+			if isUnavailableStatusCode(apiErr.Code) {
+				m.metrics.RecordCallDuration(ctx, GenAISystemGoogle, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeUnavailable)
+				return TurnOutput{}, errors.Mark(errors.Wrap(err, "Google model unavailable"), ErrModelUnavailable)
+			}
+
+			m.logger.Error("Google API error", slog.Any("error", err), slog.Any("messages", t.messages))
+		}
+
+		m.metrics.RecordCallDuration(ctx, GenAISystemGoogle, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeInternal)
+		return TurnOutput{}, err
+	}
+
+	var usage TurnUsage
+	if response.UsageMetadata != nil {
+		collector.Counter("input_tokens").Add(int(response.UsageMetadata.PromptTokenCount))
+		collector.Counter("output_tokens").Add(int(response.UsageMetadata.CandidatesTokenCount))
+		collector.Counter("cached_read_tokens").Add(int(response.UsageMetadata.CachedContentTokenCount))
+		if response.UsageMetadata.ThoughtsTokenCount > 0 {
+			collector.Counter("thinking_tokens").Add(int(response.UsageMetadata.ThoughtsTokenCount))
+		}
+
+		usage = TurnUsage{
+			InputTokens:      int64(response.UsageMetadata.PromptTokenCount),
+			OutputTokens:     int64(response.UsageMetadata.CandidatesTokenCount),
+			CachedReadTokens: int64(response.UsageMetadata.CachedContentTokenCount),
+			ThinkingTokens:   int64(response.UsageMetadata.ThoughtsTokenCount),
+		}
+
+		m.metrics.RecordCall(
+			ctx,
+			GenAISystemGoogle, GenAIOperationChat, GenAIModel(m.model),
+			int64(response.UsageMetadata.PromptTokenCount),
+			int64(response.UsageMetadata.CandidatesTokenCount),
+			int64(response.UsageMetadata.CachedContentTokenCount),
+			0,
+		)
+	}
+
+	t.lastResponse = response
+	functionCalls := response.FunctionCalls()
+
+	toolCalls := make([]ToolCall, 0, len(functionCalls))
+	for _, fc := range functionCalls {
+		argsBytes, _ := json.Marshal(fc.Args)
+		toolCalls = append(toolCalls, ToolCall{
+			ID:        fc.ID,
+			Name:      fc.Name,
+			Arguments: string(argsBytes),
+		})
+	}
+
+	var thinking []ThinkingBlock
+	if len(response.Candidates) > 0 && response.Candidates[0].Content != nil {
+		for _, p := range response.Candidates[0].Content.Parts {
+			if p.Thought && p.Text != "" {
+				// The vendored genai SDK exposes no thought-signature field,
+				// so Google thinking round-trips text only.
+				thinking = append(thinking, ThinkingBlock{Text: p.Text})
+			}
+		}
+	}
+
+	rawText := m.extractText(response)
+	t.finalText = rawText
+	if t.jsParser != nil {
+		t.finalText = t.structuredContentBuilder.String()
+	}
+
+	var finishReason genai.FinishReason
+	if len(response.Candidates) > 0 {
+		finishReason = response.Candidates[0].FinishReason
+	}
+	if len(functionCalls) == 0 && finishReason != genai.FinishReasonStop {
+		m.logger.Warn("Google API returned a non-stop finish reason", slog.String("finish_reason", string(finishReason)))
+	}
+
+	if metrics := GetMetrics(ctx); metrics != nil {
+		metrics.RecordSuccess(m.statsModel, collector)
+	}
+	m.metrics.RecordCallDuration(ctx, GenAISystemGoogle, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeNoError)
+
+	return TurnOutput{
+		Text:       rawText,
+		Thinking:   thinking,
+		ToolCalls:  toolCalls,
+		StopReason: googleStopReason(finishReason, len(functionCalls) > 0),
+		Usage:      usage,
+	}, nil
+}
+
+func googleStopReason(reason genai.FinishReason, hasToolCalls bool) StopReason {
+	if hasToolCalls {
+		return StopReasonToolUse
+	}
+	switch reason {
+	case genai.FinishReasonMaxTokens:
+		return StopReasonMaxTokens
+	case genai.FinishReasonSafety, genai.FinishReasonProhibitedContent, genai.FinishReasonBlocklist:
+		return StopReasonRefusal
+	default:
+		return StopReasonEndTurn
+	}
 }

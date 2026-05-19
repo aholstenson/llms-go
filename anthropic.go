@@ -94,6 +94,14 @@ func betaMessageToParam(msg *anthropic.BetaMessage) anthropic.BetaMessageParam {
 }
 
 func (m *anthropicModel) GenerateContent(ctx context.Context, options ...GenerateOption) (Result, error) {
+	s, err := m.newSession(options...)
+	if err != nil {
+		return nil, err
+	}
+	return runSession(ctx, s)
+}
+
+func (m *anthropicModel) newSession(options ...GenerateOption) (*Session, error) {
 	opts := resolveGenerateContentOptions(m.subParserRegistry, options...)
 
 	// Gate request parameters against the model's known capabilities.
@@ -181,266 +189,19 @@ func (m *anthropicModel) GenerateContent(ctx context.Context, options ...Generat
 		params.OutputFormat = anthropic.BetaJSONOutputFormatParam{Schema: rawJSON}
 	}
 
-	// Record a request to the LLM as we begin to generate content
-	m.metrics.RecordGenerateRequest(ctx, GenAISystemAnthropic, GenAIOperationChat, GenAIModel(m.model))
-
-	maxSteps := opts.MaxSteps
-	if maxSteps == 0 {
-		maxSteps = 10
-	}
-
-	// Create and inject execution tracker
-	tracker := NewExecutionTracker(maxSteps)
-	ctx = WithExecutionContext(ctx, tracker)
-
-	// Set up structured streaming parser if configured
 	var jsParser *jsonstream.Parser
-	var structuredContentBuilder strings.Builder
 	if opts.StructuredStreamingFunc != nil && opts.StructuredStreamingSchema != nil {
 		jsParser = jsonstream.New(opts.StructuredStreamingSchema)
 	}
 
-	steps := 0
-	for {
-		if ctx.Err() != nil {
-			return nil, ctx.Err()
-		}
-
-		steps++
-		if steps >= maxSteps {
-			return nil, errors.New("max steps reached")
-		}
-
-		// Update execution tracker
-		tracker.IncrementStep()
-
-		start := time.Now()
-
-		// Each iteration which calls the LLM starts with fresh stats
-		collector := NewCollector()
-		collector.Counter("calls").Add(1)
-		if steps == 1 {
-			// If this is the first step, record a request
-			collector.Counter("requests").Add(1)
-		}
-
-		var response *anthropic.BetaMessage
-		var err error
-
-		if opts.StreamingFunc != nil {
-			if emitErr := opts.StreamingFunc(ctx, StreamingEventMessageStart{}); emitErr != nil {
-				return nil, emitErr
-			}
-		}
-
-		func() {
-			ctx, cancel := context.WithTimeout(ctx, 120*time.Second)
-			defer cancel()
-
-			if opts.StreamingFunc != nil || opts.StructuredStreamingFunc != nil {
-				// Handle streaming
-				response, err = m.handleStreaming(ctx, params, opts.StreamingFunc, opts.StructuredStreamingFunc, jsParser, &structuredContentBuilder)
-			} else {
-				// Handle non-streaming
-				response, err = m.client.Beta.Messages.New(ctx, params,
-					option.WithHeader("anthropic-beta", "structured-outputs-2025-11-13"),
-				)
-			}
-		}()
-
-		anthropicError := &anthropic.Error{}
-		if errors.As(err, &anthropicError) {
-			if metrics := GetMetrics(ctx); metrics != nil {
-				metrics.RecordFailure(m.statsModel, collector)
-			}
-
-			if isUnavailableStatusCode(anthropicError.StatusCode) {
-				m.metrics.RecordCallDuration(ctx, GenAISystemAnthropic, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeUnavailable)
-				return nil, errors.Mark(errors.Wrap(err, "Anthropic model unavailable"), ErrModelUnavailable)
-			}
-
-			m.metrics.RecordCallDuration(ctx, GenAISystemAnthropic, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeInternal)
-			return nil, errors.Wrap(err, "error from Anthropic")
-		} else if err != nil {
-			if metrics := GetMetrics(ctx); metrics != nil {
-				metrics.RecordFailure(m.statsModel, collector)
-			}
-			m.metrics.RecordCallDuration(ctx, GenAISystemAnthropic, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeInternal)
-			return nil, err
-		}
-
-		// Check for tool calls
-		var toolCalls []anthropic.BetaToolUseBlock
-		textContent := ""
-
-		for _, block := range response.Content {
-			switch blockType := block.AsAny().(type) {
-			case anthropic.BetaTextBlock:
-				textContent += blockType.Text
-			case anthropic.BetaToolUseBlock:
-				toolCalls = append(toolCalls, blockType)
-			}
-		}
-
-		collector.Counter("input_tokens").Add(int(response.Usage.InputTokens))
-		collector.Counter("output_tokens").Add(int(response.Usage.OutputTokens))
-		collector.Counter("cached_read_tokens").Add(int(response.Usage.CacheReadInputTokens))
-		collector.Counter("cached_write_tokens").Add(int(response.Usage.CacheCreationInputTokens))
-
-		// Update execution tracker with token counts
-		tracker.AddTokens(
-			response.Usage.InputTokens,
-			response.Usage.OutputTokens,
-			response.Usage.CacheReadInputTokens,
-		)
-
-		m.metrics.RecordCall(ctx,
-			GenAISystemAnthropic, GenAIOperationChat, GenAIModel(m.model),
-			response.Usage.InputTokens,
-			response.Usage.OutputTokens,
-			response.Usage.CacheReadInputTokens,
-			response.Usage.CacheCreationInputTokens,
-		)
-
-		// If no tool calls, return the text content
-		if len(toolCalls) == 0 {
-			// Emit a final MessageEnd to signal that the agentic loop is done
-			if opts.StreamingFunc != nil {
-				if emitErr := opts.StreamingFunc(ctx, StreamingEventMessageEnd{Final: true}); emitErr != nil {
-					return nil, emitErr
-				}
-			}
-
-			if metrics := GetMetrics(ctx); metrics != nil {
-				metrics.RecordSuccess(m.statsModel, collector)
-			}
-			m.metrics.RecordCallDuration(ctx, GenAISystemAnthropic, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeNoError)
-
-			// Return structured result if ResponseSchema was set
-			if opts.ResponseSchema != nil {
-				content := textContent
-				if jsParser != nil {
-					// Use the accumulated content from structured streaming
-					content = structuredContentBuilder.String()
-				}
-				result, err := opts.ResponseSchema.ParseInto([]byte(content))
-				if err != nil {
-					return nil, errors.WithDetail(
-						errors.Wrap(err, "structured output parsing failed"),
-						content,
-					)
-				}
-				return result.(Result), nil
-			}
-
-			return TextResult{Text: textContent}, nil
-		}
-
-		// Emit an intermediate MessageEnd to signal that this is not the final reply
-		if opts.StreamingFunc != nil {
-			if emitErr := opts.StreamingFunc(ctx, StreamingEventMessageEnd{Final: false}); emitErr != nil {
-				return nil, emitErr
-			}
-		}
-
-		// Add assistant message to conversation
-		params.Messages = append(params.Messages, betaMessageToParam(response))
-
-		// Execute tool calls in parallel
-		toolResultChan := make(chan toolResult, len(toolCalls))
-		for _, toolCall := range toolCalls {
-			matchedTool, ok := toolMap[toolCall.Name]
-			if !ok {
-				toolResultChan <- toolResult{
-					id:           toolCall.ID,
-					functionName: toolCall.Name,
-					errorString:  "Requested tool not found",
-				}
-				continue
-			}
-
-			go func(call anthropic.BetaToolUseBlock) {
-				// Convert input to JSON string for doToolCall
-				inputBytes, _ := json.Marshal(call.Input)
-				result, err := doToolCall(ctx, m.logger, opts.StreamingFunc, opts.ToolCallTimeout, call.ID, matchedTool, string(inputBytes))
-				if err != nil {
-					toolResultChan <- toolResult{
-						id:           call.ID,
-						functionName: call.Name,
-						errorString:  "Tool call failed",
-					}
-				} else {
-					toolResultChan <- toolResult{
-						id:           call.ID,
-						functionName: call.Name,
-						results:      result,
-					}
-				}
-			}(toolCall)
-		}
-
-		// Clear cache control values on old tool call messages
-		for i := 0; i < len(params.Messages); i++ {
-			content := params.Messages[i].Content
-			for _, contentBlock := range content {
-				if contentBlock.OfToolResult != nil {
-					// Clear cache control by setting to zero value
-					contentBlock.OfToolResult.CacheControl = anthropic.BetaCacheControlEphemeralParam{}
-				}
-			}
-		}
-
-		// Collect tool results and add them to the conversation
-		var toolResultsContent []anthropic.BetaContentBlockParamUnion
-		for i := 0; i < len(toolCalls); i++ {
-			select {
-			case toolResult := <-toolResultChan:
-				result := ""
-				if toolResult.errorString != "" {
-					result = toolResult.errorString
-				} else {
-					result = toolResult.results
-				}
-
-				cacheControl := anthropic.BetaCacheControlEphemeralParam{}
-				if i == len(toolCalls)-1 {
-					cacheControl = anthropic.NewBetaCacheControlEphemeralParam()
-				}
-
-				block := anthropic.BetaContentBlockParamUnion{
-					OfToolResult: &anthropic.BetaToolResultBlockParam{
-						ToolUseID: toolResult.id,
-						Content: []anthropic.BetaToolResultBlockParamContentUnion{
-							{OfText: &anthropic.BetaTextBlockParam{Text: result}},
-						},
-						IsError:      anthropic.Bool(false),
-						CacheControl: cacheControl,
-					},
-				}
-
-				toolResultsContent = append(toolResultsContent, block)
-			case <-ctx.Done():
-				if metrics := GetMetrics(ctx); metrics != nil {
-					metrics.RecordFailure(m.statsModel, collector)
-				}
-
-				m.metrics.RecordCallDuration(ctx, GenAISystemAnthropic, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeInternal)
-				return nil, ctx.Err()
-			}
-		}
-
-		// Add tool results message to conversation
-		params.Messages = append(params.Messages, newBetaUserMessage(toolResultsContent...))
-
-		// Record metrics for this call to the LLM as a success
-		if metrics := GetMetrics(ctx); metrics != nil {
-			metrics.RecordSuccess(m.statsModel, collector)
-		}
-
-		m.metrics.RecordCallDuration(ctx, GenAISystemAnthropic, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeNoError)
-
-		// Continue the conversation loop
+	turn := &anthropicTurn{
+		m:        m,
+		opts:     opts,
+		params:   params,
+		jsParser: jsParser,
 	}
+
+	return newSession(turn, newTracker(opts), toolMap, opts, m.logger), nil
 }
 
 func (m *anthropicModel) handleStreaming(
@@ -691,6 +452,23 @@ func (m *anthropicModel) convertMessages(systemPrompt string, messages []*Messag
 							},
 						},
 					})
+				case *ToolResultPart:
+					// Replayed tool result. The live cache breakpoint on the
+					// latest tool_result is owned by anthropicTurn.Observe; do
+					// not stamp cache_control here.
+					result := content.Text
+					if content.Error != "" {
+						result = content.Error
+					}
+					contentParts = append(contentParts, anthropic.BetaContentBlockParamUnion{
+						OfToolResult: &anthropic.BetaToolResultBlockParam{
+							ToolUseID: content.ID,
+							Content: []anthropic.BetaToolResultBlockParamContentUnion{
+								{OfText: &anthropic.BetaTextBlockParam{Text: result}},
+							},
+							IsError: anthropic.Bool(content.Error != ""),
+						},
+					})
 				default:
 					return nil, "", errors.Newf("unsupported part type for Anthropic: %T", part)
 				}
@@ -699,18 +477,58 @@ func (m *anthropicModel) convertMessages(systemPrompt string, messages []*Messag
 			msgParam = newBetaUserMessage(contentParts...)
 
 		case RoleAssistant:
-			content := ""
+			var contentParts []anthropic.BetaContentBlockParamUnion
+			// Anthropic requires thinking blocks first in the assistant turn;
+			// assistantMessage already prepends them, but iterate them first
+			// here too so any caller-built transcript stays valid.
 			for _, part := range msg.Parts {
-				if textPart, ok := part.(*TextPart); ok {
-					content += textPart.Text
+				tp, ok := part.(*ThinkingPart)
+				if !ok {
+					continue
+				}
+				if tp.Redacted {
+					contentParts = append(contentParts, anthropic.BetaContentBlockParamUnion{
+						OfRedactedThinking: &anthropic.BetaRedactedThinkingBlockParam{Data: tp.Data},
+					})
+				} else {
+					contentParts = append(contentParts, anthropic.BetaContentBlockParamUnion{
+						OfThinking: &anthropic.BetaThinkingBlockParam{
+							Signature: tp.Signature,
+							Thinking:  tp.Text,
+						},
+					})
 				}
 			}
 
-			msgParam = newBetaAssistantMessage(anthropic.BetaContentBlockParamUnion{
-				OfText: &anthropic.BetaTextBlockParam{
-					Text: content,
-				},
-			})
+			for _, part := range msg.Parts {
+				switch content := part.(type) {
+				case *ThinkingPart:
+					// Handled above so it precedes text/tool_use.
+					continue
+				case *TextPart:
+					contentParts = append(contentParts, anthropic.BetaContentBlockParamUnion{
+						OfText: &anthropic.BetaTextBlockParam{Text: content.Text},
+					})
+				case *ToolCallPart:
+					var input any
+					if content.Arguments != "" {
+						if err := json.Unmarshal([]byte(content.Arguments), &input); err != nil {
+							return nil, "", errors.Wrapf(err, "invalid tool call arguments for %s", content.Name)
+						}
+					}
+					contentParts = append(contentParts, anthropic.BetaContentBlockParamUnion{
+						OfToolUse: &anthropic.BetaToolUseBlockParam{
+							ID:    content.ID,
+							Name:  content.Name,
+							Input: input,
+						},
+					})
+				default:
+					return nil, "", errors.Newf("unsupported assistant part type for Anthropic: %T", part)
+				}
+			}
+
+			msgParam = newBetaAssistantMessage(contentParts...)
 
 		default:
 			return nil, "", errors.Newf("unsupported message role for Anthropic: %s", msg.Role)
@@ -760,4 +578,264 @@ func (m *anthropicModel) convertTools(tools []ToolDef) ([]anthropic.BetaToolUnio
 	}
 
 	return result, toolMap
+}
+
+// anthropicTurn is the Anthropic-specific Turn. The cache-control bookkeeping
+// lives provider-local in Observe and operates on the native history, which is
+// the request's only source of truth; the neutral transcript never feeds it.
+type anthropicTurn struct {
+	m    *anthropicModel
+	opts *generateContentOptions
+
+	params anthropic.BetaMessageNewParams
+
+	jsParser                 *jsonstream.Parser
+	structuredContentBuilder strings.Builder
+
+	pending []*Message
+
+	started   bool
+	callCount int
+	finalText string
+
+	// response is stashed by Next for Observe to append natively.
+	response *anthropic.BetaMessage
+}
+
+func (t *anthropicTurn) Inject(msgs ...*Message) {
+	t.pending = append(t.pending, msgs...)
+}
+
+func (t *anthropicTurn) FinalText() string {
+	return t.finalText
+}
+
+// Observe appends the assistant message and the tool results, then applies
+// Anthropic's cache-control rule: only the last tool_result block carries
+// CacheControl, so any earlier tool_result blocks are cleared first.
+func (t *anthropicTurn) Observe(ctx context.Context, _ TurnOutput, outcomes []ToolOutcome) error {
+	// Add assistant message to conversation
+	t.params.Messages = append(t.params.Messages, betaMessageToParam(t.response))
+	return t.ObserveToolResults(ctx, nil, outcomes)
+}
+
+// ObserveToolResults folds tool outcomes into native history without
+// appending an assistant message. Used on a reconstructed turn where the
+// assistant message is already present (rebuilt by convertMessages).
+func (t *anthropicTurn) ObserveToolResults(_ context.Context, _ []ToolCall, outcomes []ToolOutcome) error {
+	// Clear cache control values on old tool call messages
+	for i := 0; i < len(t.params.Messages); i++ {
+		content := t.params.Messages[i].Content
+		for _, contentBlock := range content {
+			if contentBlock.OfToolResult != nil {
+				// Clear cache control by setting to zero value
+				contentBlock.OfToolResult.CacheControl = anthropic.BetaCacheControlEphemeralParam{}
+			}
+		}
+	}
+
+	// Collect tool results and add them to the conversation
+	var toolResultsContent []anthropic.BetaContentBlockParamUnion
+	for i, o := range outcomes {
+		result := o.Text
+		if o.Error != "" {
+			result = o.Error
+		}
+
+		cacheControl := anthropic.BetaCacheControlEphemeralParam{}
+		if i == len(outcomes)-1 {
+			cacheControl = anthropic.NewBetaCacheControlEphemeralParam()
+		}
+
+		toolResultsContent = append(toolResultsContent, anthropic.BetaContentBlockParamUnion{
+			OfToolResult: &anthropic.BetaToolResultBlockParam{
+				ToolUseID: o.ID,
+				Content: []anthropic.BetaToolResultBlockParamContentUnion{
+					{OfText: &anthropic.BetaTextBlockParam{Text: result}},
+				},
+				IsError:      anthropic.Bool(false),
+				CacheControl: cacheControl,
+			},
+		})
+	}
+
+	t.params.Messages = append(t.params.Messages, newBetaUserMessage(toolResultsContent...))
+	return nil
+}
+
+func (t *anthropicTurn) Next(ctx context.Context) (TurnOutput, error) {
+	m := t.m
+
+	if !t.started {
+		m.metrics.RecordGenerateRequest(ctx, GenAISystemAnthropic, GenAIOperationChat, GenAIModel(m.model))
+		t.started = true
+	}
+
+	if len(t.pending) > 0 {
+		conv, _, err := m.convertMessages("", t.pending)
+		if err != nil {
+			return TurnOutput{}, err
+		}
+		// convertMessages stamps cache_control on the last text part of its
+		// last message. Injected messages are not a cache prefix boundary:
+		// leaving it would add a breakpoint per Inject and blow past
+		// Anthropic's 4-block cache_control limit. The cache breakpoints
+		// (system, tools, original user text, latest tool_result) are owned
+		// by convertMessages/convertTools and Observe.
+		clearAnthropicCacheControl(conv)
+		t.params.Messages = append(t.params.Messages, conv...)
+		t.pending = nil
+	}
+
+	t.callCount++
+	start := time.Now()
+
+	collector := NewCollector()
+	collector.Counter("calls").Add(1)
+	if t.callCount == 1 {
+		collector.Counter("requests").Add(1)
+	}
+
+	var response *anthropic.BetaMessage
+	var err error
+
+	func() {
+		ctx, cancel := context.WithTimeout(ctx, 120*time.Second)
+		defer cancel()
+
+		if t.opts.StreamingFunc != nil || t.opts.StructuredStreamingFunc != nil {
+			response, err = m.handleStreaming(ctx, t.params, t.opts.StreamingFunc, t.opts.StructuredStreamingFunc, t.jsParser, &t.structuredContentBuilder)
+		} else {
+			response, err = m.client.Beta.Messages.New(ctx, t.params,
+				option.WithHeader("anthropic-beta", "structured-outputs-2025-11-13"),
+			)
+		}
+	}()
+
+	anthropicError := &anthropic.Error{}
+	if errors.As(err, &anthropicError) {
+		if metrics := GetMetrics(ctx); metrics != nil {
+			metrics.RecordFailure(m.statsModel, collector)
+		}
+
+		if isUnavailableStatusCode(anthropicError.StatusCode) {
+			m.metrics.RecordCallDuration(ctx, GenAISystemAnthropic, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeUnavailable)
+			return TurnOutput{}, errors.Mark(errors.Wrap(err, "Anthropic model unavailable"), ErrModelUnavailable)
+		}
+
+		m.metrics.RecordCallDuration(ctx, GenAISystemAnthropic, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeInternal)
+		return TurnOutput{}, errors.Wrap(err, "error from Anthropic")
+	} else if err != nil {
+		if metrics := GetMetrics(ctx); metrics != nil {
+			metrics.RecordFailure(m.statsModel, collector)
+		}
+		m.metrics.RecordCallDuration(ctx, GenAISystemAnthropic, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeInternal)
+		return TurnOutput{}, err
+	}
+
+	var toolUseBlocks []anthropic.BetaToolUseBlock
+	var thinking []ThinkingBlock
+	textContent := ""
+	// response is the accumulated BetaMessage for both the streaming and
+	// non-streaming paths (message.Accumulate folds signature deltas into the
+	// thinking block), so a single walk recovers signed thinking either way.
+	for _, block := range response.Content {
+		switch blockType := block.AsAny().(type) {
+		case anthropic.BetaTextBlock:
+			textContent += blockType.Text
+		case anthropic.BetaToolUseBlock:
+			toolUseBlocks = append(toolUseBlocks, blockType)
+		case anthropic.BetaThinkingBlock:
+			thinking = append(thinking, ThinkingBlock{
+				Text:      blockType.Thinking,
+				Signature: blockType.Signature,
+			})
+		case anthropic.BetaRedactedThinkingBlock:
+			thinking = append(thinking, ThinkingBlock{
+				Redacted: true,
+				Data:     blockType.Data,
+			})
+		}
+	}
+
+	collector.Counter("input_tokens").Add(int(response.Usage.InputTokens))
+	collector.Counter("output_tokens").Add(int(response.Usage.OutputTokens))
+	collector.Counter("cached_read_tokens").Add(int(response.Usage.CacheReadInputTokens))
+	collector.Counter("cached_write_tokens").Add(int(response.Usage.CacheCreationInputTokens))
+
+	m.metrics.RecordCall(ctx,
+		GenAISystemAnthropic, GenAIOperationChat, GenAIModel(m.model),
+		response.Usage.InputTokens,
+		response.Usage.OutputTokens,
+		response.Usage.CacheReadInputTokens,
+		response.Usage.CacheCreationInputTokens,
+	)
+
+	t.response = response
+
+	toolCalls := make([]ToolCall, 0, len(toolUseBlocks))
+	for _, b := range toolUseBlocks {
+		inputBytes, _ := json.Marshal(b.Input)
+		toolCalls = append(toolCalls, ToolCall{
+			ID:        b.ID,
+			Name:      b.Name,
+			Arguments: string(inputBytes),
+		})
+	}
+
+	content := textContent
+	if t.jsParser != nil {
+		content = t.structuredContentBuilder.String()
+	}
+	t.finalText = content
+
+	if metrics := GetMetrics(ctx); metrics != nil {
+		metrics.RecordSuccess(m.statsModel, collector)
+	}
+	m.metrics.RecordCallDuration(ctx, GenAISystemAnthropic, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeNoError)
+
+	return TurnOutput{
+		Text:       textContent,
+		Thinking:   thinking,
+		ToolCalls:  toolCalls,
+		StopReason: anthropicStopReason(string(response.StopReason), len(toolCalls) > 0),
+		Usage: TurnUsage{
+			InputTokens:       response.Usage.InputTokens,
+			OutputTokens:      response.Usage.OutputTokens,
+			CachedReadTokens:  response.Usage.CacheReadInputTokens,
+			CachedWriteTokens: response.Usage.CacheCreationInputTokens,
+		},
+	}, nil
+}
+
+// clearAnthropicCacheControl zeroes any cache_control set by convertMessages
+// on the given messages. Used for injected messages so they do not consume a
+// cache_control breakpoint (Anthropic permits at most 4).
+func clearAnthropicCacheControl(msgs []anthropic.BetaMessageParam) {
+	for _, msg := range msgs {
+		for _, block := range msg.Content {
+			if block.OfText != nil {
+				block.OfText.CacheControl = anthropic.BetaCacheControlEphemeralParam{}
+			}
+			if block.OfToolResult != nil {
+				block.OfToolResult.CacheControl = anthropic.BetaCacheControlEphemeralParam{}
+			}
+		}
+	}
+}
+
+func anthropicStopReason(reason string, hasToolCalls bool) StopReason {
+	if hasToolCalls {
+		return StopReasonToolUse
+	}
+	switch reason {
+	case "tool_use":
+		return StopReasonToolUse
+	case "max_tokens":
+		return StopReasonMaxTokens
+	case "refusal":
+		return StopReasonRefusal
+	default:
+		return StopReasonEndTurn
+	}
 }

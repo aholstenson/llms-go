@@ -61,6 +61,14 @@ func NewOpenRouterModel(logger *slog.Logger, metrics *Metrics, apiKey string, mo
 }
 
 func (m *openaiModel) GenerateContent(ctx context.Context, options ...GenerateOption) (Result, error) {
+	s, err := m.newSession(options...)
+	if err != nil {
+		return nil, err
+	}
+	return runSession(ctx, s)
+}
+
+func (m *openaiModel) newSession(options ...GenerateOption) (*Session, error) {
 	opts := resolveGenerateContentOptions(m.subParserRegistry, options...)
 
 	// Gate request parameters against the model's known capabilities.
@@ -139,336 +147,19 @@ func (m *openaiModel) GenerateContent(ctx context.Context, options ...GenerateOp
 		}
 	}
 
-	maxSteps := opts.MaxSteps
-	if maxSteps == 0 {
-		maxSteps = 10
-	}
-
-	// Create and inject execution tracker
-	tracker := NewExecutionTracker(maxSteps)
-	ctx = WithExecutionContext(ctx, tracker)
-
-	// Set up custom streaming handler
-	var streamHandler StreamingFunc
-	if opts.StreamingFunc != nil {
-		streamHandler = opts.StreamingFunc
-	} else {
-		// No-op handler when streaming is not requested
-		streamHandler = func(_ context.Context, _ StreamingEvent) error {
-			return nil
-		}
-	}
-
-	// Set up structured streaming parser if configured
 	var jsParser *jsonstream.Parser
-	var structuredContentBuilder strings.Builder
 	if opts.StructuredStreamingFunc != nil && opts.StructuredStreamingSchema != nil {
 		jsParser = jsonstream.New(opts.StructuredStreamingSchema)
 	}
 
-	// Record a request to the LLM as we begin to generate content
-	m.metrics.RecordGenerateRequest(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model))
-
-	streamHasErrored := false
-	steps := 0
-	for {
-		if ctx.Err() != nil {
-			return nil, ctx.Err()
-		}
-
-		steps++
-		if steps >= maxSteps {
-			return nil, errors.New("max steps reached")
-		}
-
-		// Update execution tracker
-		tracker.IncrementStep()
-
-		start := time.Now()
-		hasRecordedFirstToken := false
-
-		// Each iteration which calls the LLM starts with fresh stats
-		collector := NewCollector()
-		collector.Counter("calls").Add(1)
-		if steps == 1 {
-			// If this is the first step, record a request
-			collector.Counter("requests").Add(1)
-		}
-
-		if opts.StreamingFunc != nil {
-			if emitErr := opts.StreamingFunc(ctx, StreamingEventMessageStart{}); emitErr != nil {
-				return nil, emitErr
-			}
-		}
-
-		// Use the accumulator to collect streaming responses
-		stream := m.client.Chat.Completions.NewStreaming(ctx, params)
-		acc := openai.ChatCompletionAccumulator{}
-
-		toolCalls := 0
-		toolResultChan := make(chan toolResult)
-		for stream.Next() {
-			chunk := stream.Current()
-			acc.AddChunk(chunk)
-
-			// When this fires, the current chunk value will not contain content data
-			if _, ok := acc.JustFinishedContent(); ok { //nolint:staticcheck
-				// TODO: Handle content stream finished
-			}
-
-			if _, ok := acc.JustFinishedRefusal(); ok { //nolint:staticcheck
-				// TODO: Decide on how to handle refusals
-			}
-
-			if tool, ok := acc.JustFinishedToolCall(); ok {
-				matchedTool, ok := toolMap[tool.Name]
-				if !ok {
-					toolResultChan <- toolResult{
-						id:           tool.ID,
-						functionName: tool.Name,
-						errorString:  "Requested tool not found",
-					}
-					continue
-				}
-
-				toolCalls++
-				go func() {
-					result, err := doToolCall(ctx, m.logger, opts.StreamingFunc, opts.ToolCallTimeout, tool.ID, matchedTool, tool.Arguments)
-					if err != nil {
-						toolResultChan <- toolResult{
-							id:           tool.ID,
-							functionName: tool.Name,
-							errorString:  err.Error(),
-						}
-					} else {
-						toolResultChan <- toolResult{
-							id:           tool.ID,
-							functionName: tool.Name,
-							results:      result,
-						}
-					}
-				}()
-			}
-
-			// It's best to use chunks after handling JustFinished events.
-			// Here we print the delta of the content, if it exists.
-			if len(chunk.Choices) > 0 && chunk.Choices[0].Delta.Content != "" && !streamHasErrored {
-				if !hasRecordedFirstToken {
-					m.metrics.RecordTimeToFirstToken(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start))
-					hasRecordedFirstToken = true
-				}
-
-				content := chunk.Choices[0].Delta.Content
-
-				// Handle structured streaming if configured
-				if jsParser != nil && opts.StructuredStreamingFunc != nil {
-					structuredContentBuilder.WriteString(content)
-					events, err := jsParser.Feed(content)
-					if err != nil {
-						m.logger.Error("Error parsing structured JSON stream", slog.Any("error", err))
-					} else {
-						for _, event := range events {
-							if err := opts.StructuredStreamingFunc(ctx, event); err != nil {
-								m.logger.Error("Error handling structured streaming event", slog.Any("error", err))
-								streamHasErrored = true
-								break
-							}
-						}
-					}
-				}
-
-				err := streamHandler(ctx, StreamingEventTextChunk{Text: content})
-				if err != nil {
-					m.logger.Error("Error handling OpenAI response", slog.Any("error", err))
-					streamHasErrored = true
-
-					// Close the stream and break out of the loop
-					err = stream.Close()
-					if err != nil {
-						m.logger.Warn("Error closing OpenAI stream", slog.Any("error", err))
-					}
-					break
-				}
-			}
-		}
-
-		// Make sure to close the stream after we're done with it
-		err := stream.Close()
-		if err != nil {
-			m.logger.Warn("Error closing OpenAI stream", slog.Any("error", err))
-		}
-
-		// Accumulate stats for this call
-		promptTokens := acc.Usage.PromptTokens
-		cachedTokens := acc.Usage.PromptTokensDetails.CachedTokens
-		collector.Counter("input_tokens").Add(int(promptTokens))
-		collector.Counter("output_tokens").Add(int(acc.Usage.CompletionTokens))
-		collector.Counter("cached_read_tokens").Add(int(cachedTokens))
-
-		// Update execution tracker with token counts
-		tracker.AddTokens(
-			promptTokens,
-			acc.Usage.CompletionTokens,
-			cachedTokens,
-		)
-
-		m.metrics.RecordCall(
-			ctx,
-			GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model),
-			promptTokens,
-			acc.Usage.CompletionTokens,
-			cachedTokens,
-			0,
-		)
-
-		// Flush the jsonstream parser if we were using structured streaming
-		if jsParser != nil && opts.StructuredStreamingFunc != nil {
-			events, err := jsParser.Flush()
-			if err != nil {
-				m.logger.Error("Error flushing structured JSON stream", slog.Any("error", err))
-			} else {
-				for _, event := range events {
-					if err := opts.StructuredStreamingFunc(ctx, event); err != nil {
-						m.logger.Error("Error handling structured streaming event", slog.Any("error", err))
-						break
-					}
-				}
-			}
-		}
-
-		if streamHasErrored {
-			// The stream handling has failed, record metrics and return
-			if metrics := GetMetrics(ctx); metrics != nil {
-				metrics.RecordFailure(m.statsModel, collector)
-			}
-
-			m.metrics.RecordCallDuration(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeStreamProcessing)
-			return nil, errors.New("stream handling failed")
-		} else if stream.Err() != nil {
-			if metrics := GetMetrics(ctx); metrics != nil {
-				metrics.RecordFailure(m.statsModel, collector)
-			}
-
-			openaiError := &openai.Error{}
-			if errors.As(stream.Err(), &openaiError) && isUnavailableStatusCode(openaiError.StatusCode) {
-				m.metrics.RecordCallDuration(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeUnavailable)
-				return nil, errors.Mark(errors.Wrap(stream.Err(), "OpenAI model unavailable"), ErrModelUnavailable)
-			}
-
-			m.metrics.RecordCallDuration(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeInternal)
-			return nil, errors.Wrap(stream.Err(), "got error from OpenAI while streaming")
-		}
-
-		// Get complete response from accumulator
-		if len(acc.Choices) == 0 {
-			// Record metrics for this call to the LLM as a failure
-			if metrics := GetMetrics(ctx); metrics != nil {
-				metrics.RecordFailure(m.statsModel, collector)
-			}
-
-			m.metrics.RecordCallDuration(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeEmptyResponse)
-			return nil, errors.New("no completion choices returned")
-		}
-
-		choice := acc.Choices[0]
-
-		// Tool calls are executed early so to continue our loop with their
-		// results collect them and add them to the conversation history.
-		if len(choice.Message.ToolCalls) > 0 {
-			// Emit an intermediate MessageEnd to signal that this is not the final reply
-			if opts.StreamingFunc != nil {
-				if emitErr := opts.StreamingFunc(ctx, StreamingEventMessageEnd{Final: false}); emitErr != nil {
-					return nil, emitErr
-				}
-			}
-			// Tool calls sometimes return empty IDs, so we filter those out
-			// or this will wait forever for a call that never happened
-			var n int
-			actualToolCalls := make([]openai.ChatCompletionMessageToolCall, 0, len(choice.Message.ToolCalls))
-			for _, toolCall := range choice.Message.ToolCalls {
-				if toolCall.ID == "" {
-					continue
-				}
-
-				actualToolCalls = append(actualToolCalls, toolCall)
-				n++
-			}
-
-			choice.Message.ToolCalls = actualToolCalls
-			params.Messages = append(params.Messages, choice.Message.ToParam())
-
-			// Wait for all tool calls to complete
-			for i := 0; i < n; i++ {
-				select {
-				case toolResult := <-toolResultChan:
-					result := ""
-					if toolResult.errorString != "" {
-						result = toolResult.errorString
-					} else {
-						result = toolResult.results
-					}
-
-					params.Messages = append(params.Messages, openai.ChatCompletionMessageParamUnion{
-						OfTool: &openai.ChatCompletionToolMessageParam{
-							Content: openai.ChatCompletionToolMessageParamContentUnion{
-								OfString: openai.String(result),
-							},
-							ToolCallID: toolResult.id,
-						},
-					})
-				case <-ctx.Done():
-					// Record metrics for this call to the LLM as a failure
-					if metrics := GetMetrics(ctx); metrics != nil {
-						metrics.RecordFailure(m.statsModel, collector)
-					}
-
-					return nil, ctx.Err()
-				}
-			}
-
-			// Record metrics for this call to the LLM as a success
-			if metrics := GetMetrics(ctx); metrics != nil {
-				metrics.RecordSuccess(m.statsModel, collector)
-			}
-
-			// Continue conversation with tool results
-			m.metrics.RecordCallDuration(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeNoError)
-			continue
-		}
-
-		// Emit a final MessageEnd to signal that the agentic loop is done
-		if opts.StreamingFunc != nil {
-			if emitErr := opts.StreamingFunc(ctx, StreamingEventMessageEnd{Final: true}); emitErr != nil {
-				return nil, emitErr
-			}
-		}
-
-		// LLM call loop is done, record metrics for this call to the LLM as a success
-		if metrics := GetMetrics(ctx); metrics != nil {
-			metrics.RecordSuccess(m.statsModel, collector)
-		}
-
-		m.metrics.RecordCallDuration(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeNoError)
-
-		// Return structured result if ResponseSchema was set
-		if opts.ResponseSchema != nil {
-			content := choice.Message.Content
-			if jsParser != nil {
-				// Use the accumulated content from structured streaming
-				content = structuredContentBuilder.String()
-			}
-			result, err := opts.ResponseSchema.ParseInto([]byte(content))
-			if err != nil {
-				return nil, errors.WithDetail(
-					errors.Wrap(err, "structured output parsing failed"),
-					content,
-				)
-			}
-			return result.(Result), nil
-		}
-
-		return TextResult{Text: choice.Message.Content}, nil
+	turn := &openaiTurn{
+		m:        m,
+		opts:     opts,
+		params:   params,
+		jsParser: jsParser,
 	}
+
+	return newSession(turn, newTracker(opts), toolMap, opts, m.logger), nil
 }
 
 func (m *openaiModel) convertMessages(systemPrompt string, messages []*Message) ([]openai.ChatCompletionMessageParamUnion, error) {
@@ -486,6 +177,30 @@ func (m *openaiModel) convertMessages(systemPrompt string, messages []*Message) 
 			// Handle user message
 			if len(msg.Parts) == 0 {
 				return nil, errors.New("user message has no parts")
+			}
+
+			// Tool-result messages map to OpenAI's separate tool role, one
+			// message per result, rather than parts of a user message.
+			if _, isToolResult := msg.Parts[0].(*ToolResultPart); isToolResult {
+				for _, part := range msg.Parts {
+					trp, ok := part.(*ToolResultPart)
+					if !ok {
+						return nil, errors.Newf("cannot mix tool-result and %T parts for OpenAI", part)
+					}
+					text := trp.Text
+					if trp.Error != "" {
+						text = trp.Error
+					}
+					result = append(result, openai.ChatCompletionMessageParamUnion{
+						OfTool: &openai.ChatCompletionToolMessageParam{
+							Content: openai.ChatCompletionToolMessageParamContentUnion{
+								OfString: openai.String(text),
+							},
+							ToolCallID: trp.ID,
+						},
+					})
+				}
+				continue
 			}
 
 			// Check if we have a single text part or multiple parts
@@ -526,13 +241,38 @@ func (m *openaiModel) convertMessages(systemPrompt string, messages []*Message) 
 
 		case RoleAssistant:
 			content := ""
+			var toolCalls []openai.ChatCompletionMessageToolCall
 			for _, part := range msg.Parts {
-				if textPart, ok := part.(*TextPart); ok {
-					content += textPart.Text
+				switch p := part.(type) {
+				case *ThinkingPart:
+					// OpenAI has no reasoning replay; skip silently.
+					continue
+				case *TextPart:
+					content += p.Text
+				case *ToolCallPart:
+					toolCalls = append(toolCalls, openai.ChatCompletionMessageToolCall{
+						ID: p.ID,
+						Function: openai.ChatCompletionMessageToolCallFunction{
+							Name:      p.Name,
+							Arguments: p.Arguments,
+						},
+					})
+				default:
+					return nil, errors.Newf("unsupported assistant part type for OpenAI: %T", part)
 				}
 			}
 
-			result = append(result, openai.AssistantMessage(content))
+			if len(toolCalls) > 0 {
+				// Mirror anthropicTurn/openaiTurn.Observe: build the native
+				// assistant message via ChatCompletionMessage.ToParam so the
+				// tool_calls round-trip exactly as the SDK expects.
+				result = append(result, openai.ChatCompletionMessage{
+					Content:   content,
+					ToolCalls: toolCalls,
+				}.ToParam())
+			} else {
+				result = append(result, openai.AssistantMessage(content))
+			}
 
 		default:
 			return nil, errors.Newf("unsupported message role for OpenAI: %s", msg.Role)
@@ -582,4 +322,274 @@ func (m *openaiModel) convertTools(tools []ToolDef) ([]openai.ChatCompletionTool
 	}
 
 	return result, toolMap, nil
+}
+
+// openaiTurn is the OpenAI-specific Turn: it owns the native
+// ChatCompletionNewParams history so the agentic loop never round-trips
+// through neutral types.
+type openaiTurn struct {
+	m    *openaiModel
+	opts *generateContentOptions
+
+	params openai.ChatCompletionNewParams
+
+	jsParser                 *jsonstream.Parser
+	structuredContentBuilder strings.Builder
+
+	pending []*Message
+
+	started   bool
+	callCount int
+	finalText string
+
+	// assistantMsg is the most recent assistant message (with empty-ID tool
+	// calls filtered out), stashed by Next for Observe to append natively.
+	assistantMsg openai.ChatCompletionMessage
+}
+
+func (t *openaiTurn) Inject(msgs ...*Message) {
+	t.pending = append(t.pending, msgs...)
+}
+
+func (t *openaiTurn) FinalText() string {
+	return t.finalText
+}
+
+func (t *openaiTurn) Observe(ctx context.Context, _ TurnOutput, outcomes []ToolOutcome) error {
+	t.params.Messages = append(t.params.Messages, t.assistantMsg.ToParam())
+	return t.ObserveToolResults(ctx, nil, outcomes)
+}
+
+// ObserveToolResults appends only the tool-result messages, used when the
+// assistant message is already in native history (reconstructed turn).
+func (t *openaiTurn) ObserveToolResults(_ context.Context, _ []ToolCall, outcomes []ToolOutcome) error {
+	for _, o := range outcomes {
+		result := o.Text
+		if o.Error != "" {
+			result = o.Error
+		}
+		t.params.Messages = append(t.params.Messages, openai.ChatCompletionMessageParamUnion{
+			OfTool: &openai.ChatCompletionToolMessageParam{
+				Content: openai.ChatCompletionToolMessageParamContentUnion{
+					OfString: openai.String(result),
+				},
+				ToolCallID: o.ID,
+			},
+		})
+	}
+	return nil
+}
+
+func (t *openaiTurn) Next(ctx context.Context) (TurnOutput, error) {
+	m := t.m
+
+	if !t.started {
+		m.metrics.RecordGenerateRequest(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model))
+		t.started = true
+	}
+
+	// Apply any caller-injected messages before this call.
+	if len(t.pending) > 0 {
+		conv, err := m.convertMessages("", t.pending)
+		if err != nil {
+			return TurnOutput{}, err
+		}
+		t.params.Messages = append(t.params.Messages, conv...)
+		t.pending = nil
+	}
+
+	t.callCount++
+	start := time.Now()
+	hasRecordedFirstToken := false
+
+	collector := NewCollector()
+	collector.Counter("calls").Add(1)
+	if t.callCount == 1 {
+		collector.Counter("requests").Add(1)
+	}
+
+	streamHasErrored := false
+
+	stream := m.client.Chat.Completions.NewStreaming(ctx, t.params)
+	acc := openai.ChatCompletionAccumulator{}
+
+	for stream.Next() {
+		chunk := stream.Current()
+		acc.AddChunk(chunk)
+
+		if _, ok := acc.JustFinishedContent(); ok { //nolint:staticcheck
+			// TODO: Handle content stream finished
+		}
+
+		if _, ok := acc.JustFinishedRefusal(); ok { //nolint:staticcheck
+			// TODO: Decide on how to handle refusals
+		}
+
+		if _, ok := acc.JustFinishedToolCall(); ok { //nolint:staticcheck
+			// Tool calls are collected from the accumulator after the stream
+			// completes; the Session drives execution.
+		}
+
+		if len(chunk.Choices) > 0 && chunk.Choices[0].Delta.Content != "" && !streamHasErrored {
+			if !hasRecordedFirstToken {
+				m.metrics.RecordTimeToFirstToken(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start))
+				hasRecordedFirstToken = true
+			}
+
+			content := chunk.Choices[0].Delta.Content
+
+			if t.jsParser != nil && t.opts.StructuredStreamingFunc != nil {
+				t.structuredContentBuilder.WriteString(content)
+				events, err := t.jsParser.Feed(content)
+				if err != nil {
+					m.logger.Error("Error parsing structured JSON stream", slog.Any("error", err))
+				} else {
+					for _, event := range events {
+						if err := t.opts.StructuredStreamingFunc(ctx, event); err != nil {
+							m.logger.Error("Error handling structured streaming event", slog.Any("error", err))
+							streamHasErrored = true
+							break
+						}
+					}
+				}
+			}
+
+			if t.opts.StreamingFunc != nil {
+				if err := t.opts.StreamingFunc(ctx, StreamingEventTextChunk{Text: content}); err != nil {
+					m.logger.Error("Error handling OpenAI response", slog.Any("error", err))
+					streamHasErrored = true
+					if cerr := stream.Close(); cerr != nil {
+						m.logger.Warn("Error closing OpenAI stream", slog.Any("error", cerr))
+					}
+					break
+				}
+			}
+		}
+	}
+
+	if err := stream.Close(); err != nil {
+		m.logger.Warn("Error closing OpenAI stream", slog.Any("error", err))
+	}
+
+	promptTokens := acc.Usage.PromptTokens
+	cachedTokens := acc.Usage.PromptTokensDetails.CachedTokens
+	collector.Counter("input_tokens").Add(int(promptTokens))
+	collector.Counter("output_tokens").Add(int(acc.Usage.CompletionTokens))
+	collector.Counter("cached_read_tokens").Add(int(cachedTokens))
+
+	m.metrics.RecordCall(
+		ctx,
+		GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model),
+		promptTokens,
+		acc.Usage.CompletionTokens,
+		cachedTokens,
+		0,
+	)
+
+	if t.jsParser != nil && t.opts.StructuredStreamingFunc != nil {
+		events, err := t.jsParser.Flush()
+		if err != nil {
+			m.logger.Error("Error flushing structured JSON stream", slog.Any("error", err))
+		} else {
+			for _, event := range events {
+				if err := t.opts.StructuredStreamingFunc(ctx, event); err != nil {
+					m.logger.Error("Error handling structured streaming event", slog.Any("error", err))
+					break
+				}
+			}
+		}
+	}
+
+	if streamHasErrored {
+		if metrics := GetMetrics(ctx); metrics != nil {
+			metrics.RecordFailure(m.statsModel, collector)
+		}
+		m.metrics.RecordCallDuration(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeStreamProcessing)
+		return TurnOutput{}, errors.New("stream handling failed")
+	} else if stream.Err() != nil {
+		if metrics := GetMetrics(ctx); metrics != nil {
+			metrics.RecordFailure(m.statsModel, collector)
+		}
+
+		openaiError := &openai.Error{}
+		if errors.As(stream.Err(), &openaiError) && isUnavailableStatusCode(openaiError.StatusCode) {
+			m.metrics.RecordCallDuration(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeUnavailable)
+			return TurnOutput{}, errors.Mark(errors.Wrap(stream.Err(), "OpenAI model unavailable"), ErrModelUnavailable)
+		}
+
+		m.metrics.RecordCallDuration(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeInternal)
+		return TurnOutput{}, errors.Wrap(stream.Err(), "got error from OpenAI while streaming")
+	}
+
+	if len(acc.Choices) == 0 {
+		if metrics := GetMetrics(ctx); metrics != nil {
+			metrics.RecordFailure(m.statsModel, collector)
+		}
+		m.metrics.RecordCallDuration(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeEmptyResponse)
+		return TurnOutput{}, errors.New("no completion choices returned")
+	}
+
+	choice := acc.Choices[0]
+
+	// Tool calls sometimes return empty IDs; filter those out or the loop
+	// would wait forever for a call that never happened.
+	actualToolCalls := make([]openai.ChatCompletionMessageToolCall, 0, len(choice.Message.ToolCalls))
+	for _, tc := range choice.Message.ToolCalls {
+		if tc.ID == "" {
+			continue
+		}
+		actualToolCalls = append(actualToolCalls, tc)
+	}
+	choice.Message.ToolCalls = actualToolCalls
+	t.assistantMsg = choice.Message
+
+	toolCalls := make([]ToolCall, 0, len(actualToolCalls))
+	for _, tc := range actualToolCalls {
+		toolCalls = append(toolCalls, ToolCall{
+			ID:        tc.ID,
+			Name:      tc.Function.Name,
+			Arguments: tc.Function.Arguments,
+		})
+	}
+
+	content := choice.Message.Content
+	if t.jsParser != nil {
+		content = t.structuredContentBuilder.String()
+	}
+	t.finalText = content
+
+	// This per-call accounting succeeded; record duration + success here so
+	// metrics stay provider-local. Token rollup to the execution tracker is
+	// done by the Session from TurnOutput.Usage.
+	if metrics := GetMetrics(ctx); metrics != nil {
+		metrics.RecordSuccess(m.statsModel, collector)
+	}
+	m.metrics.RecordCallDuration(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeNoError)
+
+	return TurnOutput{
+		Text:       choice.Message.Content,
+		ToolCalls:  toolCalls,
+		StopReason: openaiStopReason(choice.FinishReason, len(toolCalls) > 0),
+		Usage: TurnUsage{
+			InputTokens:      promptTokens,
+			OutputTokens:     acc.Usage.CompletionTokens,
+			CachedReadTokens: cachedTokens,
+		},
+	}, nil
+}
+
+func openaiStopReason(finishReason string, hasToolCalls bool) StopReason {
+	if hasToolCalls {
+		return StopReasonToolUse
+	}
+	switch finishReason {
+	case "tool_calls":
+		return StopReasonToolUse
+	case "length":
+		return StopReasonMaxTokens
+	case "content_filter":
+		return StopReasonRefusal
+	default:
+		return StopReasonEndTurn
+	}
 }

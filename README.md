@@ -80,6 +80,7 @@ Runnable programs live in [`examples/`](./examples):
 | [`examples/streaming`](./examples/streaming) | Streaming text and thinking tokens |
 | [`examples/structured`](./examples/structured) | Typed structured output via generics |
 | [`examples/tools`](./examples/tools) | Defining a tool and running an agentic loop |
+| [`examples/agent`](./examples/agent) | Multi-step tool calling with execution control |
 
 Each example reads the model name from `LLM_EXAMPLE_MODEL` (defaulting to
 `anthropic/claude-sonnet-4-5`) and the matching provider token from the
