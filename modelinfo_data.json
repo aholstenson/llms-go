@@ -1,0 +1,10977 @@
+{
+  "anthropic/claude-3-5-haiku-20241022": {
+    "c": {
+      "i": 0.8,
+      "o": 4,
+      "r": 0.08,
+      "w": 1
+    },
+    "l": {
+      "c": 200000,
+      "o": 8192
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "claude-haiku",
+    "k": "2024-07-31",
+    "rd": "2024-10-22"
+  },
+  "anthropic/claude-3-5-haiku-latest": {
+    "c": {
+      "i": 0.8,
+      "o": 4,
+      "r": 0.08,
+      "w": 1
+    },
+    "l": {
+      "c": 200000,
+      "o": 8192
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "claude-haiku",
+    "k": "2024-07-31",
+    "rd": "2024-10-22"
+  },
+  "anthropic/claude-3-5-sonnet-20240620": {
+    "c": {
+      "i": 3,
+      "o": 15,
+      "r": 0.3,
+      "w": 3.75
+    },
+    "l": {
+      "c": 200000,
+      "o": 8192
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "claude-sonnet",
+    "k": "2024-04-30",
+    "rd": "2024-06-20"
+  },
+  "anthropic/claude-3-5-sonnet-20241022": {
+    "c": {
+      "i": 3,
+      "o": 15,
+      "r": 0.3,
+      "w": 3.75
+    },
+    "l": {
+      "c": 200000,
+      "o": 8192
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "claude-sonnet",
+    "k": "2024-04-30",
+    "rd": "2024-10-22"
+  },
+  "anthropic/claude-3-7-sonnet-20250219": {
+    "c": {
+      "i": 3,
+      "o": 15,
+      "r": 0.3,
+      "w": 3.75
+    },
+    "l": {
+      "c": 200000,
+      "o": 64000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "claude-sonnet",
+    "k": "2024-10-31",
+    "rd": "2025-02-19"
+  },
+  "anthropic/claude-3-haiku-20240307": {
+    "c": {
+      "i": 0.25,
+      "o": 1.25,
+      "r": 0.03,
+      "w": 0.3
+    },
+    "l": {
+      "c": 200000,
+      "o": 4096
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "claude-haiku",
+    "k": "2023-08-31",
+    "rd": "2024-03-13"
+  },
+  "anthropic/claude-3-opus-20240229": {
+    "c": {
+      "i": 15,
+      "o": 75,
+      "r": 1.5,
+      "w": 18.75
+    },
+    "l": {
+      "c": 200000,
+      "o": 4096
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "claude-opus",
+    "k": "2023-08-31",
+    "rd": "2024-02-29"
+  },
+  "anthropic/claude-3-sonnet-20240229": {
+    "c": {
+      "i": 3,
+      "o": 15,
+      "r": 0.3,
+      "w": 0.3
+    },
+    "l": {
+      "c": 200000,
+      "o": 4096
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "claude-sonnet",
+    "k": "2023-08-31",
+    "rd": "2024-03-04"
+  },
+  "anthropic/claude-haiku-4-5": {
+    "c": {
+      "i": 1,
+      "o": 5,
+      "r": 0.1,
+      "w": 1.25
+    },
+    "l": {
+      "c": 200000,
+      "o": 64000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "claude-haiku",
+    "k": "2025-02-28",
+    "rd": "2025-10-15"
+  },
+  "anthropic/claude-haiku-4-5-20251001": {
+    "c": {
+      "i": 1,
+      "o": 5,
+      "r": 0.1,
+      "w": 1.25
+    },
+    "l": {
+      "c": 200000,
+      "o": 64000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "claude-haiku",
+    "k": "2025-02-28",
+    "rd": "2025-10-15"
+  },
+  "anthropic/claude-opus-4-0": {
+    "c": {
+      "i": 15,
+      "o": 75,
+      "r": 1.5,
+      "w": 18.75
+    },
+    "l": {
+      "c": 200000,
+      "o": 32000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "claude-opus",
+    "k": "2025-03-31",
+    "rd": "2025-05-22"
+  },
+  "anthropic/claude-opus-4-1": {
+    "c": {
+      "i": 15,
+      "o": 75,
+      "r": 1.5,
+      "w": 18.75
+    },
+    "l": {
+      "c": 200000,
+      "o": 32000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "claude-opus",
+    "k": "2025-03-31",
+    "rd": "2025-08-05"
+  },
+  "anthropic/claude-opus-4-1-20250805": {
+    "c": {
+      "i": 15,
+      "o": 75,
+      "r": 1.5,
+      "w": 18.75
+    },
+    "l": {
+      "c": 200000,
+      "o": 32000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "claude-opus",
+    "k": "2025-03-31",
+    "rd": "2025-08-05"
+  },
+  "anthropic/claude-opus-4-20250514": {
+    "c": {
+      "i": 15,
+      "o": 75,
+      "r": 1.5,
+      "w": 18.75
+    },
+    "l": {
+      "c": 200000,
+      "o": 32000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "claude-opus",
+    "k": "2025-03-31",
+    "rd": "2025-05-22"
+  },
+  "anthropic/claude-opus-4-5": {
+    "c": {
+      "i": 5,
+      "o": 25,
+      "r": 0.5,
+      "w": 6.25
+    },
+    "l": {
+      "c": 200000,
+      "o": 64000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "claude-opus",
+    "k": "2025-03-31",
+    "rd": "2025-11-24"
+  },
+  "anthropic/claude-opus-4-5-20251101": {
+    "c": {
+      "i": 5,
+      "o": 25,
+      "r": 0.5,
+      "w": 6.25
+    },
+    "l": {
+      "c": 200000,
+      "o": 64000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "claude-opus",
+    "k": "2025-03-31",
+    "rd": "2025-11-01"
+  },
+  "anthropic/claude-opus-4-6": {
+    "c": {
+      "i": 5,
+      "o": 25,
+      "r": 0.5,
+      "w": 6.25
+    },
+    "l": {
+      "c": 1000000,
+      "o": 128000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "claude-opus",
+    "k": "2025-05-31",
+    "rd": "2026-02-05"
+  },
+  "anthropic/claude-opus-4-7": {
+    "c": {
+      "i": 5,
+      "o": 25,
+      "r": 0.5,
+      "w": 6.25
+    },
+    "l": {
+      "c": 1000000,
+      "o": 128000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "claude-opus",
+    "k": "2026-01-31",
+    "rd": "2026-04-16"
+  },
+  "anthropic/claude-sonnet-4-0": {
+    "c": {
+      "i": 3,
+      "o": 15,
+      "r": 0.3,
+      "w": 3.75
+    },
+    "l": {
+      "c": 200000,
+      "o": 64000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "claude-sonnet",
+    "k": "2025-03-31",
+    "rd": "2025-05-22"
+  },
+  "anthropic/claude-sonnet-4-20250514": {
+    "c": {
+      "i": 3,
+      "o": 15,
+      "r": 0.3,
+      "w": 3.75
+    },
+    "l": {
+      "c": 200000,
+      "o": 64000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "claude-sonnet",
+    "k": "2025-03-31",
+    "rd": "2025-05-22"
+  },
+  "anthropic/claude-sonnet-4-5": {
+    "c": {
+      "i": 3,
+      "o": 15,
+      "r": 0.3,
+      "w": 3.75
+    },
+    "l": {
+      "c": 200000,
+      "o": 64000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "claude-sonnet",
+    "k": "2025-07-31",
+    "rd": "2025-09-29"
+  },
+  "anthropic/claude-sonnet-4-5-20250929": {
+    "c": {
+      "i": 3,
+      "o": 15,
+      "r": 0.3,
+      "w": 3.75
+    },
+    "l": {
+      "c": 200000,
+      "o": 64000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "claude-sonnet",
+    "k": "2025-07-31",
+    "rd": "2025-09-29"
+  },
+  "anthropic/claude-sonnet-4-6": {
+    "c": {
+      "i": 3,
+      "o": 15,
+      "r": 0.3,
+      "w": 3.75
+    },
+    "l": {
+      "c": 1000000,
+      "o": 64000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "claude-sonnet",
+    "k": "2025-08-31",
+    "rd": "2026-02-17"
+  },
+  "google/gemini-1.5-flash": {
+    "c": {
+      "i": 0.075,
+      "o": 0.3,
+      "r": 0.01875
+    },
+    "l": {
+      "c": 1000000,
+      "o": 8192
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "audio",
+      "video"
+    ],
+    "fam": "gemini-flash",
+    "k": "2024-04",
+    "rd": "2024-05-14"
+  },
+  "google/gemini-1.5-flash-8b": {
+    "c": {
+      "i": 0.0375,
+      "o": 0.15,
+      "r": 0.01
+    },
+    "l": {
+      "c": 1000000,
+      "o": 8192
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "audio",
+      "video"
+    ],
+    "fam": "gemini-flash",
+    "k": "2024-04",
+    "rd": "2024-10-03"
+  },
+  "google/gemini-1.5-pro": {
+    "c": {
+      "i": 1.25,
+      "o": 5,
+      "r": 0.3125
+    },
+    "l": {
+      "c": 1000000,
+      "o": 8192
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "audio",
+      "video"
+    ],
+    "fam": "gemini-pro",
+    "k": "2024-04",
+    "rd": "2024-02-15"
+  },
+  "google/gemini-2.0-flash": {
+    "c": {
+      "i": 0.1,
+      "o": 0.4,
+      "r": 0.025
+    },
+    "l": {
+      "c": 1048576,
+      "o": 8192
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "audio",
+      "video",
+      "pdf"
+    ],
+    "fam": "gemini-flash",
+    "k": "2024-06",
+    "rd": "2024-12-11"
+  },
+  "google/gemini-2.0-flash-lite": {
+    "c": {
+      "i": 0.075,
+      "o": 0.3
+    },
+    "l": {
+      "c": 1048576,
+      "o": 8192
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "audio",
+      "video",
+      "pdf"
+    ],
+    "fam": "gemini-flash-lite",
+    "k": "2024-06",
+    "rd": "2024-12-11"
+  },
+  "google/gemini-2.5-flash": {
+    "c": {
+      "i": 0.3,
+      "o": 2.5,
+      "r": 0.03
+    },
+    "l": {
+      "c": 1048576,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "audio",
+      "video",
+      "pdf"
+    ],
+    "fam": "gemini-flash",
+    "k": "2025-01",
+    "rd": "2025-03-20"
+  },
+  "google/gemini-2.5-flash-image": {
+    "c": {
+      "i": 0.3,
+      "o": 30,
+      "r": 0.075
+    },
+    "l": {
+      "c": 32768,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": false,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "gemini-flash",
+    "k": "2025-06",
+    "rd": "2025-08-26"
+  },
+  "google/gemini-2.5-flash-image-preview": {
+    "c": {
+      "i": 0.3,
+      "o": 30,
+      "r": 0.075
+    },
+    "l": {
+      "c": 32768,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": false,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "gemini-flash",
+    "k": "2025-06",
+    "rd": "2025-08-26"
+  },
+  "google/gemini-2.5-flash-lite": {
+    "c": {
+      "i": 0.1,
+      "o": 0.4,
+      "r": 0.01
+    },
+    "l": {
+      "c": 1048576,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "audio",
+      "video",
+      "pdf"
+    ],
+    "fam": "gemini-flash-lite",
+    "k": "2025-01",
+    "rd": "2025-06-17"
+  },
+  "google/gemini-2.5-flash-lite-preview-06-17": {
+    "c": {
+      "i": 0.1,
+      "o": 0.4,
+      "r": 0.025
+    },
+    "l": {
+      "c": 1048576,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "audio",
+      "video",
+      "pdf"
+    ],
+    "fam": "gemini-flash-lite",
+    "k": "2025-01",
+    "rd": "2025-06-17"
+  },
+  "google/gemini-2.5-flash-lite-preview-09-2025": {
+    "c": {
+      "i": 0.1,
+      "o": 0.4,
+      "r": 0.025
+    },
+    "l": {
+      "c": 1048576,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "audio",
+      "video",
+      "pdf"
+    ],
+    "fam": "gemini-flash-lite",
+    "k": "2025-01",
+    "rd": "2025-09-25"
+  },
+  "google/gemini-2.5-flash-preview-04-17": {
+    "c": {
+      "i": 0.15,
+      "o": 0.6,
+      "r": 0.0375
+    },
+    "l": {
+      "c": 1048576,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "audio",
+      "video",
+      "pdf"
+    ],
+    "fam": "gemini-flash",
+    "k": "2025-01",
+    "rd": "2025-04-17"
+  },
+  "google/gemini-2.5-flash-preview-05-20": {
+    "c": {
+      "i": 0.15,
+      "o": 0.6,
+      "r": 0.0375
+    },
+    "l": {
+      "c": 1048576,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "audio",
+      "video",
+      "pdf"
+    ],
+    "fam": "gemini-flash",
+    "k": "2025-01",
+    "rd": "2025-05-20"
+  },
+  "google/gemini-2.5-flash-preview-09-2025": {
+    "c": {
+      "i": 0.3,
+      "o": 2.5,
+      "r": 0.075
+    },
+    "l": {
+      "c": 1048576,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "audio",
+      "video",
+      "pdf"
+    ],
+    "fam": "gemini-flash",
+    "k": "2025-01",
+    "rd": "2025-09-25"
+  },
+  "google/gemini-2.5-flash-preview-tts": {
+    "c": {
+      "i": 0.5,
+      "o": 10
+    },
+    "l": {
+      "c": 8000,
+      "o": 16000
+    },
+    "f": {
+      "t": false,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "gemini-flash",
+    "k": "2025-01",
+    "rd": "2025-05-01"
+  },
+  "google/gemini-2.5-pro": {
+    "c": {
+      "i": 1.25,
+      "o": 10,
+      "r": 0.125
+    },
+    "l": {
+      "c": 1048576,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "audio",
+      "video",
+      "pdf"
+    ],
+    "fam": "gemini-pro",
+    "k": "2025-01",
+    "rd": "2025-03-20"
+  },
+  "google/gemini-2.5-pro-preview-05-06": {
+    "c": {
+      "i": 1.25,
+      "o": 10,
+      "r": 0.31
+    },
+    "l": {
+      "c": 1048576,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "audio",
+      "video",
+      "pdf"
+    ],
+    "fam": "gemini-pro",
+    "k": "2025-01",
+    "rd": "2025-05-06"
+  },
+  "google/gemini-2.5-pro-preview-06-05": {
+    "c": {
+      "i": 1.25,
+      "o": 10,
+      "r": 0.31
+    },
+    "l": {
+      "c": 1048576,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "audio",
+      "video",
+      "pdf"
+    ],
+    "fam": "gemini-pro",
+    "k": "2025-01",
+    "rd": "2025-06-05"
+  },
+  "google/gemini-2.5-pro-preview-tts": {
+    "c": {
+      "i": 1,
+      "o": 20
+    },
+    "l": {
+      "c": 8000,
+      "o": 16000
+    },
+    "f": {
+      "t": false,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "gemini-flash",
+    "k": "2025-01",
+    "rd": "2025-05-01"
+  },
+  "google/gemini-3-flash-preview": {
+    "c": {
+      "i": 0.5,
+      "o": 3,
+      "r": 0.05
+    },
+    "l": {
+      "c": 1048576,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "video",
+      "audio",
+      "pdf"
+    ],
+    "fam": "gemini-flash",
+    "k": "2025-01",
+    "rd": "2025-12-17"
+  },
+  "google/gemini-3-pro-preview": {
+    "c": {
+      "i": 2,
+      "o": 12,
+      "r": 0.2
+    },
+    "l": {
+      "c": 1000000,
+      "o": 64000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "video",
+      "audio",
+      "pdf"
+    ],
+    "fam": "gemini-pro",
+    "k": "2025-01",
+    "rd": "2025-11-18"
+  },
+  "google/gemini-3.1-flash-image-preview": {
+    "c": {
+      "i": 0.5,
+      "o": 60
+    },
+    "l": {
+      "c": 131072,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": false,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "gemini-flash",
+    "k": "2025-01",
+    "rd": "2026-02-26"
+  },
+  "google/gemini-3.1-flash-lite": {
+    "c": {
+      "i": 0.25,
+      "o": 1.5,
+      "r": 0.025
+    },
+    "l": {
+      "c": 1048576,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "video",
+      "audio",
+      "pdf"
+    ],
+    "fam": "gemini-flash-lite",
+    "k": "2025-01",
+    "rd": "2026-05-07"
+  },
+  "google/gemini-3.1-flash-lite-preview": {
+    "c": {
+      "i": 0.25,
+      "o": 1.5,
+      "r": 0.025
+    },
+    "l": {
+      "c": 1048576,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "video",
+      "audio",
+      "pdf"
+    ],
+    "fam": "gemini-flash-lite",
+    "k": "2025-01",
+    "rd": "2026-03-03"
+  },
+  "google/gemini-3.1-pro-preview": {
+    "c": {
+      "i": 2,
+      "o": 12,
+      "r": 0.2
+    },
+    "l": {
+      "c": 1048576,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "video",
+      "audio",
+      "pdf"
+    ],
+    "fam": "gemini-pro",
+    "k": "2025-01",
+    "rd": "2026-02-19"
+  },
+  "google/gemini-3.1-pro-preview-customtools": {
+    "c": {
+      "i": 2,
+      "o": 12,
+      "r": 0.2
+    },
+    "l": {
+      "c": 1048576,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "video",
+      "audio",
+      "pdf"
+    ],
+    "fam": "gemini-pro",
+    "k": "2025-01",
+    "rd": "2026-02-19"
+  },
+  "google/gemini-embedding-001": {
+    "c": {
+      "i": 0.15,
+      "o": 0
+    },
+    "l": {
+      "c": 2048,
+      "o": 3072
+    },
+    "f": {
+      "t": false,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "gemini",
+    "k": "2025-05",
+    "rd": "2025-05-20"
+  },
+  "google/gemini-flash-latest": {
+    "c": {
+      "i": 0.3,
+      "o": 2.5,
+      "r": 0.075
+    },
+    "l": {
+      "c": 1048576,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "audio",
+      "video",
+      "pdf"
+    ],
+    "fam": "gemini-flash",
+    "k": "2025-01",
+    "rd": "2025-09-25"
+  },
+  "google/gemini-flash-lite-latest": {
+    "c": {
+      "i": 0.1,
+      "o": 0.4,
+      "r": 0.025
+    },
+    "l": {
+      "c": 1048576,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "audio",
+      "video",
+      "pdf"
+    ],
+    "fam": "gemini-flash-lite",
+    "k": "2025-01",
+    "rd": "2025-09-25"
+  },
+  "google/gemini-live-2.5-flash": {
+    "c": {
+      "i": 0.5,
+      "o": 2
+    },
+    "l": {
+      "c": 128000,
+      "o": 8000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "audio",
+      "video"
+    ],
+    "fam": "gemini-flash",
+    "k": "2025-01",
+    "rd": "2025-09-01"
+  },
+  "google/gemini-live-2.5-flash-preview-native-audio": {
+    "c": {
+      "i": 0.5,
+      "o": 2
+    },
+    "l": {
+      "c": 131072,
+      "o": 65536
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text",
+      "audio",
+      "video"
+    ],
+    "fam": "gemini-flash",
+    "k": "2025-01",
+    "rd": "2025-06-17"
+  },
+  "google/gemma-3-12b-it": {
+    "c": {
+      "i": 0,
+      "o": 0
+    },
+    "l": {
+      "c": 32768,
+      "o": 8192
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "gemma",
+    "k": "2024-10",
+    "rd": "2025-03-13"
+  },
+  "google/gemma-3-27b-it": {
+    "c": {
+      "i": 0,
+      "o": 0
+    },
+    "l": {
+      "c": 131072,
+      "o": 8192
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "gemma",
+    "k": "2024-10",
+    "rd": "2025-03-12"
+  },
+  "google/gemma-3-4b-it": {
+    "c": {
+      "i": 0,
+      "o": 0
+    },
+    "l": {
+      "c": 32768,
+      "o": 8192
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "gemma",
+    "k": "2024-10",
+    "rd": "2025-03-13"
+  },
+  "google/gemma-3n-e2b-it": {
+    "c": {
+      "i": 0,
+      "o": 0
+    },
+    "l": {
+      "c": 8192,
+      "o": 2000
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": true
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "gemma",
+    "k": "2024-10",
+    "rd": "2025-07-09"
+  },
+  "google/gemma-3n-e4b-it": {
+    "c": {
+      "i": 0,
+      "o": 0
+    },
+    "l": {
+      "c": 8192,
+      "o": 2000
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": true
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "gemma",
+    "k": "2024-10",
+    "rd": "2025-05-20"
+  },
+  "google/gemma-4-26b-a4b-it": {
+    "c": {
+      "i": 0,
+      "o": 0
+    },
+    "l": {
+      "c": 256000,
+      "o": 8192
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "gemma",
+    "rd": "2026-04-02"
+  },
+  "google/gemma-4-31b-it": {
+    "c": {
+      "i": 0,
+      "o": 0
+    },
+    "l": {
+      "c": 256000,
+      "o": 8192
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "gemma",
+    "rd": "2026-04-02"
+  },
+  "openai/chatgpt-image-latest": {
+    "c": {
+      "i": 0,
+      "o": 0
+    },
+    "l": {},
+    "f": {
+      "t": false,
+      "r": false,
+      "tc": false,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "gpt-image",
+    "rd": "2025-12-16"
+  },
+  "openai/gpt-3.5-turbo": {
+    "c": {
+      "i": 0.5,
+      "o": 1.5,
+      "r": 1.25
+    },
+    "l": {
+      "c": 16385,
+      "o": 4096
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "gpt",
+    "k": "2021-09-01",
+    "rd": "2023-03-01"
+  },
+  "openai/gpt-4": {
+    "c": {
+      "i": 30,
+      "o": 60
+    },
+    "l": {
+      "c": 8192,
+      "o": 8192
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "gpt",
+    "k": "2023-11",
+    "rd": "2023-11-06"
+  },
+  "openai/gpt-4-turbo": {
+    "c": {
+      "i": 10,
+      "o": 30
+    },
+    "l": {
+      "c": 128000,
+      "o": 4096
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "gpt",
+    "k": "2023-12",
+    "rd": "2023-11-06"
+  },
+  "openai/gpt-4.1": {
+    "c": {
+      "i": 2,
+      "o": 8,
+      "r": 0.5
+    },
+    "l": {
+      "c": 1047576,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "gpt",
+    "k": "2024-04",
+    "rd": "2025-04-14"
+  },
+  "openai/gpt-4.1-mini": {
+    "c": {
+      "i": 0.4,
+      "o": 1.6,
+      "r": 0.1
+    },
+    "l": {
+      "c": 1047576,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "gpt-mini",
+    "k": "2024-04",
+    "rd": "2025-04-14"
+  },
+  "openai/gpt-4.1-nano": {
+    "c": {
+      "i": 0.1,
+      "o": 0.4,
+      "r": 0.03
+    },
+    "l": {
+      "c": 1047576,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "gpt-nano",
+    "k": "2024-04",
+    "rd": "2025-04-14"
+  },
+  "openai/gpt-4o": {
+    "c": {
+      "i": 2.5,
+      "o": 10,
+      "r": 1.25
+    },
+    "l": {
+      "c": 128000,
+      "o": 16384
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "gpt",
+    "k": "2023-09",
+    "rd": "2024-05-13"
+  },
+  "openai/gpt-4o-2024-05-13": {
+    "c": {
+      "i": 5,
+      "o": 15
+    },
+    "l": {
+      "c": 128000,
+      "o": 4096
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "gpt",
+    "k": "2023-09",
+    "rd": "2024-05-13"
+  },
+  "openai/gpt-4o-2024-08-06": {
+    "c": {
+      "i": 2.5,
+      "o": 10,
+      "r": 1.25
+    },
+    "l": {
+      "c": 128000,
+      "o": 16384
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "gpt",
+    "k": "2023-09",
+    "rd": "2024-08-06"
+  },
+  "openai/gpt-4o-2024-11-20": {
+    "c": {
+      "i": 2.5,
+      "o": 10,
+      "r": 1.25
+    },
+    "l": {
+      "c": 128000,
+      "o": 16384
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "gpt",
+    "k": "2023-09",
+    "rd": "2024-11-20"
+  },
+  "openai/gpt-4o-mini": {
+    "c": {
+      "i": 0.15,
+      "o": 0.6,
+      "r": 0.08
+    },
+    "l": {
+      "c": 128000,
+      "o": 16384
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "gpt-mini",
+    "k": "2023-09",
+    "rd": "2024-07-18"
+  },
+  "openai/gpt-5": {
+    "c": {
+      "i": 1.25,
+      "o": 10,
+      "r": 0.125
+    },
+    "l": {
+      "c": 400000,
+      "o": 128000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "gpt",
+    "k": "2024-09-30",
+    "rd": "2025-08-07"
+  },
+  "openai/gpt-5-chat-latest": {
+    "c": {
+      "i": 1.25,
+      "o": 10
+    },
+    "l": {
+      "c": 400000,
+      "o": 128000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": false,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "gpt-codex",
+    "k": "2024-09-30",
+    "rd": "2025-08-07"
+  },
+  "openai/gpt-5-codex": {
+    "c": {
+      "i": 1.25,
+      "o": 10,
+      "r": 0.125
+    },
+    "l": {
+      "c": 400000,
+      "o": 128000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "gpt-codex",
+    "k": "2024-09-30",
+    "rd": "2025-09-15"
+  },
+  "openai/gpt-5-mini": {
+    "c": {
+      "i": 0.25,
+      "o": 2,
+      "r": 0.025
+    },
+    "l": {
+      "c": 400000,
+      "o": 128000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "gpt-mini",
+    "k": "2024-05-30",
+    "rd": "2025-08-07"
+  },
+  "openai/gpt-5-nano": {
+    "c": {
+      "i": 0.05,
+      "o": 0.4,
+      "r": 0.005
+    },
+    "l": {
+      "c": 400000,
+      "o": 128000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "gpt-nano",
+    "k": "2024-05-30",
+    "rd": "2025-08-07"
+  },
+  "openai/gpt-5-pro": {
+    "c": {
+      "i": 15,
+      "o": 120
+    },
+    "l": {
+      "c": 400000,
+      "o": 272000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "gpt-pro",
+    "k": "2024-09-30",
+    "rd": "2025-10-06"
+  },
+  "openai/gpt-5.1": {
+    "c": {
+      "i": 1.25,
+      "o": 10,
+      "r": 0.13
+    },
+    "l": {
+      "c": 400000,
+      "o": 128000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "gpt",
+    "k": "2024-09-30",
+    "rd": "2025-11-13"
+  },
+  "openai/gpt-5.1-chat-latest": {
+    "c": {
+      "i": 1.25,
+      "o": 10,
+      "r": 0.125
+    },
+    "l": {
+      "c": 128000,
+      "o": 16384
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "gpt-codex",
+    "k": "2024-09-30",
+    "rd": "2025-11-13"
+  },
+  "openai/gpt-5.1-codex": {
+    "c": {
+      "i": 1.25,
+      "o": 10,
+      "r": 0.125
+    },
+    "l": {
+      "c": 400000,
+      "o": 128000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "gpt-codex",
+    "k": "2024-09-30",
+    "rd": "2025-11-13"
+  },
+  "openai/gpt-5.1-codex-max": {
+    "c": {
+      "i": 1.25,
+      "o": 10,
+      "r": 0.125
+    },
+    "l": {
+      "c": 400000,
+      "o": 128000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "gpt-codex",
+    "k": "2024-09-30",
+    "rd": "2025-11-13"
+  },
+  "openai/gpt-5.1-codex-mini": {
+    "c": {
+      "i": 0.25,
+      "o": 2,
+      "r": 0.025
+    },
+    "l": {
+      "c": 400000,
+      "o": 128000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "gpt-codex",
+    "k": "2024-09-30",
+    "rd": "2025-11-13"
+  },
+  "openai/gpt-5.2": {
+    "c": {
+      "i": 1.75,
+      "o": 14,
+      "r": 0.175
+    },
+    "l": {
+      "c": 400000,
+      "o": 128000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "gpt",
+    "k": "2025-08-31",
+    "rd": "2025-12-11"
+  },
+  "openai/gpt-5.2-chat-latest": {
+    "c": {
+      "i": 1.75,
+      "o": 14,
+      "r": 0.175
+    },
+    "l": {
+      "c": 128000,
+      "o": 16384
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "gpt-codex",
+    "k": "2025-08-31",
+    "rd": "2025-12-11"
+  },
+  "openai/gpt-5.2-codex": {
+    "c": {
+      "i": 1.75,
+      "o": 14,
+      "r": 0.175
+    },
+    "l": {
+      "c": 400000,
+      "o": 128000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "gpt-codex",
+    "k": "2025-08-31",
+    "rd": "2025-12-11"
+  },
+  "openai/gpt-5.2-pro": {
+    "c": {
+      "i": 21,
+      "o": 168
+    },
+    "l": {
+      "c": 400000,
+      "o": 128000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "gpt-pro",
+    "k": "2025-08-31",
+    "rd": "2025-12-11"
+  },
+  "openai/gpt-5.3-chat-latest": {
+    "c": {
+      "i": 1.75,
+      "o": 14,
+      "r": 0.175
+    },
+    "l": {
+      "c": 128000,
+      "o": 16384
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "gpt",
+    "k": "2025-08-31",
+    "rd": "2026-03-03"
+  },
+  "openai/gpt-5.3-codex": {
+    "c": {
+      "i": 1.75,
+      "o": 14,
+      "r": 0.175
+    },
+    "l": {
+      "c": 400000,
+      "o": 128000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "gpt-codex",
+    "k": "2025-08-31",
+    "rd": "2026-02-05"
+  },
+  "openai/gpt-5.3-codex-spark": {
+    "c": {
+      "i": 1.75,
+      "o": 14,
+      "r": 0.175
+    },
+    "l": {
+      "c": 128000,
+      "o": 32000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "gpt-codex-spark",
+    "k": "2025-08-31",
+    "rd": "2026-02-05"
+  },
+  "openai/gpt-5.4": {
+    "c": {
+      "i": 2.5,
+      "o": 15,
+      "r": 0.25
+    },
+    "l": {
+      "c": 1050000,
+      "o": 128000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "gpt",
+    "k": "2025-08-31",
+    "rd": "2026-03-05"
+  },
+  "openai/gpt-5.4-mini": {
+    "c": {
+      "i": 0.75,
+      "o": 4.5,
+      "r": 0.075
+    },
+    "l": {
+      "c": 400000,
+      "o": 128000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "gpt-mini",
+    "k": "2025-08-31",
+    "rd": "2026-03-17"
+  },
+  "openai/gpt-5.4-nano": {
+    "c": {
+      "i": 0.2,
+      "o": 1.25,
+      "r": 0.02
+    },
+    "l": {
+      "c": 400000,
+      "o": 128000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "gpt-nano",
+    "k": "2025-08-31",
+    "rd": "2026-03-17"
+  },
+  "openai/gpt-5.4-pro": {
+    "c": {
+      "i": 30,
+      "o": 180
+    },
+    "l": {
+      "c": 1050000,
+      "o": 128000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "gpt-pro",
+    "k": "2025-08-31",
+    "rd": "2026-03-05"
+  },
+  "openai/gpt-5.5": {
+    "c": {
+      "i": 5,
+      "o": 30,
+      "r": 0.5
+    },
+    "l": {
+      "c": 1050000,
+      "o": 128000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "gpt",
+    "k": "2025-12-01",
+    "rd": "2026-04-23"
+  },
+  "openai/gpt-5.5-pro": {
+    "c": {
+      "i": 30,
+      "o": 180
+    },
+    "l": {
+      "c": 1050000,
+      "o": 128000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "gpt-pro",
+    "k": "2025-12-01",
+    "rd": "2026-04-23"
+  },
+  "openai/gpt-image-1": {
+    "c": {
+      "i": 0,
+      "o": 0
+    },
+    "l": {},
+    "f": {
+      "t": false,
+      "r": false,
+      "tc": false,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "gpt-image",
+    "rd": "2025-04-24"
+  },
+  "openai/gpt-image-1-mini": {
+    "c": {
+      "i": 0,
+      "o": 0
+    },
+    "l": {},
+    "f": {
+      "t": false,
+      "r": false,
+      "tc": false,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "gpt-image",
+    "rd": "2025-09-26"
+  },
+  "openai/gpt-image-1.5": {
+    "c": {
+      "i": 0,
+      "o": 0
+    },
+    "l": {},
+    "f": {
+      "t": false,
+      "r": false,
+      "tc": false,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "gpt-image",
+    "rd": "2025-11-25"
+  },
+  "openai/o1": {
+    "c": {
+      "i": 15,
+      "o": 60,
+      "r": 7.5
+    },
+    "l": {
+      "c": 200000,
+      "o": 100000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "o",
+    "k": "2023-09",
+    "rd": "2024-12-05"
+  },
+  "openai/o1-mini": {
+    "c": {
+      "i": 1.1,
+      "o": 4.4,
+      "r": 0.55
+    },
+    "l": {
+      "c": 128000,
+      "o": 65536
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "o-mini",
+    "k": "2023-09",
+    "rd": "2024-09-12"
+  },
+  "openai/o1-preview": {
+    "c": {
+      "i": 15,
+      "o": 60,
+      "r": 7.5
+    },
+    "l": {
+      "c": 128000,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "o",
+    "k": "2023-09",
+    "rd": "2024-09-12"
+  },
+  "openai/o1-pro": {
+    "c": {
+      "i": 150,
+      "o": 600
+    },
+    "l": {
+      "c": 200000,
+      "o": 100000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "o-pro",
+    "k": "2023-09",
+    "rd": "2025-03-19"
+  },
+  "openai/o3": {
+    "c": {
+      "i": 2,
+      "o": 8,
+      "r": 0.5
+    },
+    "l": {
+      "c": 200000,
+      "o": 100000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "o",
+    "k": "2024-05",
+    "rd": "2025-04-16"
+  },
+  "openai/o3-deep-research": {
+    "c": {
+      "i": 10,
+      "o": 40,
+      "r": 2.5
+    },
+    "l": {
+      "c": 200000,
+      "o": 100000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "o",
+    "k": "2024-05",
+    "rd": "2024-06-26"
+  },
+  "openai/o3-mini": {
+    "c": {
+      "i": 1.1,
+      "o": 4.4,
+      "r": 0.55
+    },
+    "l": {
+      "c": 200000,
+      "o": 100000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "o-mini",
+    "k": "2024-05",
+    "rd": "2024-12-20"
+  },
+  "openai/o3-pro": {
+    "c": {
+      "i": 20,
+      "o": 80
+    },
+    "l": {
+      "c": 200000,
+      "o": 100000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "o-pro",
+    "k": "2024-05",
+    "rd": "2025-06-10"
+  },
+  "openai/o4-mini": {
+    "c": {
+      "i": 1.1,
+      "o": 4.4,
+      "r": 0.28
+    },
+    "l": {
+      "c": 200000,
+      "o": 100000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "o-mini",
+    "k": "2024-05",
+    "rd": "2025-04-16"
+  },
+  "openai/o4-mini-deep-research": {
+    "c": {
+      "i": 2,
+      "o": 8,
+      "r": 0.5
+    },
+    "l": {
+      "c": 200000,
+      "o": 100000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "o-mini",
+    "k": "2024-05",
+    "rd": "2024-06-26"
+  },
+  "openai/text-embedding-3-large": {
+    "c": {
+      "i": 0.13,
+      "o": 0
+    },
+    "l": {
+      "c": 8191,
+      "o": 3072
+    },
+    "f": {
+      "t": false,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "text-embedding",
+    "k": "2024-01",
+    "rd": "2024-01-25"
+  },
+  "openai/text-embedding-3-small": {
+    "c": {
+      "i": 0.02,
+      "o": 0
+    },
+    "l": {
+      "c": 8191,
+      "o": 1536
+    },
+    "f": {
+      "t": false,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "text-embedding",
+    "k": "2024-01",
+    "rd": "2024-01-25"
+  },
+  "openai/text-embedding-ada-002": {
+    "c": {
+      "i": 0.1,
+      "o": 0
+    },
+    "l": {
+      "c": 8192,
+      "o": 1536
+    },
+    "f": {
+      "t": false,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "text-embedding",
+    "k": "2022-12",
+    "rd": "2022-12-15"
+  },
+  "openrouter/ai21/jamba-large-1.7": {
+    "c": {
+      "i": 2,
+      "o": 8
+    },
+    "l": {
+      "c": 256000,
+      "o": 4096
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "jamba",
+    "k": "2024-08-31",
+    "rd": "2025-08-08"
+  },
+  "openrouter/aion-labs/aion-1.0": {
+    "c": {
+      "i": 4,
+      "o": 8
+    },
+    "l": {
+      "c": 131072,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "rd": "2025-02-04"
+  },
+  "openrouter/aion-labs/aion-1.0-mini": {
+    "c": {
+      "i": 0.7,
+      "o": 1.4
+    },
+    "l": {
+      "c": 131072,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "rd": "2025-02-04"
+  },
+  "openrouter/aion-labs/aion-2.0": {
+    "c": {
+      "i": 0.8,
+      "o": 1.6,
+      "r": 0.2
+    },
+    "l": {
+      "c": 131072,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "rd": "2026-02-23"
+  },
+  "openrouter/aion-labs/aion-rp-llama-3.1-8b": {
+    "c": {
+      "i": 0.8,
+      "o": 1.6
+    },
+    "l": {
+      "c": 32768,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "llama",
+    "k": "2023-12-31",
+    "rd": "2025-02-04"
+  },
+  "openrouter/alfredpros/codellama-7b-instruct-solidity": {
+    "c": {
+      "i": 0.8,
+      "o": 1.2
+    },
+    "l": {
+      "c": 4096,
+      "o": 4096
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "llama",
+    "k": "2023-06-30",
+    "rd": "2025-04-14"
+  },
+  "openrouter/alibaba/tongyi-deepresearch-30b-a3b": {
+    "c": {
+      "i": 0.09,
+      "o": 0.45,
+      "r": 0.09
+    },
+    "l": {
+      "c": 131072,
+      "o": 131072
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "yi",
+    "k": "2025-03-31",
+    "rd": "2025-09-18"
+  },
+  "openrouter/allenai/olmo-3-32b-think": {
+    "c": {
+      "i": 0.15,
+      "o": 0.5
+    },
+    "l": {
+      "c": 65536,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "allenai",
+    "rd": "2025-11-21"
+  },
+  "openrouter/amazon/nova-2-lite-v1": {
+    "c": {
+      "i": 0.3,
+      "o": 2.5
+    },
+    "l": {
+      "c": 1000000,
+      "o": 65535
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "video",
+      "pdf"
+    ],
+    "fam": "nova",
+    "rd": "2025-12-02"
+  },
+  "openrouter/amazon/nova-lite-v1": {
+    "c": {
+      "i": 0.06,
+      "o": 0.24
+    },
+    "l": {
+      "c": 300000,
+      "o": 5120
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "nova-lite",
+    "k": "2024-10-31",
+    "rd": "2024-12-05"
+  },
+  "openrouter/amazon/nova-micro-v1": {
+    "c": {
+      "i": 0.035,
+      "o": 0.14
+    },
+    "l": {
+      "c": 128000,
+      "o": 5120
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "nova-micro",
+    "k": "2024-10-31",
+    "rd": "2024-12-05"
+  },
+  "openrouter/amazon/nova-premier-v1": {
+    "c": {
+      "i": 2.5,
+      "o": 12.5,
+      "r": 0.625
+    },
+    "l": {
+      "c": 1000000,
+      "o": 32000
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "nova",
+    "rd": "2025-10-31"
+  },
+  "openrouter/amazon/nova-pro-v1": {
+    "c": {
+      "i": 0.8,
+      "o": 3.2
+    },
+    "l": {
+      "c": 300000,
+      "o": 5120
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "nova-pro",
+    "k": "2024-10-31",
+    "rd": "2024-12-05"
+  },
+  "openrouter/anthracite-org/magnum-v4-72b": {
+    "c": {
+      "i": 3,
+      "o": 5
+    },
+    "l": {
+      "c": 16384,
+      "o": 2048
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "k": "2024-06-30",
+    "rd": "2024-10-22"
+  },
+  "openrouter/anthropic/claude-3-haiku": {
+    "c": {
+      "i": 0.25,
+      "o": 1.25,
+      "r": 0.03,
+      "w": 0.3
+    },
+    "l": {
+      "c": 200000,
+      "o": 4096
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "claude",
+    "k": "2023-08-31",
+    "rd": "2024-03-13"
+  },
+  "openrouter/anthropic/claude-3.5-haiku": {
+    "c": {
+      "i": 0.8,
+      "o": 4,
+      "r": 0.08,
+      "w": 1
+    },
+    "l": {
+      "c": 200000,
+      "o": 8192
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "claude",
+    "k": "2024-07-31",
+    "rd": "2024-11-04"
+  },
+  "openrouter/anthropic/claude-haiku-4.5": {
+    "c": {
+      "i": 1,
+      "o": 5,
+      "r": 0.1,
+      "w": 1.25
+    },
+    "l": {
+      "c": 200000,
+      "o": 64000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "claude-haiku",
+    "k": "2025-02-28",
+    "rd": "2025-10-15"
+  },
+  "openrouter/anthropic/claude-opus-4": {
+    "c": {
+      "i": 15,
+      "o": 75,
+      "r": 1.5,
+      "w": 18.75
+    },
+    "l": {
+      "c": 200000,
+      "o": 32000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "image",
+      "text",
+      "pdf"
+    ],
+    "fam": "claude-opus",
+    "k": "2025-01-31",
+    "rd": "2025-05-22"
+  },
+  "openrouter/anthropic/claude-opus-4.1": {
+    "c": {
+      "i": 15,
+      "o": 75,
+      "r": 1.5,
+      "w": 18.75
+    },
+    "l": {
+      "c": 200000,
+      "o": 32000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "image",
+      "text",
+      "pdf"
+    ],
+    "fam": "claude-opus",
+    "k": "2025-01-31",
+    "rd": "2025-08-05"
+  },
+  "openrouter/anthropic/claude-opus-4.5": {
+    "c": {
+      "i": 5,
+      "o": 25,
+      "r": 0.5,
+      "w": 6.25
+    },
+    "l": {
+      "c": 200000,
+      "o": 64000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "pdf",
+      "image",
+      "text"
+    ],
+    "fam": "claude-opus",
+    "k": "2025-05-30",
+    "rd": "2025-11-24"
+  },
+  "openrouter/anthropic/claude-opus-4.6": {
+    "c": {
+      "i": 5,
+      "o": 25,
+      "r": 0.5,
+      "w": 6.25
+    },
+    "l": {
+      "c": 1000000,
+      "o": 128000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "claude-opus",
+    "k": "2025-05-31",
+    "rd": "2026-02-04"
+  },
+  "openrouter/anthropic/claude-opus-4.6-fast": {
+    "c": {
+      "i": 30,
+      "o": 150,
+      "r": 3,
+      "w": 37.5
+    },
+    "l": {
+      "c": 1000000,
+      "o": 128000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "claude-opus",
+    "rd": "2026-04-07"
+  },
+  "openrouter/anthropic/claude-opus-4.7": {
+    "c": {
+      "i": 5,
+      "o": 25,
+      "r": 0.5,
+      "w": 6.25
+    },
+    "l": {
+      "c": 1000000,
+      "o": 128000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "claude-opus",
+    "k": "2026-01-31",
+    "rd": "2026-04-16"
+  },
+  "openrouter/anthropic/claude-opus-4.7-fast": {
+    "c": {
+      "i": 30,
+      "o": 150,
+      "r": 3,
+      "w": 37.5
+    },
+    "l": {
+      "c": 1000000,
+      "o": 128000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "claude-opus",
+    "rd": "2026-05-12"
+  },
+  "openrouter/anthropic/claude-sonnet-4": {
+    "c": {
+      "i": 3,
+      "o": 15,
+      "r": 0.3,
+      "w": 3.75
+    },
+    "l": {
+      "c": 1000000,
+      "o": 64000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "image",
+      "text",
+      "pdf"
+    ],
+    "fam": "claude-sonnet",
+    "k": "2025-01-31",
+    "rd": "2025-05-22"
+  },
+  "openrouter/anthropic/claude-sonnet-4.5": {
+    "c": {
+      "i": 3,
+      "o": 15,
+      "r": 0.3,
+      "w": 3.75
+    },
+    "l": {
+      "c": 1000000,
+      "o": 64000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "claude-sonnet",
+    "k": "2025-01-31",
+    "rd": "2025-09-29"
+  },
+  "openrouter/anthropic/claude-sonnet-4.6": {
+    "c": {
+      "i": 3,
+      "o": 15,
+      "r": 0.3,
+      "w": 3.75
+    },
+    "l": {
+      "c": 1000000,
+      "o": 128000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "claude-sonnet",
+    "k": "2025-08-31",
+    "rd": "2026-02-17"
+  },
+  "openrouter/arcee-ai/coder-large": {
+    "c": {
+      "i": 0.5,
+      "o": 0.8
+    },
+    "l": {
+      "c": 32768,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "k": "2025-03-31",
+    "rd": "2025-05-05"
+  },
+  "openrouter/arcee-ai/maestro-reasoning": {
+    "c": {
+      "i": 0.9,
+      "o": 3.3
+    },
+    "l": {
+      "c": 131072,
+      "o": 32000
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "k": "2025-03-31",
+    "rd": "2025-05-05"
+  },
+  "openrouter/arcee-ai/spotlight": {
+    "c": {
+      "i": 0.18,
+      "o": 0.18
+    },
+    "l": {
+      "c": 131072,
+      "o": 65537
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": true
+    },
+    "m": [
+      "image",
+      "text"
+    ],
+    "k": "2025-03-31",
+    "rd": "2025-05-05"
+  },
+  "openrouter/arcee-ai/trinity-large-preview": {
+    "c": {
+      "i": 0.15,
+      "o": 0.45
+    },
+    "l": {
+      "c": 131000,
+      "o": 131000
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "trinity",
+    "rd": "2026-01-27"
+  },
+  "openrouter/arcee-ai/trinity-large-thinking": {
+    "c": {
+      "i": 0.22,
+      "o": 0.85,
+      "r": 0.06
+    },
+    "l": {
+      "c": 262144,
+      "o": 262144
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "trinity",
+    "rd": "2026-04-01"
+  },
+  "openrouter/arcee-ai/trinity-large-thinking:free": {
+    "c": {
+      "i": 0,
+      "o": 0
+    },
+    "l": {
+      "c": 262144,
+      "o": 80000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "trinity",
+    "rd": "2026-04-01"
+  },
+  "openrouter/arcee-ai/trinity-mini": {
+    "c": {
+      "i": 0.045,
+      "o": 0.15
+    },
+    "l": {
+      "c": 131072,
+      "o": 131072
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "trinity-mini",
+    "rd": "2025-12-01"
+  },
+  "openrouter/arcee-ai/virtuoso-large": {
+    "c": {
+      "i": 0.75,
+      "o": 1.2
+    },
+    "l": {
+      "c": 131072,
+      "o": 64000
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "k": "2025-03-31",
+    "rd": "2025-05-05"
+  },
+  "openrouter/baidu/cobuddy:free": {
+    "c": {
+      "i": 0,
+      "o": 0
+    },
+    "l": {
+      "c": 131072,
+      "o": 65536
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "rd": "2026-05-06"
+  },
+  "openrouter/baidu/ernie-4.5-21b-a3b": {
+    "c": {
+      "i": 0.07,
+      "o": 0.28
+    },
+    "l": {
+      "c": 120000,
+      "o": 8000
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "ernie",
+    "k": "2025-03-31",
+    "rd": "2025-08-12"
+  },
+  "openrouter/baidu/ernie-4.5-21b-a3b-thinking": {
+    "c": {
+      "i": 0.07,
+      "o": 0.28
+    },
+    "l": {
+      "c": 131072,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "ernie",
+    "k": "2025-03-31",
+    "rd": "2025-10-09"
+  },
+  "openrouter/baidu/ernie-4.5-300b-a47b": {
+    "c": {
+      "i": 0.28,
+      "o": 1.1
+    },
+    "l": {
+      "c": 123000,
+      "o": 12000
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "ernie",
+    "k": "2025-03-31",
+    "rd": "2025-06-30"
+  },
+  "openrouter/baidu/ernie-4.5-vl-28b-a3b": {
+    "c": {
+      "i": 0.14,
+      "o": 0.56
+    },
+    "l": {
+      "c": 30000,
+      "o": 8000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "ernie",
+    "k": "2025-03-31",
+    "rd": "2025-08-12"
+  },
+  "openrouter/baidu/ernie-4.5-vl-424b-a47b": {
+    "c": {
+      "i": 0.42,
+      "o": 1.25
+    },
+    "l": {
+      "c": 123000,
+      "o": 16000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": false,
+      "a": true
+    },
+    "m": [
+      "image",
+      "text"
+    ],
+    "fam": "ernie",
+    "k": "2025-03-31",
+    "rd": "2025-06-30"
+  },
+  "openrouter/baidu/qianfan-ocr-fast": {
+    "c": {
+      "i": 0.68,
+      "o": 2.81
+    },
+    "l": {
+      "c": 65536,
+      "o": 28672
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": false,
+      "a": true
+    },
+    "m": [
+      "image",
+      "text"
+    ],
+    "rd": "2026-04-20"
+  },
+  "openrouter/bytedance-seed/seed-1.6": {
+    "c": {
+      "i": 0.25,
+      "o": 2
+    },
+    "l": {
+      "c": 262144,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "image",
+      "text",
+      "video"
+    ],
+    "fam": "seed",
+    "rd": "2025-12-23"
+  },
+  "openrouter/bytedance-seed/seed-1.6-flash": {
+    "c": {
+      "i": 0.075,
+      "o": 0.3
+    },
+    "l": {
+      "c": 262144,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "image",
+      "text",
+      "video"
+    ],
+    "fam": "seed",
+    "rd": "2025-12-23"
+  },
+  "openrouter/bytedance-seed/seed-2.0-lite": {
+    "c": {
+      "i": 0.25,
+      "o": 2
+    },
+    "l": {
+      "c": 262144,
+      "o": 131072
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "video"
+    ],
+    "fam": "seed",
+    "rd": "2026-03-10"
+  },
+  "openrouter/bytedance-seed/seed-2.0-mini": {
+    "c": {
+      "i": 0.1,
+      "o": 0.4
+    },
+    "l": {
+      "c": 262144,
+      "o": 131072
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "video"
+    ],
+    "fam": "seed",
+    "rd": "2026-02-26"
+  },
+  "openrouter/bytedance/ui-tars-1.5-7b": {
+    "c": {
+      "i": 0.1,
+      "o": 0.2,
+      "r": 0.1
+    },
+    "l": {
+      "c": 128000,
+      "o": 2048
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": true
+    },
+    "m": [
+      "image",
+      "text"
+    ],
+    "k": "2025-01-31",
+    "rd": "2025-07-22"
+  },
+  "openrouter/cognitivecomputations/dolphin-mistral-24b-venice-edition:free": {
+    "c": {
+      "i": 0,
+      "o": 0
+    },
+    "l": {
+      "c": 32768,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "mistral",
+    "k": "2024-04-30",
+    "rd": "2025-07-09"
+  },
+  "openrouter/cohere/command-a": {
+    "c": {
+      "i": 2.5,
+      "o": 10
+    },
+    "l": {
+      "c": 256000,
+      "o": 8192
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "command-a",
+    "k": "2024-08-31",
+    "rd": "2025-03-13"
+  },
+  "openrouter/cohere/command-r-08-2024": {
+    "c": {
+      "i": 0.15,
+      "o": 0.6
+    },
+    "l": {
+      "c": 128000,
+      "o": 4000
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "command-r",
+    "k": "2024-03-31",
+    "rd": "2024-08-30"
+  },
+  "openrouter/cohere/command-r-plus-08-2024": {
+    "c": {
+      "i": 2.5,
+      "o": 10
+    },
+    "l": {
+      "c": 128000,
+      "o": 4000
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "command-r",
+    "k": "2024-03-31",
+    "rd": "2024-08-30"
+  },
+  "openrouter/cohere/command-r7b-12-2024": {
+    "c": {
+      "i": 0.0375,
+      "o": 0.15
+    },
+    "l": {
+      "c": 128000,
+      "o": 4000
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "command-r",
+    "k": "2024-08-31",
+    "rd": "2024-12-14"
+  },
+  "openrouter/deepcogito/cogito-v2.1-671b": {
+    "c": {
+      "i": 1.25,
+      "o": 1.25
+    },
+    "l": {
+      "c": 128000,
+      "o": 128000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "cogito",
+    "rd": "2025-11-13"
+  },
+  "openrouter/deepseek/deepseek-chat": {
+    "c": {
+      "i": 0.32,
+      "o": 0.89
+    },
+    "l": {
+      "c": 163840,
+      "o": 16384
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "deepseek",
+    "k": "2024-07-31",
+    "rd": "2024-12-26"
+  },
+  "openrouter/deepseek/deepseek-chat-v3-0324": {
+    "c": {
+      "i": 0.2,
+      "o": 0.77,
+      "r": 0.135
+    },
+    "l": {
+      "c": 163840,
+      "o": 16384
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "deepseek",
+    "k": "2024-07-31",
+    "rd": "2025-03-24"
+  },
+  "openrouter/deepseek/deepseek-chat-v3.1": {
+    "c": {
+      "i": 0.21,
+      "o": 0.79,
+      "r": 0.13
+    },
+    "l": {
+      "c": 163840,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "deepseek",
+    "k": "2025-03-31",
+    "rd": "2025-08-21"
+  },
+  "openrouter/deepseek/deepseek-r1": {
+    "c": {
+      "i": 0.7,
+      "o": 2.5
+    },
+    "l": {
+      "c": 64000,
+      "o": 16000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "deepseek-thinking",
+    "k": "2024-07-31",
+    "rd": "2025-01-20"
+  },
+  "openrouter/deepseek/deepseek-r1-0528": {
+    "c": {
+      "i": 0.5,
+      "o": 2.15,
+      "r": 0.35
+    },
+    "l": {
+      "c": 163840,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "deepseek",
+    "k": "2025-03-31",
+    "rd": "2025-05-28"
+  },
+  "openrouter/deepseek/deepseek-r1-distill-llama-70b": {
+    "c": {
+      "i": 0.7,
+      "o": 0.8
+    },
+    "l": {
+      "c": 131072,
+      "o": 16384
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "deepseek-thinking",
+    "k": "2024-07-31",
+    "rd": "2025-01-23"
+  },
+  "openrouter/deepseek/deepseek-r1-distill-qwen-32b": {
+    "c": {
+      "i": 0.29,
+      "o": 0.29
+    },
+    "l": {
+      "c": 32768,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "deepseek",
+    "k": "2024-07-31",
+    "rd": "2025-01-29"
+  },
+  "openrouter/deepseek/deepseek-v3.1-terminus": {
+    "c": {
+      "i": 0.27,
+      "o": 0.95,
+      "r": 0.13
+    },
+    "l": {
+      "c": 163840,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "deepseek",
+    "k": "2025-03-31",
+    "rd": "2025-09-22"
+  },
+  "openrouter/deepseek/deepseek-v3.2": {
+    "c": {
+      "i": 0.252,
+      "o": 0.378,
+      "r": 0.0252
+    },
+    "l": {
+      "c": 131072,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "deepseek",
+    "k": "2024-07",
+    "rd": "2025-12-01"
+  },
+  "openrouter/deepseek/deepseek-v3.2-exp": {
+    "c": {
+      "i": 0.27,
+      "o": 0.41
+    },
+    "l": {
+      "c": 163840,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "deepseek",
+    "k": "2025-07-31",
+    "rd": "2025-09-29"
+  },
+  "openrouter/deepseek/deepseek-v3.2-speciale": {
+    "c": {
+      "i": 0.287,
+      "o": 0.431,
+      "r": 0.058
+    },
+    "l": {
+      "c": 163840,
+      "o": 163840
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "deepseek",
+    "k": "2024-07",
+    "rd": "2025-12-01"
+  },
+  "openrouter/deepseek/deepseek-v4-flash": {
+    "c": {
+      "i": 0.112,
+      "o": 0.224,
+      "r": 0.022
+    },
+    "l": {
+      "c": 1048575,
+      "o": 131072
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "deepseek",
+    "rd": "2026-04-24"
+  },
+  "openrouter/deepseek/deepseek-v4-flash:free": {
+    "c": {
+      "i": 0,
+      "o": 0
+    },
+    "l": {
+      "c": 1048576,
+      "o": 384000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "deepseek",
+    "rd": "2026-04-24"
+  },
+  "openrouter/deepseek/deepseek-v4-pro": {
+    "c": {
+      "i": 0.435,
+      "o": 0.87,
+      "r": 0.003625
+    },
+    "l": {
+      "c": 1048576,
+      "o": 384000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "deepseek",
+    "rd": "2026-04-24"
+  },
+  "openrouter/essentialai/rnj-1-instruct": {
+    "c": {
+      "i": 0.15,
+      "o": 0.15
+    },
+    "l": {
+      "c": 32768,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "rnj",
+    "rd": "2025-12-07"
+  },
+  "openrouter/google/gemini-2.0-flash-001": {
+    "c": {
+      "i": 0.1,
+      "o": 0.4,
+      "r": 0.025,
+      "w": 0.083333
+    },
+    "l": {
+      "c": 1048576,
+      "o": 8192
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf",
+      "audio",
+      "video"
+    ],
+    "fam": "gemini-flash",
+    "k": "2024-08-31",
+    "rd": "2025-02-05"
+  },
+  "openrouter/google/gemini-2.0-flash-lite-001": {
+    "c": {
+      "i": 0.075,
+      "o": 0.3
+    },
+    "l": {
+      "c": 1048576,
+      "o": 8192
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf",
+      "audio",
+      "video"
+    ],
+    "fam": "gemini",
+    "k": "2024-08-31",
+    "rd": "2025-02-25"
+  },
+  "openrouter/google/gemini-2.5-flash": {
+    "c": {
+      "i": 0.3,
+      "o": 2.5,
+      "r": 0.03,
+      "w": 0.083333
+    },
+    "l": {
+      "c": 1048576,
+      "o": 65535
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "pdf",
+      "image",
+      "text",
+      "audio",
+      "video"
+    ],
+    "fam": "gemini-flash",
+    "k": "2025-01-31",
+    "rd": "2025-06-17"
+  },
+  "openrouter/google/gemini-2.5-flash-image": {
+    "c": {
+      "i": 0.3,
+      "o": 2.5,
+      "r": 0.03,
+      "w": 0.083333
+    },
+    "l": {
+      "c": 32768,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": true
+    },
+    "m": [
+      "image",
+      "text"
+    ],
+    "fam": "gemini",
+    "k": "2025-01-31",
+    "rd": "2025-10-07"
+  },
+  "openrouter/google/gemini-2.5-flash-lite": {
+    "c": {
+      "i": 0.1,
+      "o": 0.4,
+      "r": 0.01,
+      "w": 0.083333
+    },
+    "l": {
+      "c": 1048576,
+      "o": 65535
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf",
+      "audio",
+      "video"
+    ],
+    "fam": "gemini-flash-lite",
+    "k": "2025-01-31",
+    "rd": "2025-07-22"
+  },
+  "openrouter/google/gemini-2.5-flash-lite-preview-09-2025": {
+    "c": {
+      "i": 0.1,
+      "o": 0.4,
+      "r": 0.01,
+      "w": 0.083333
+    },
+    "l": {
+      "c": 1048576,
+      "o": 65535
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf",
+      "audio",
+      "video"
+    ],
+    "fam": "gemini-flash-lite",
+    "k": "2025-01-31",
+    "rd": "2025-09-25"
+  },
+  "openrouter/google/gemini-2.5-pro": {
+    "c": {
+      "i": 1.25,
+      "o": 10,
+      "r": 0.125,
+      "w": 0.375
+    },
+    "l": {
+      "c": 1048576,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf",
+      "audio",
+      "video"
+    ],
+    "fam": "gemini",
+    "k": "2025-01-31",
+    "rd": "2025-06-17"
+  },
+  "openrouter/google/gemini-2.5-pro-preview": {
+    "c": {
+      "i": 1.25,
+      "o": 10,
+      "r": 0.125,
+      "w": 0.375
+    },
+    "l": {
+      "c": 1048576,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "pdf",
+      "image",
+      "text",
+      "audio"
+    ],
+    "fam": "gemini",
+    "k": "2025-01-31",
+    "rd": "2025-06-05"
+  },
+  "openrouter/google/gemini-2.5-pro-preview-05-06": {
+    "c": {
+      "i": 1.25,
+      "o": 10,
+      "r": 0.125,
+      "w": 0.375
+    },
+    "l": {
+      "c": 1048576,
+      "o": 65535
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf",
+      "audio",
+      "video"
+    ],
+    "fam": "gemini-pro",
+    "k": "2025-01-31",
+    "rd": "2025-05-07"
+  },
+  "openrouter/google/gemini-3-flash-preview": {
+    "c": {
+      "i": 0.5,
+      "o": 3,
+      "r": 0.05,
+      "w": 0.083333
+    },
+    "l": {
+      "c": 1048576,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf",
+      "audio",
+      "video"
+    ],
+    "fam": "gemini-flash",
+    "k": "2025-01",
+    "rd": "2025-12-17"
+  },
+  "openrouter/google/gemini-3-pro-image-preview": {
+    "c": {
+      "i": 2,
+      "o": 12,
+      "r": 0.2,
+      "w": 0.375
+    },
+    "l": {
+      "c": 65536,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": false,
+      "a": true
+    },
+    "m": [
+      "image",
+      "text"
+    ],
+    "fam": "gemini",
+    "rd": "2025-11-20"
+  },
+  "openrouter/google/gemini-3.1-flash-image-preview": {
+    "c": {
+      "i": 0.5,
+      "o": 3
+    },
+    "l": {
+      "c": 65536,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": false,
+      "a": true
+    },
+    "m": [
+      "image",
+      "text"
+    ],
+    "fam": "gemini-flash",
+    "k": "2025-01",
+    "rd": "2026-02-26"
+  },
+  "openrouter/google/gemini-3.1-flash-lite": {
+    "c": {
+      "i": 0.25,
+      "o": 1.5,
+      "r": 0.025,
+      "w": 0.083333
+    },
+    "l": {
+      "c": 1048576,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "video",
+      "pdf",
+      "audio"
+    ],
+    "fam": "gemini",
+    "rd": "2026-05-07"
+  },
+  "openrouter/google/gemini-3.1-flash-lite-preview": {
+    "c": {
+      "i": 0.25,
+      "o": 1.5,
+      "r": 0.025,
+      "w": 0.083333
+    },
+    "l": {
+      "c": 1048576,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "video",
+      "pdf",
+      "audio"
+    ],
+    "fam": "gemini-flash-lite",
+    "rd": "2026-03-03"
+  },
+  "openrouter/google/gemini-3.1-pro-preview": {
+    "c": {
+      "i": 2,
+      "o": 12,
+      "r": 0.2,
+      "w": 0.375
+    },
+    "l": {
+      "c": 1048576,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "audio",
+      "pdf",
+      "image",
+      "text",
+      "video"
+    ],
+    "fam": "gemini-pro",
+    "k": "2025-01",
+    "rd": "2026-02-19"
+  },
+  "openrouter/google/gemini-3.1-pro-preview-customtools": {
+    "c": {
+      "i": 2,
+      "o": 12,
+      "r": 0.2,
+      "w": 0.375
+    },
+    "l": {
+      "c": 1048576,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "audio",
+      "image",
+      "video",
+      "pdf"
+    ],
+    "fam": "gemini-pro",
+    "k": "2025-01",
+    "rd": "2026-02-25"
+  },
+  "openrouter/google/gemma-2-27b-it": {
+    "c": {
+      "i": 0.65,
+      "o": 0.65
+    },
+    "l": {
+      "c": 8192,
+      "o": 2048
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "gemma",
+    "k": "2024-06-30",
+    "rd": "2024-07-13"
+  },
+  "openrouter/google/gemma-3-12b-it": {
+    "c": {
+      "i": 0.04,
+      "o": 0.13
+    },
+    "l": {
+      "c": 131072,
+      "o": 16384
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "gemma",
+    "k": "2024-08-31",
+    "rd": "2025-03-13"
+  },
+  "openrouter/google/gemma-3-27b-it": {
+    "c": {
+      "i": 0.08,
+      "o": 0.16
+    },
+    "l": {
+      "c": 131072,
+      "o": 16384
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "gemma",
+    "k": "2024-08-31",
+    "rd": "2025-03-12"
+  },
+  "openrouter/google/gemma-3-4b-it": {
+    "c": {
+      "i": 0.04,
+      "o": 0.08
+    },
+    "l": {
+      "c": 131072,
+      "o": 16384
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "gemma",
+    "k": "2024-08-31",
+    "rd": "2025-03-13"
+  },
+  "openrouter/google/gemma-3n-e4b-it": {
+    "c": {
+      "i": 0.06,
+      "o": 0.12
+    },
+    "l": {
+      "c": 32768,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "gemma",
+    "k": "2024-08-31",
+    "rd": "2025-05-20"
+  },
+  "openrouter/google/gemma-4-26b-a4b-it": {
+    "c": {
+      "i": 0.06,
+      "o": 0.33
+    },
+    "l": {
+      "c": 262144,
+      "o": 262144
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "image",
+      "text",
+      "video"
+    ],
+    "fam": "gemma",
+    "k": "2025-01",
+    "rd": "2026-04-03"
+  },
+  "openrouter/google/gemma-4-26b-a4b-it:free": {
+    "c": {
+      "i": 0,
+      "o": 0
+    },
+    "l": {
+      "c": 262144,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "image",
+      "text",
+      "video"
+    ],
+    "fam": "gemma",
+    "k": "2025-01",
+    "rd": "2026-04-03"
+  },
+  "openrouter/google/gemma-4-31b-it": {
+    "c": {
+      "i": 0.12,
+      "o": 0.37
+    },
+    "l": {
+      "c": 262144,
+      "o": 16384
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "image",
+      "text",
+      "video"
+    ],
+    "fam": "gemma",
+    "k": "2025-01",
+    "rd": "2026-04-02"
+  },
+  "openrouter/google/gemma-4-31b-it:free": {
+    "c": {
+      "i": 0,
+      "o": 0
+    },
+    "l": {
+      "c": 262144,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "image",
+      "text",
+      "video"
+    ],
+    "fam": "gemma",
+    "k": "2025-01",
+    "rd": "2026-04-02"
+  },
+  "openrouter/google/lyria-3-clip-preview": {
+    "c": {
+      "i": 0,
+      "o": 0
+    },
+    "l": {
+      "c": 1048576,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "lyria",
+    "rd": "2026-03-30"
+  },
+  "openrouter/google/lyria-3-pro-preview": {
+    "c": {
+      "i": 0,
+      "o": 0
+    },
+    "l": {
+      "c": 1048576,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "lyria",
+    "rd": "2026-03-30"
+  },
+  "openrouter/gryphe/mythomax-l2-13b": {
+    "c": {
+      "i": 0.06,
+      "o": 0.06
+    },
+    "l": {
+      "c": 4096,
+      "o": 4096
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "k": "2023-06-30",
+    "rd": "2023-07-02"
+  },
+  "openrouter/ibm-granite/granite-4.0-h-micro": {
+    "c": {
+      "i": 0.017,
+      "o": 0.112
+    },
+    "l": {
+      "c": 131000,
+      "o": 131000
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "granite",
+    "rd": "2025-10-20"
+  },
+  "openrouter/ibm-granite/granite-4.1-8b": {
+    "c": {
+      "i": 0.05,
+      "o": 0.1,
+      "r": 0.05
+    },
+    "l": {
+      "c": 131072,
+      "o": 131072
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "granite",
+    "rd": "2026-04-30"
+  },
+  "openrouter/inception/mercury-2": {
+    "c": {
+      "i": 0.25,
+      "o": 0.75,
+      "r": 0.025
+    },
+    "l": {
+      "c": 128000,
+      "o": 50000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "mercury",
+    "rd": "2026-03-04"
+  },
+  "openrouter/inclusionai/ling-2.6-1t": {
+    "c": {
+      "i": 0.3,
+      "o": 2.5,
+      "r": 0.06
+    },
+    "l": {
+      "c": 262144,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "ling",
+    "rd": "2026-04-23"
+  },
+  "openrouter/inclusionai/ling-2.6-flash": {
+    "c": {
+      "i": 0.01,
+      "o": 0.03,
+      "r": 0.002
+    },
+    "l": {
+      "c": 262144,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "ling",
+    "rd": "2026-04-21"
+  },
+  "openrouter/inclusionai/ring-2.6-1t": {
+    "c": {
+      "i": 0.075,
+      "o": 0.625,
+      "r": 0.015
+    },
+    "l": {
+      "c": 262144,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "ring",
+    "rd": "2026-05-08"
+  },
+  "openrouter/inflection/inflection-3-pi": {
+    "c": {
+      "i": 2.5,
+      "o": 10
+    },
+    "l": {
+      "c": 8000,
+      "o": 1024
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "k": "2024-10-31",
+    "rd": "2024-10-11"
+  },
+  "openrouter/inflection/inflection-3-productivity": {
+    "c": {
+      "i": 2.5,
+      "o": 10
+    },
+    "l": {
+      "c": 8000,
+      "o": 1024
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "k": "2024-10-31",
+    "rd": "2024-10-11"
+  },
+  "openrouter/kwaipilot/kat-coder-pro-v2": {
+    "c": {
+      "i": 0.3,
+      "o": 1.2,
+      "r": 0.06
+    },
+    "l": {
+      "c": 256000,
+      "o": 80000
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "kat-coder",
+    "rd": "2026-03-27"
+  },
+  "openrouter/liquid/lfm-2-24b-a2b": {
+    "c": {
+      "i": 0.03,
+      "o": 0.12
+    },
+    "l": {
+      "c": 32768,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "liquid",
+    "rd": "2026-02-25"
+  },
+  "openrouter/liquid/lfm-2.5-1.2b-instruct:free": {
+    "c": {
+      "i": 0,
+      "o": 0
+    },
+    "l": {
+      "c": 32768,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "liquid",
+    "k": "2025-06",
+    "rd": "2026-01-20"
+  },
+  "openrouter/liquid/lfm-2.5-1.2b-thinking:free": {
+    "c": {
+      "i": 0,
+      "o": 0
+    },
+    "l": {
+      "c": 32768,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "liquid",
+    "k": "2025-06",
+    "rd": "2026-01-20"
+  },
+  "openrouter/mancer/weaver": {
+    "c": {
+      "i": 0.75,
+      "o": 1
+    },
+    "l": {
+      "c": 8000,
+      "o": 2000
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "alpha",
+    "k": "2023-06-30",
+    "rd": "2023-08-02"
+  },
+  "openrouter/meta-llama/llama-3-70b-instruct": {
+    "c": {
+      "i": 0.51,
+      "o": 0.74
+    },
+    "l": {
+      "c": 8192,
+      "o": 8000
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "llama",
+    "k": "2023-12-31",
+    "rd": "2024-04-18"
+  },
+  "openrouter/meta-llama/llama-3-8b-instruct": {
+    "c": {
+      "i": 0.04,
+      "o": 0.04
+    },
+    "l": {
+      "c": 8192,
+      "o": 8192
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "llama",
+    "k": "2023-12-31",
+    "rd": "2024-04-18"
+  },
+  "openrouter/meta-llama/llama-3.1-70b-instruct": {
+    "c": {
+      "i": 0.4,
+      "o": 0.4
+    },
+    "l": {
+      "c": 131072,
+      "o": 16384
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "llama",
+    "k": "2023-12-31",
+    "rd": "2024-07-23"
+  },
+  "openrouter/meta-llama/llama-3.1-8b-instruct": {
+    "c": {
+      "i": 0.02,
+      "o": 0.05
+    },
+    "l": {
+      "c": 16384,
+      "o": 16384
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "llama",
+    "k": "2023-12-31",
+    "rd": "2024-07-23"
+  },
+  "openrouter/meta-llama/llama-3.2-11b-vision-instruct": {
+    "c": {
+      "i": 0.245,
+      "o": 0.245
+    },
+    "l": {
+      "c": 131072,
+      "o": 16384
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "llama",
+    "k": "2023-12-31",
+    "rd": "2024-09-25"
+  },
+  "openrouter/meta-llama/llama-3.2-1b-instruct": {
+    "c": {
+      "i": 0.027,
+      "o": 0.201
+    },
+    "l": {
+      "c": 60000,
+      "o": 60000
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "llama",
+    "k": "2023-12-31",
+    "rd": "2024-09-25"
+  },
+  "openrouter/meta-llama/llama-3.2-3b-instruct": {
+    "c": {
+      "i": 0.0509,
+      "o": 0.335
+    },
+    "l": {
+      "c": 80000,
+      "o": 80000
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "llama",
+    "k": "2023-12-31",
+    "rd": "2024-09-25"
+  },
+  "openrouter/meta-llama/llama-3.2-3b-instruct:free": {
+    "c": {
+      "i": 0,
+      "o": 0
+    },
+    "l": {
+      "c": 131072,
+      "o": 131072
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "llama",
+    "k": "2023-12-31",
+    "rd": "2024-09-25"
+  },
+  "openrouter/meta-llama/llama-3.3-70b-instruct": {
+    "c": {
+      "i": 0.1,
+      "o": 0.32
+    },
+    "l": {
+      "c": 131072,
+      "o": 16384
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "llama",
+    "k": "2023-12-31",
+    "rd": "2024-12-06"
+  },
+  "openrouter/meta-llama/llama-3.3-70b-instruct:free": {
+    "c": {
+      "i": 0,
+      "o": 0
+    },
+    "l": {
+      "c": 65536,
+      "o": 131072
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "llama",
+    "k": "2023-12-31",
+    "rd": "2024-12-06"
+  },
+  "openrouter/meta-llama/llama-4-maverick": {
+    "c": {
+      "i": 0.15,
+      "o": 0.6
+    },
+    "l": {
+      "c": 1048576,
+      "o": 16384
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "llama",
+    "k": "2024-08-31",
+    "rd": "2025-04-05"
+  },
+  "openrouter/meta-llama/llama-4-scout": {
+    "c": {
+      "i": 0.08,
+      "o": 0.3
+    },
+    "l": {
+      "c": 327680,
+      "o": 16384
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "llama",
+    "k": "2024-08-31",
+    "rd": "2025-04-05"
+  },
+  "openrouter/meta-llama/llama-guard-3-8b": {
+    "c": {
+      "i": 0.484,
+      "o": 0.03
+    },
+    "l": {
+      "c": 131072,
+      "o": 131072
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "llama",
+    "k": "2023-12-31",
+    "rd": "2025-02-12"
+  },
+  "openrouter/meta-llama/llama-guard-4-12b": {
+    "c": {
+      "i": 0.18,
+      "o": 0.18
+    },
+    "l": {
+      "c": 163840,
+      "o": 16384
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": true
+    },
+    "m": [
+      "image",
+      "text"
+    ],
+    "fam": "llama",
+    "k": "2024-08-31",
+    "rd": "2025-04-30"
+  },
+  "openrouter/microsoft/phi-4": {
+    "c": {
+      "i": 0.065,
+      "o": 0.14
+    },
+    "l": {
+      "c": 16384,
+      "o": 16384
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "phi",
+    "k": "2024-06-30",
+    "rd": "2025-01-10"
+  },
+  "openrouter/microsoft/phi-4-mini-instruct": {
+    "c": {
+      "i": 0.08,
+      "o": 0.35,
+      "r": 0.08
+    },
+    "l": {
+      "c": 128000,
+      "o": 128000
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "phi",
+    "rd": "2025-10-17"
+  },
+  "openrouter/microsoft/wizardlm-2-8x22b": {
+    "c": {
+      "i": 0.62,
+      "o": 0.62
+    },
+    "l": {
+      "c": 65535,
+      "o": 8000
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "k": "2024-04-30",
+    "rd": "2024-04-16"
+  },
+  "openrouter/minimax/minimax-01": {
+    "c": {
+      "i": 0.2,
+      "o": 1.1
+    },
+    "l": {
+      "c": 1000192,
+      "o": 1000192
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "minimax",
+    "k": "2024-03-31",
+    "rd": "2025-01-15"
+  },
+  "openrouter/minimax/minimax-m1": {
+    "c": {
+      "i": 0.4,
+      "o": 2.2
+    },
+    "l": {
+      "c": 1000000,
+      "o": 40000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "minimax",
+    "k": "2024-06-30",
+    "rd": "2025-06-17"
+  },
+  "openrouter/minimax/minimax-m2": {
+    "c": {
+      "i": 0.255,
+      "o": 1,
+      "r": 0.03
+    },
+    "l": {
+      "c": 196608,
+      "o": 196608
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "minimax",
+    "rd": "2025-10-23"
+  },
+  "openrouter/minimax/minimax-m2-her": {
+    "c": {
+      "i": 0.3,
+      "o": 1.2,
+      "r": 0.03
+    },
+    "l": {
+      "c": 65536,
+      "o": 2048
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "minimax",
+    "rd": "2026-01-23"
+  },
+  "openrouter/minimax/minimax-m2.1": {
+    "c": {
+      "i": 0.29,
+      "o": 0.95,
+      "r": 0.03
+    },
+    "l": {
+      "c": 196608,
+      "o": 196608
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "minimax",
+    "rd": "2025-12-23"
+  },
+  "openrouter/minimax/minimax-m2.5": {
+    "c": {
+      "i": 0.15,
+      "o": 1.15
+    },
+    "l": {
+      "c": 196608,
+      "o": 196608
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "minimax",
+    "rd": "2026-02-12"
+  },
+  "openrouter/minimax/minimax-m2.5:free": {
+    "c": {
+      "i": 0,
+      "o": 0
+    },
+    "l": {
+      "c": 196608,
+      "o": 8192
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "minimax",
+    "rd": "2026-02-12"
+  },
+  "openrouter/minimax/minimax-m2.7": {
+    "c": {
+      "i": 0.279,
+      "o": 1.2
+    },
+    "l": {
+      "c": 196608,
+      "o": 131072
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "minimax",
+    "rd": "2026-03-18"
+  },
+  "openrouter/mistralai/codestral-2508": {
+    "c": {
+      "i": 0.3,
+      "o": 0.9,
+      "r": 0.03
+    },
+    "l": {
+      "c": 256000,
+      "o": 256000
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "pdf"
+    ],
+    "fam": "codestral",
+    "k": "2025-03-31",
+    "rd": "2025-08-01"
+  },
+  "openrouter/mistralai/devstral-2512": {
+    "c": {
+      "i": 0.4,
+      "o": 2,
+      "r": 0.04
+    },
+    "l": {
+      "c": 262144,
+      "o": 262144
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "pdf"
+    ],
+    "fam": "devstral",
+    "k": "2025-12",
+    "rd": "2025-12-09"
+  },
+  "openrouter/mistralai/devstral-medium": {
+    "c": {
+      "i": 0.4,
+      "o": 2,
+      "r": 0.04
+    },
+    "l": {
+      "c": 131072,
+      "o": 131072
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "pdf"
+    ],
+    "fam": "devstral",
+    "k": "2025-06-30",
+    "rd": "2025-07-10"
+  },
+  "openrouter/mistralai/devstral-small": {
+    "c": {
+      "i": 0.1,
+      "o": 0.3,
+      "r": 0.01
+    },
+    "l": {
+      "c": 131072,
+      "o": 131072
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "pdf"
+    ],
+    "fam": "devstral",
+    "k": "2025-03-31",
+    "rd": "2025-07-10"
+  },
+  "openrouter/mistralai/ministral-14b-2512": {
+    "c": {
+      "i": 0.2,
+      "o": 0.2,
+      "r": 0.02
+    },
+    "l": {
+      "c": 262144,
+      "o": 262144
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "ministral",
+    "rd": "2025-12-02"
+  },
+  "openrouter/mistralai/ministral-3b-2512": {
+    "c": {
+      "i": 0.1,
+      "o": 0.1,
+      "r": 0.01
+    },
+    "l": {
+      "c": 131072,
+      "o": 131072
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "ministral",
+    "rd": "2025-12-02"
+  },
+  "openrouter/mistralai/ministral-8b-2512": {
+    "c": {
+      "i": 0.15,
+      "o": 0.15,
+      "r": 0.015
+    },
+    "l": {
+      "c": 262144,
+      "o": 262144
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "ministral",
+    "rd": "2025-12-02"
+  },
+  "openrouter/mistralai/mistral-7b-instruct-v0.1": {
+    "c": {
+      "i": 0.11,
+      "o": 0.19
+    },
+    "l": {
+      "c": 2824,
+      "o": 2824
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "mistral",
+    "k": "2023-09-30",
+    "rd": "2023-09-28"
+  },
+  "openrouter/mistralai/mistral-large": {
+    "c": {
+      "i": 2,
+      "o": 6,
+      "r": 0.2
+    },
+    "l": {
+      "c": 128000,
+      "o": 128000
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "pdf"
+    ],
+    "fam": "mistral-large",
+    "k": "2024-11-30",
+    "rd": "2024-02-26"
+  },
+  "openrouter/mistralai/mistral-large-2407": {
+    "c": {
+      "i": 2,
+      "o": 6,
+      "r": 0.2
+    },
+    "l": {
+      "c": 131072,
+      "o": 131072
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "pdf"
+    ],
+    "fam": "mistral-large",
+    "k": "2024-03-31",
+    "rd": "2024-11-19"
+  },
+  "openrouter/mistralai/mistral-large-2411": {
+    "c": {
+      "i": 2,
+      "o": 6,
+      "r": 0.2
+    },
+    "l": {
+      "c": 131072,
+      "o": 131072
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "pdf"
+    ],
+    "fam": "mistral-large",
+    "k": "2024-07-31",
+    "rd": "2024-11-19"
+  },
+  "openrouter/mistralai/mistral-large-2512": {
+    "c": {
+      "i": 0.5,
+      "o": 1.5,
+      "r": 0.05
+    },
+    "l": {
+      "c": 262144,
+      "o": 262144
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "mistral-large",
+    "rd": "2025-12-01"
+  },
+  "openrouter/mistralai/mistral-medium-3": {
+    "c": {
+      "i": 0.4,
+      "o": 2,
+      "r": 0.04
+    },
+    "l": {
+      "c": 131072,
+      "o": 131072
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "mistral-medium",
+    "k": "2025-03-31",
+    "rd": "2025-05-07"
+  },
+  "openrouter/mistralai/mistral-medium-3-5": {
+    "c": {
+      "i": 1.5,
+      "o": 7.5
+    },
+    "l": {
+      "c": 262144,
+      "o": 262144
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "mistral-medium",
+    "rd": "2026-04-30"
+  },
+  "openrouter/mistralai/mistral-medium-3.1": {
+    "c": {
+      "i": 0.4,
+      "o": 2,
+      "r": 0.04
+    },
+    "l": {
+      "c": 131072,
+      "o": 262144
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "mistral-medium",
+    "k": "2025-06-30",
+    "rd": "2025-08-13"
+  },
+  "openrouter/mistralai/mistral-nemo": {
+    "c": {
+      "i": 0.02,
+      "o": 0.03
+    },
+    "l": {
+      "c": 131072,
+      "o": 131072
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "mistral-nemo",
+    "k": "2024-04-30",
+    "rd": "2024-07-19"
+  },
+  "openrouter/mistralai/mistral-saba": {
+    "c": {
+      "i": 0.2,
+      "o": 0.6,
+      "r": 0.02
+    },
+    "l": {
+      "c": 32768,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "pdf"
+    ],
+    "fam": "mistral",
+    "k": "2024-09-30",
+    "rd": "2025-02-17"
+  },
+  "openrouter/mistralai/mistral-small-24b-instruct-2501": {
+    "c": {
+      "i": 0.05,
+      "o": 0.08
+    },
+    "l": {
+      "c": 32768,
+      "o": 16384
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "mistral-small",
+    "k": "2023-10-31",
+    "rd": "2025-01-30"
+  },
+  "openrouter/mistralai/mistral-small-2603": {
+    "c": {
+      "i": 0.15,
+      "o": 0.6,
+      "r": 0.015
+    },
+    "l": {
+      "c": 262144,
+      "o": 262144
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "mistral-small",
+    "k": "2025-06",
+    "rd": "2026-03-16"
+  },
+  "openrouter/mistralai/mistral-small-3.1-24b-instruct": {
+    "c": {
+      "i": 0.351,
+      "o": 0.555
+    },
+    "l": {
+      "c": 128000,
+      "o": 128000
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "mistral-small",
+    "k": "2023-10-31",
+    "rd": "2025-03-17"
+  },
+  "openrouter/mistralai/mistral-small-3.2-24b-instruct": {
+    "c": {
+      "i": 0.075,
+      "o": 0.2
+    },
+    "l": {
+      "c": 128000,
+      "o": 16384
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "image",
+      "text"
+    ],
+    "fam": "mistral-small",
+    "k": "2023-10-31",
+    "rd": "2025-06-20"
+  },
+  "openrouter/mistralai/mixtral-8x22b-instruct": {
+    "c": {
+      "i": 2,
+      "o": 6,
+      "r": 0.2
+    },
+    "l": {
+      "c": 65536,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "pdf"
+    ],
+    "fam": "mistral",
+    "k": "2024-01-31",
+    "rd": "2024-04-17"
+  },
+  "openrouter/mistralai/pixtral-large-2411": {
+    "c": {
+      "i": 2,
+      "o": 6,
+      "r": 0.2
+    },
+    "l": {
+      "c": 131072,
+      "o": 131072
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "mistral",
+    "k": "2024-07-31",
+    "rd": "2024-11-19"
+  },
+  "openrouter/mistralai/voxtral-small-24b-2507": {
+    "c": {
+      "i": 0.1,
+      "o": 0.3,
+      "r": 0.01
+    },
+    "l": {
+      "c": 32000,
+      "o": 32000
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "audio",
+      "pdf"
+    ],
+    "fam": "mistral",
+    "rd": "2025-10-30"
+  },
+  "openrouter/moonshotai/kimi-k2": {
+    "c": {
+      "i": 0.57,
+      "o": 2.3
+    },
+    "l": {
+      "c": 131072,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "kimi",
+    "k": "2024-12-31",
+    "rd": "2025-07-11"
+  },
+  "openrouter/moonshotai/kimi-k2-0905": {
+    "c": {
+      "i": 0.6,
+      "o": 2.5
+    },
+    "l": {
+      "c": 262144,
+      "o": 262144
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "kimi",
+    "k": "2024-12-31",
+    "rd": "2025-09-04"
+  },
+  "openrouter/moonshotai/kimi-k2-thinking": {
+    "c": {
+      "i": 0.6,
+      "o": 2.5
+    },
+    "l": {
+      "c": 262144,
+      "o": 262144
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "kimi-thinking",
+    "k": "2024-08",
+    "rd": "2025-11-06"
+  },
+  "openrouter/moonshotai/kimi-k2.5": {
+    "c": {
+      "i": 0.4,
+      "o": 1.9,
+      "r": 0.09
+    },
+    "l": {
+      "c": 262144,
+      "o": 262144
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "kimi",
+    "k": "2025-01",
+    "rd": "2026-01-27"
+  },
+  "openrouter/moonshotai/kimi-k2.6": {
+    "c": {
+      "i": 0.73,
+      "o": 3.49,
+      "r": 0.25
+    },
+    "l": {
+      "c": 262142,
+      "o": 262142
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "kimi",
+    "rd": "2026-04-20"
+  },
+  "openrouter/morph/morph-v3-fast": {
+    "c": {
+      "i": 0.8,
+      "o": 1.2
+    },
+    "l": {
+      "c": 81920,
+      "o": 38000
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "morph",
+    "rd": "2025-07-07"
+  },
+  "openrouter/morph/morph-v3-large": {
+    "c": {
+      "i": 0.9,
+      "o": 1.9
+    },
+    "l": {
+      "c": 262144,
+      "o": 131072
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "morph",
+    "rd": "2025-07-07"
+  },
+  "openrouter/nex-agi/deepseek-v3.1-nex-n1": {
+    "c": {
+      "i": 0.135,
+      "o": 0.5
+    },
+    "l": {
+      "c": 131072,
+      "o": 163840
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "deepseek",
+    "rd": "2025-12-08"
+  },
+  "openrouter/nousresearch/hermes-2-pro-llama-3-8b": {
+    "c": {
+      "i": 0.14,
+      "o": 0.14
+    },
+    "l": {
+      "c": 8192,
+      "o": 8192
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "nousresearch",
+    "k": "2023-12-31",
+    "rd": "2024-05-27"
+  },
+  "openrouter/nousresearch/hermes-3-llama-3.1-405b": {
+    "c": {
+      "i": 1,
+      "o": 1
+    },
+    "l": {
+      "c": 131072,
+      "o": 16384
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "nousresearch",
+    "k": "2023-12-31",
+    "rd": "2024-08-16"
+  },
+  "openrouter/nousresearch/hermes-3-llama-3.1-405b:free": {
+    "c": {
+      "i": 0,
+      "o": 0
+    },
+    "l": {
+      "c": 131072,
+      "o": 131072
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "hermes",
+    "k": "2023-12-31",
+    "rd": "2024-08-16"
+  },
+  "openrouter/nousresearch/hermes-3-llama-3.1-70b": {
+    "c": {
+      "i": 0.3,
+      "o": 0.3
+    },
+    "l": {
+      "c": 131072,
+      "o": 16384
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "nousresearch",
+    "k": "2023-12-31",
+    "rd": "2024-08-18"
+  },
+  "openrouter/nousresearch/hermes-4-405b": {
+    "c": {
+      "i": 1,
+      "o": 3
+    },
+    "l": {
+      "c": 131072,
+      "o": 131072
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "hermes",
+    "k": "2024-08-31",
+    "rd": "2025-08-26"
+  },
+  "openrouter/nousresearch/hermes-4-70b": {
+    "c": {
+      "i": 0.13,
+      "o": 0.4
+    },
+    "l": {
+      "c": 131072,
+      "o": 131072
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "hermes",
+    "k": "2024-08-31",
+    "rd": "2025-08-26"
+  },
+  "openrouter/nvidia/llama-3.3-nemotron-super-49b-v1.5": {
+    "c": {
+      "i": 0.1,
+      "o": 0.4
+    },
+    "l": {
+      "c": 131072,
+      "o": 16384
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "nemotron",
+    "k": "2024-03-31",
+    "rd": "2025-10-10"
+  },
+  "openrouter/nvidia/nemotron-3-nano-30b-a3b": {
+    "c": {
+      "i": 0.05,
+      "o": 0.2
+    },
+    "l": {
+      "c": 262144,
+      "o": 228000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "nemotron",
+    "rd": "2025-12-14"
+  },
+  "openrouter/nvidia/nemotron-3-nano-30b-a3b:free": {
+    "c": {
+      "i": 0,
+      "o": 0
+    },
+    "l": {
+      "c": 256000,
+      "o": 256000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "nemotron",
+    "k": "2025-11",
+    "rd": "2025-12-14"
+  },
+  "openrouter/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free": {
+    "c": {
+      "i": 0,
+      "o": 0
+    },
+    "l": {
+      "c": 256000,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "audio",
+      "image",
+      "video"
+    ],
+    "fam": "nemotron",
+    "rd": "2026-04-28"
+  },
+  "openrouter/nvidia/nemotron-3-super-120b-a12b": {
+    "c": {
+      "i": 0.09,
+      "o": 0.45
+    },
+    "l": {
+      "c": 262144,
+      "o": 262144
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "nemotron",
+    "k": "2024-04",
+    "rd": "2026-03-11"
+  },
+  "openrouter/nvidia/nemotron-3-super-120b-a12b:free": {
+    "c": {
+      "i": 0,
+      "o": 0
+    },
+    "l": {
+      "c": 262144,
+      "o": 262144
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "nemotron",
+    "k": "2024-04",
+    "rd": "2026-03-11"
+  },
+  "openrouter/nvidia/nemotron-nano-12b-v2-vl:free": {
+    "c": {
+      "i": 0,
+      "o": 0
+    },
+    "l": {
+      "c": 128000,
+      "o": 128000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "image",
+      "text",
+      "video"
+    ],
+    "fam": "nemotron",
+    "k": "2025-11",
+    "rd": "2025-10-28"
+  },
+  "openrouter/nvidia/nemotron-nano-9b-v2": {
+    "c": {
+      "i": 0.04,
+      "o": 0.16
+    },
+    "l": {
+      "c": 131072,
+      "o": 16384
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "nemotron",
+    "k": "2025-03-31",
+    "rd": "2025-09-05"
+  },
+  "openrouter/nvidia/nemotron-nano-9b-v2:free": {
+    "c": {
+      "i": 0,
+      "o": 0
+    },
+    "l": {
+      "c": 128000,
+      "o": 128000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "nemotron",
+    "k": "2025-03-31",
+    "rd": "2025-09-05"
+  },
+  "openrouter/openai/gpt-3.5-turbo": {
+    "c": {
+      "i": 0.5,
+      "o": 1.5
+    },
+    "l": {
+      "c": 16385,
+      "o": 4096
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "gpt",
+    "k": "2021-09-30",
+    "rd": "2023-05-28"
+  },
+  "openrouter/openai/gpt-3.5-turbo-0613": {
+    "c": {
+      "i": 1,
+      "o": 2
+    },
+    "l": {
+      "c": 4095,
+      "o": 4096
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "gpt",
+    "k": "2021-09-30",
+    "rd": "2024-01-25"
+  },
+  "openrouter/openai/gpt-3.5-turbo-16k": {
+    "c": {
+      "i": 3,
+      "o": 4
+    },
+    "l": {
+      "c": 16385,
+      "o": 4096
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "gpt",
+    "k": "2021-09-30",
+    "rd": "2023-08-28"
+  },
+  "openrouter/openai/gpt-3.5-turbo-instruct": {
+    "c": {
+      "i": 1.5,
+      "o": 2
+    },
+    "l": {
+      "c": 4095,
+      "o": 4096
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "gpt",
+    "k": "2021-09-30",
+    "rd": "2023-09-28"
+  },
+  "openrouter/openai/gpt-4": {
+    "c": {
+      "i": 30,
+      "o": 60
+    },
+    "l": {
+      "c": 8191,
+      "o": 4096
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "gpt",
+    "k": "2021-09-30",
+    "rd": "2023-05-28"
+  },
+  "openrouter/openai/gpt-4-0314": {
+    "c": {
+      "i": 30,
+      "o": 60
+    },
+    "l": {
+      "c": 8191,
+      "o": 4096
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "gpt",
+    "k": "2021-09-30",
+    "rd": "2023-05-28"
+  },
+  "openrouter/openai/gpt-4-1106-preview": {
+    "c": {
+      "i": 10,
+      "o": 30
+    },
+    "l": {
+      "c": 128000,
+      "o": 4096
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "gpt",
+    "k": "2023-04-30",
+    "rd": "2023-11-06"
+  },
+  "openrouter/openai/gpt-4-turbo": {
+    "c": {
+      "i": 10,
+      "o": 30
+    },
+    "l": {
+      "c": 128000,
+      "o": 4096
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "gpt",
+    "k": "2023-12-31",
+    "rd": "2024-04-09"
+  },
+  "openrouter/openai/gpt-4-turbo-preview": {
+    "c": {
+      "i": 10,
+      "o": 30
+    },
+    "l": {
+      "c": 128000,
+      "o": 4096
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "gpt",
+    "k": "2023-12-31",
+    "rd": "2024-01-25"
+  },
+  "openrouter/openai/gpt-4.1": {
+    "c": {
+      "i": 2,
+      "o": 8,
+      "r": 0.5
+    },
+    "l": {
+      "c": 1047576,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "image",
+      "text",
+      "pdf"
+    ],
+    "fam": "gpt",
+    "k": "2024-06-30",
+    "rd": "2025-04-14"
+  },
+  "openrouter/openai/gpt-4.1-mini": {
+    "c": {
+      "i": 0.4,
+      "o": 1.6,
+      "r": 0.1
+    },
+    "l": {
+      "c": 1047576,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "image",
+      "text",
+      "pdf"
+    ],
+    "fam": "gpt-mini",
+    "k": "2024-06-30",
+    "rd": "2025-04-14"
+  },
+  "openrouter/openai/gpt-4.1-nano": {
+    "c": {
+      "i": 0.1,
+      "o": 0.4,
+      "r": 0.025
+    },
+    "l": {
+      "c": 1047576,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "image",
+      "text",
+      "pdf"
+    ],
+    "fam": "gpt",
+    "k": "2024-06-30",
+    "rd": "2025-04-14"
+  },
+  "openrouter/openai/gpt-4o": {
+    "c": {
+      "i": 2.5,
+      "o": 10
+    },
+    "l": {
+      "c": 128000,
+      "o": 16384
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "gpt",
+    "k": "2023-10-31",
+    "rd": "2024-05-13"
+  },
+  "openrouter/openai/gpt-4o-2024-05-13": {
+    "c": {
+      "i": 5,
+      "o": 15
+    },
+    "l": {
+      "c": 128000,
+      "o": 4096
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "gpt",
+    "k": "2023-10-31",
+    "rd": "2024-05-13"
+  },
+  "openrouter/openai/gpt-4o-2024-08-06": {
+    "c": {
+      "i": 2.5,
+      "o": 10,
+      "r": 1.25
+    },
+    "l": {
+      "c": 128000,
+      "o": 16384
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "gpt",
+    "k": "2023-10-31",
+    "rd": "2024-08-06"
+  },
+  "openrouter/openai/gpt-4o-2024-11-20": {
+    "c": {
+      "i": 2.5,
+      "o": 10,
+      "r": 1.25
+    },
+    "l": {
+      "c": 128000,
+      "o": 16384
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "gpt",
+    "k": "2023-10-31",
+    "rd": "2024-11-20"
+  },
+  "openrouter/openai/gpt-4o-audio-preview": {
+    "c": {
+      "i": 2.5,
+      "o": 10
+    },
+    "l": {
+      "c": 128000,
+      "o": 16384
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "audio",
+      "text"
+    ],
+    "fam": "gpt",
+    "k": "2023-10-31",
+    "rd": "2025-08-15"
+  },
+  "openrouter/openai/gpt-4o-mini": {
+    "c": {
+      "i": 0.15,
+      "o": 0.6,
+      "r": 0.075
+    },
+    "l": {
+      "c": 128000,
+      "o": 16384
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "gpt-mini",
+    "k": "2023-10-31",
+    "rd": "2024-07-18"
+  },
+  "openrouter/openai/gpt-4o-mini-2024-07-18": {
+    "c": {
+      "i": 0.15,
+      "o": 0.6,
+      "r": 0.075
+    },
+    "l": {
+      "c": 128000,
+      "o": 16384
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "o-mini",
+    "k": "2023-10-31",
+    "rd": "2024-07-18"
+  },
+  "openrouter/openai/gpt-4o-mini-search-preview": {
+    "c": {
+      "i": 0.15,
+      "o": 0.6
+    },
+    "l": {
+      "c": 128000,
+      "o": 16384
+    },
+    "f": {
+      "t": false,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "o-mini",
+    "k": "2023-10-31",
+    "rd": "2025-03-12"
+  },
+  "openrouter/openai/gpt-4o-search-preview": {
+    "c": {
+      "i": 2.5,
+      "o": 10
+    },
+    "l": {
+      "c": 128000,
+      "o": 16384
+    },
+    "f": {
+      "t": false,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "gpt",
+    "k": "2023-10-31",
+    "rd": "2025-03-12"
+  },
+  "openrouter/openai/gpt-5": {
+    "c": {
+      "i": 1.25,
+      "o": 10,
+      "r": 0.125
+    },
+    "l": {
+      "c": 400000,
+      "o": 128000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "gpt",
+    "k": "2024-09-30",
+    "rd": "2025-08-07"
+  },
+  "openrouter/openai/gpt-5-chat": {
+    "c": {
+      "i": 1.25,
+      "o": 10,
+      "r": 0.125
+    },
+    "l": {
+      "c": 128000,
+      "o": 16384
+    },
+    "f": {
+      "t": false,
+      "r": false,
+      "tc": false,
+      "a": true
+    },
+    "m": [
+      "pdf",
+      "image",
+      "text"
+    ],
+    "fam": "gpt-codex",
+    "k": "2024-09-30",
+    "rd": "2025-08-07"
+  },
+  "openrouter/openai/gpt-5-codex": {
+    "c": {
+      "i": 1.25,
+      "o": 10,
+      "r": 0.125
+    },
+    "l": {
+      "c": 400000,
+      "o": 128000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "gpt-codex",
+    "k": "2024-09-30",
+    "rd": "2025-09-23"
+  },
+  "openrouter/openai/gpt-5-image": {
+    "c": {
+      "i": 10,
+      "o": 10,
+      "r": 1.25
+    },
+    "l": {
+      "c": 400000,
+      "o": 128000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": false,
+      "a": true
+    },
+    "m": [
+      "image",
+      "text",
+      "pdf"
+    ],
+    "fam": "gpt",
+    "k": "2024-10-01",
+    "rd": "2025-10-14"
+  },
+  "openrouter/openai/gpt-5-image-mini": {
+    "c": {
+      "i": 2.5,
+      "o": 2,
+      "r": 0.25
+    },
+    "l": {
+      "c": 400000,
+      "o": 128000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": false,
+      "a": true
+    },
+    "m": [
+      "pdf",
+      "image",
+      "text"
+    ],
+    "fam": "gpt",
+    "rd": "2025-10-16"
+  },
+  "openrouter/openai/gpt-5-mini": {
+    "c": {
+      "i": 0.25,
+      "o": 2,
+      "r": 0.025
+    },
+    "l": {
+      "c": 400000,
+      "o": 128000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "gpt-mini",
+    "k": "2024-05-31",
+    "rd": "2025-08-07"
+  },
+  "openrouter/openai/gpt-5-nano": {
+    "c": {
+      "i": 0.05,
+      "o": 0.4,
+      "r": 0.01
+    },
+    "l": {
+      "c": 400000,
+      "o": 128000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "gpt-nano",
+    "k": "2024-05-31",
+    "rd": "2025-08-07"
+  },
+  "openrouter/openai/gpt-5-pro": {
+    "c": {
+      "i": 15,
+      "o": 120
+    },
+    "l": {
+      "c": 400000,
+      "o": 128000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "image",
+      "text",
+      "pdf"
+    ],
+    "fam": "gpt-pro",
+    "k": "2024-09-30",
+    "rd": "2025-10-06"
+  },
+  "openrouter/openai/gpt-5.1": {
+    "c": {
+      "i": 1.25,
+      "o": 10,
+      "r": 0.13
+    },
+    "l": {
+      "c": 400000,
+      "o": 128000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "image",
+      "text",
+      "pdf"
+    ],
+    "fam": "gpt",
+    "k": "2024-09-30",
+    "rd": "2025-11-13"
+  },
+  "openrouter/openai/gpt-5.1-chat": {
+    "c": {
+      "i": 1.25,
+      "o": 10,
+      "r": 0.125
+    },
+    "l": {
+      "c": 128000,
+      "o": 16384
+    },
+    "f": {
+      "t": false,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "pdf",
+      "image",
+      "text"
+    ],
+    "fam": "gpt-codex",
+    "k": "2024-09-30",
+    "rd": "2025-11-13"
+  },
+  "openrouter/openai/gpt-5.1-codex": {
+    "c": {
+      "i": 1.25,
+      "o": 10,
+      "r": 0.125
+    },
+    "l": {
+      "c": 400000,
+      "o": 128000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "gpt-codex",
+    "k": "2024-09-30",
+    "rd": "2025-11-13"
+  },
+  "openrouter/openai/gpt-5.1-codex-max": {
+    "c": {
+      "i": 1.25,
+      "o": 10,
+      "r": 0.125
+    },
+    "l": {
+      "c": 400000,
+      "o": 128000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "gpt-codex",
+    "k": "2024-09-30",
+    "rd": "2025-12-04"
+  },
+  "openrouter/openai/gpt-5.1-codex-mini": {
+    "c": {
+      "i": 0.25,
+      "o": 2,
+      "r": 0.03
+    },
+    "l": {
+      "c": 400000,
+      "o": 128000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "image",
+      "text"
+    ],
+    "fam": "gpt-codex",
+    "k": "2024-09-30",
+    "rd": "2025-11-13"
+  },
+  "openrouter/openai/gpt-5.2": {
+    "c": {
+      "i": 1.75,
+      "o": 14,
+      "r": 0.175
+    },
+    "l": {
+      "c": 400000,
+      "o": 128000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "pdf",
+      "image",
+      "text"
+    ],
+    "fam": "gpt",
+    "k": "2025-08-31",
+    "rd": "2025-12-10"
+  },
+  "openrouter/openai/gpt-5.2-chat": {
+    "c": {
+      "i": 1.75,
+      "o": 14,
+      "r": 0.175
+    },
+    "l": {
+      "c": 128000,
+      "o": 32000
+    },
+    "f": {
+      "t": false,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "pdf",
+      "image",
+      "text"
+    ],
+    "fam": "gpt-codex",
+    "k": "2025-08-31",
+    "rd": "2025-12-10"
+  },
+  "openrouter/openai/gpt-5.2-codex": {
+    "c": {
+      "i": 1.75,
+      "o": 14,
+      "r": 0.175
+    },
+    "l": {
+      "c": 400000,
+      "o": 128000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "gpt-codex",
+    "k": "2025-08-31",
+    "rd": "2026-01-14"
+  },
+  "openrouter/openai/gpt-5.2-pro": {
+    "c": {
+      "i": 21,
+      "o": 168
+    },
+    "l": {
+      "c": 400000,
+      "o": 128000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "image",
+      "text",
+      "pdf"
+    ],
+    "fam": "gpt-pro",
+    "k": "2025-08-31",
+    "rd": "2025-12-10"
+  },
+  "openrouter/openai/gpt-5.3-chat": {
+    "c": {
+      "i": 1.75,
+      "o": 14,
+      "r": 0.175
+    },
+    "l": {
+      "c": 128000,
+      "o": 16384
+    },
+    "f": {
+      "t": false,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "gpt",
+    "rd": "2026-03-03"
+  },
+  "openrouter/openai/gpt-5.3-codex": {
+    "c": {
+      "i": 1.75,
+      "o": 14,
+      "r": 0.175
+    },
+    "l": {
+      "c": 400000,
+      "o": 128000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "gpt-codex",
+    "k": "2025-08-31",
+    "rd": "2026-02-24"
+  },
+  "openrouter/openai/gpt-5.4": {
+    "c": {
+      "i": 2.5,
+      "o": 15,
+      "r": 0.25
+    },
+    "l": {
+      "c": 1050000,
+      "o": 128000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "gpt",
+    "rd": "2026-03-05"
+  },
+  "openrouter/openai/gpt-5.4-image-2": {
+    "c": {
+      "i": 8,
+      "o": 15,
+      "r": 2
+    },
+    "l": {
+      "c": 272000,
+      "o": 128000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": false,
+      "a": true
+    },
+    "m": [
+      "image",
+      "text",
+      "pdf"
+    ],
+    "fam": "gpt",
+    "rd": "2026-04-21"
+  },
+  "openrouter/openai/gpt-5.4-mini": {
+    "c": {
+      "i": 0.75,
+      "o": 4.5,
+      "r": 0.075
+    },
+    "l": {
+      "c": 400000,
+      "o": 128000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "pdf",
+      "image",
+      "text"
+    ],
+    "fam": "gpt-mini",
+    "k": "2025-08-31",
+    "rd": "2026-03-17"
+  },
+  "openrouter/openai/gpt-5.4-nano": {
+    "c": {
+      "i": 0.2,
+      "o": 1.25,
+      "r": 0.02
+    },
+    "l": {
+      "c": 400000,
+      "o": 128000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "pdf",
+      "image",
+      "text"
+    ],
+    "fam": "gpt-nano",
+    "k": "2025-08-31",
+    "rd": "2026-03-17"
+  },
+  "openrouter/openai/gpt-5.4-pro": {
+    "c": {
+      "i": 30,
+      "o": 180
+    },
+    "l": {
+      "c": 1050000,
+      "o": 128000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "gpt-pro",
+    "k": "2025-08-31",
+    "rd": "2026-03-05"
+  },
+  "openrouter/openai/gpt-5.5": {
+    "c": {
+      "i": 5,
+      "o": 30,
+      "r": 0.5
+    },
+    "l": {
+      "c": 1050000,
+      "o": 128000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "pdf",
+      "image",
+      "text"
+    ],
+    "fam": "gpt",
+    "k": "2025-12-01",
+    "rd": "2026-04-24"
+  },
+  "openrouter/openai/gpt-5.5-pro": {
+    "c": {
+      "i": 30,
+      "o": 180
+    },
+    "l": {
+      "c": 1050000,
+      "o": 128000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "pdf",
+      "image",
+      "text"
+    ],
+    "fam": "gpt",
+    "k": "2025-12-01",
+    "rd": "2026-04-24"
+  },
+  "openrouter/openai/gpt-audio": {
+    "c": {
+      "i": 2.5,
+      "o": 10
+    },
+    "l": {
+      "c": 128000,
+      "o": 16384
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "audio"
+    ],
+    "fam": "gpt",
+    "rd": "2026-01-19"
+  },
+  "openrouter/openai/gpt-audio-mini": {
+    "c": {
+      "i": 0.6,
+      "o": 2.4
+    },
+    "l": {
+      "c": 128000,
+      "o": 16384
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "audio"
+    ],
+    "fam": "o-mini",
+    "rd": "2026-01-19"
+  },
+  "openrouter/openai/gpt-chat-latest": {
+    "c": {
+      "i": 5,
+      "o": 30,
+      "r": 0.5
+    },
+    "l": {
+      "c": 400000,
+      "o": 128000
+    },
+    "f": {
+      "t": false,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "gpt",
+    "rd": "2026-05-05"
+  },
+  "openrouter/openai/gpt-oss-120b": {
+    "c": {
+      "i": 0.039,
+      "o": 0.18
+    },
+    "l": {
+      "c": 131072,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "gpt-oss",
+    "k": "2024-06-30",
+    "rd": "2025-08-05"
+  },
+  "openrouter/openai/gpt-oss-120b:free": {
+    "c": {
+      "i": 0,
+      "o": 0
+    },
+    "l": {
+      "c": 131072,
+      "o": 131072
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "gpt-oss",
+    "k": "2024-06-30",
+    "rd": "2025-08-05"
+  },
+  "openrouter/openai/gpt-oss-20b": {
+    "c": {
+      "i": 0.03,
+      "o": 0.14
+    },
+    "l": {
+      "c": 131072,
+      "o": 131072
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "gpt-oss",
+    "k": "2024-06-30",
+    "rd": "2025-08-05"
+  },
+  "openrouter/openai/gpt-oss-20b:free": {
+    "c": {
+      "i": 0,
+      "o": 0
+    },
+    "l": {
+      "c": 131072,
+      "o": 8192
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "gpt-oss",
+    "k": "2024-06-30",
+    "rd": "2025-08-05"
+  },
+  "openrouter/openai/gpt-oss-safeguard-20b": {
+    "c": {
+      "i": 0.075,
+      "o": 0.3,
+      "r": 0.037
+    },
+    "l": {
+      "c": 131072,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "gpt-oss",
+    "rd": "2025-10-29"
+  },
+  "openrouter/openai/o1": {
+    "c": {
+      "i": 15,
+      "o": 60,
+      "r": 7.5
+    },
+    "l": {
+      "c": 200000,
+      "o": 100000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "o",
+    "k": "2023-10-31",
+    "rd": "2024-12-17"
+  },
+  "openrouter/openai/o1-pro": {
+    "c": {
+      "i": 150,
+      "o": 600
+    },
+    "l": {
+      "c": 200000,
+      "o": 100000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": false,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "o",
+    "k": "2023-10-31",
+    "rd": "2025-03-19"
+  },
+  "openrouter/openai/o3": {
+    "c": {
+      "i": 2,
+      "o": 8,
+      "r": 0.5
+    },
+    "l": {
+      "c": 200000,
+      "o": 100000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "image",
+      "text",
+      "pdf"
+    ],
+    "fam": "o",
+    "k": "2024-06-30",
+    "rd": "2025-04-16"
+  },
+  "openrouter/openai/o3-deep-research": {
+    "c": {
+      "i": 10,
+      "o": 40,
+      "r": 2.5
+    },
+    "l": {
+      "c": 200000,
+      "o": 100000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "image",
+      "text",
+      "pdf"
+    ],
+    "fam": "o",
+    "rd": "2025-10-10"
+  },
+  "openrouter/openai/o3-mini": {
+    "c": {
+      "i": 1.1,
+      "o": 4.4,
+      "r": 0.55
+    },
+    "l": {
+      "c": 200000,
+      "o": 100000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "pdf"
+    ],
+    "fam": "o",
+    "k": "2023-10-31",
+    "rd": "2025-01-31"
+  },
+  "openrouter/openai/o3-mini-high": {
+    "c": {
+      "i": 1.1,
+      "o": 4.4,
+      "r": 0.55
+    },
+    "l": {
+      "c": 200000,
+      "o": 100000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "pdf"
+    ],
+    "fam": "o",
+    "k": "2023-10-31",
+    "rd": "2025-02-12"
+  },
+  "openrouter/openai/o3-pro": {
+    "c": {
+      "i": 20,
+      "o": 80
+    },
+    "l": {
+      "c": 200000,
+      "o": 100000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "pdf",
+      "image"
+    ],
+    "fam": "o",
+    "k": "2024-06-30",
+    "rd": "2025-06-10"
+  },
+  "openrouter/openai/o4-mini": {
+    "c": {
+      "i": 1.1,
+      "o": 4.4,
+      "r": 0.275
+    },
+    "l": {
+      "c": 200000,
+      "o": 100000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "image",
+      "text",
+      "pdf"
+    ],
+    "fam": "o-mini",
+    "k": "2024-06-30",
+    "rd": "2025-04-16"
+  },
+  "openrouter/openai/o4-mini-deep-research": {
+    "c": {
+      "i": 2,
+      "o": 8,
+      "r": 0.5
+    },
+    "l": {
+      "c": 200000,
+      "o": 100000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "pdf",
+      "image",
+      "text"
+    ],
+    "fam": "o",
+    "rd": "2025-10-10"
+  },
+  "openrouter/openai/o4-mini-high": {
+    "c": {
+      "i": 1.1,
+      "o": 4.4,
+      "r": 0.275
+    },
+    "l": {
+      "c": 200000,
+      "o": 100000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "image",
+      "text",
+      "pdf"
+    ],
+    "fam": "o",
+    "k": "2024-06-30",
+    "rd": "2025-04-16"
+  },
+  "openrouter/openrouter/auto": {
+    "c": {
+      "i": 0,
+      "o": 0
+    },
+    "l": {
+      "c": 2000000,
+      "o": 2000000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "audio",
+      "pdf",
+      "video"
+    ],
+    "fam": "auto",
+    "rd": "2023-11-08"
+  },
+  "openrouter/openrouter/bodybuilder": {
+    "c": {
+      "i": 0,
+      "o": 0
+    },
+    "l": {
+      "c": 128000,
+      "o": 128000
+    },
+    "f": {
+      "t": false,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "rd": "2025-12-05"
+  },
+  "openrouter/openrouter/free": {
+    "c": {
+      "i": 0,
+      "o": 0
+    },
+    "l": {
+      "c": 200000,
+      "o": 8000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "rd": "2026-02-01"
+  },
+  "openrouter/openrouter/owl-alpha": {
+    "c": {
+      "i": 0,
+      "o": 0
+    },
+    "l": {
+      "c": 1048756,
+      "o": 262144
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "alpha",
+    "rd": "2026-04-28"
+  },
+  "openrouter/openrouter/pareto-code": {
+    "c": {
+      "i": 0,
+      "o": 0
+    },
+    "l": {
+      "c": 2000000,
+      "o": 200000
+    },
+    "f": {
+      "t": false,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "rd": "2026-04-21"
+  },
+  "openrouter/perceptron/perceptron-mk1": {
+    "c": {
+      "i": 0.15,
+      "o": 1.5
+    },
+    "l": {
+      "c": 32768,
+      "o": 8192
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": false,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "video"
+    ],
+    "rd": "2026-05-12"
+  },
+  "openrouter/perplexity/sonar": {
+    "c": {
+      "i": 1,
+      "o": 1
+    },
+    "l": {
+      "c": 127072,
+      "o": 127072
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "sonar",
+    "rd": "2025-01-27"
+  },
+  "openrouter/perplexity/sonar-deep-research": {
+    "c": {
+      "i": 2,
+      "o": 8
+    },
+    "l": {
+      "c": 128000,
+      "o": 128000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "sonar-deep-research",
+    "rd": "2025-03-07"
+  },
+  "openrouter/perplexity/sonar-pro": {
+    "c": {
+      "i": 3,
+      "o": 15
+    },
+    "l": {
+      "c": 200000,
+      "o": 8000
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "sonar-pro",
+    "rd": "2025-03-07"
+  },
+  "openrouter/perplexity/sonar-pro-search": {
+    "c": {
+      "i": 3,
+      "o": 15
+    },
+    "l": {
+      "c": 200000,
+      "o": 8000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": false,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "sonar-pro",
+    "rd": "2025-10-30"
+  },
+  "openrouter/perplexity/sonar-reasoning-pro": {
+    "c": {
+      "i": 2,
+      "o": 8
+    },
+    "l": {
+      "c": 128000,
+      "o": 128000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": false,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "sonar-reasoning",
+    "rd": "2025-03-07"
+  },
+  "openrouter/poolside/laguna-m.1:free": {
+    "c": {
+      "i": 0,
+      "o": 0
+    },
+    "l": {
+      "c": 131072,
+      "o": 8192
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "rd": "2026-04-28"
+  },
+  "openrouter/poolside/laguna-xs.2:free": {
+    "c": {
+      "i": 0,
+      "o": 0
+    },
+    "l": {
+      "c": 131072,
+      "o": 8192
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "rd": "2026-04-28"
+  },
+  "openrouter/prime-intellect/intellect-3": {
+    "c": {
+      "i": 0.2,
+      "o": 1.1
+    },
+    "l": {
+      "c": 131072,
+      "o": 131072
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "glm",
+    "k": "2024-10",
+    "rd": "2025-11-27"
+  },
+  "openrouter/qwen/qwen-2.5-72b-instruct": {
+    "c": {
+      "i": 0.36,
+      "o": 0.4
+    },
+    "l": {
+      "c": 32768,
+      "o": 16384
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "qwen",
+    "k": "2024-06-30",
+    "rd": "2024-09-19"
+  },
+  "openrouter/qwen/qwen-2.5-7b-instruct": {
+    "c": {
+      "i": 0.04,
+      "o": 0.1
+    },
+    "l": {
+      "c": 32768,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "qwen",
+    "k": "2024-06-30",
+    "rd": "2024-10-16"
+  },
+  "openrouter/qwen/qwen-2.5-coder-32b-instruct": {
+    "c": {
+      "i": 0.66,
+      "o": 1
+    },
+    "l": {
+      "c": 32768,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "qwen",
+    "k": "2024-06-30",
+    "rd": "2024-11-11"
+  },
+  "openrouter/qwen/qwen-plus": {
+    "c": {
+      "i": 0.26,
+      "o": 0.78,
+      "r": 0.052,
+      "w": 0.325
+    },
+    "l": {
+      "c": 1000000,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "qwen",
+    "k": "2025-03-31",
+    "rd": "2025-02-01"
+  },
+  "openrouter/qwen/qwen-plus-2025-07-28": {
+    "c": {
+      "i": 0.26,
+      "o": 0.78,
+      "w": 0.325
+    },
+    "l": {
+      "c": 1000000,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "qwen",
+    "k": "2025-03-31",
+    "rd": "2025-09-08"
+  },
+  "openrouter/qwen/qwen-plus-2025-07-28:thinking": {
+    "c": {
+      "i": 0.26,
+      "o": 0.78,
+      "w": 0.325
+    },
+    "l": {
+      "c": 1000000,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "qwen",
+    "k": "2025-03-31",
+    "rd": "2025-09-08"
+  },
+  "openrouter/qwen/qwen2.5-vl-72b-instruct": {
+    "c": {
+      "i": 0.25,
+      "o": 0.75
+    },
+    "l": {
+      "c": 32000,
+      "o": 8192
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "qwen",
+    "k": "2024-06-30",
+    "rd": "2025-02-01"
+  },
+  "openrouter/qwen/qwen3-14b": {
+    "c": {
+      "i": 0.1,
+      "o": 0.24
+    },
+    "l": {
+      "c": 40960,
+      "o": 40960
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "qwen",
+    "k": "2025-03-31",
+    "rd": "2025-04-28"
+  },
+  "openrouter/qwen/qwen3-235b-a22b": {
+    "c": {
+      "i": 0.455,
+      "o": 1.82
+    },
+    "l": {
+      "c": 131072,
+      "o": 8192
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "qwen",
+    "k": "2025-03-31",
+    "rd": "2025-04-28"
+  },
+  "openrouter/qwen/qwen3-235b-a22b-2507": {
+    "c": {
+      "i": 0.071,
+      "o": 0.1
+    },
+    "l": {
+      "c": 262144,
+      "o": 16384
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "qwen",
+    "k": "2025-06-30",
+    "rd": "2025-07-21"
+  },
+  "openrouter/qwen/qwen3-235b-a22b-thinking-2507": {
+    "c": {
+      "i": 0.1495,
+      "o": 1.495
+    },
+    "l": {
+      "c": 131072,
+      "o": 81920
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "qwen",
+    "k": "2025-06-30",
+    "rd": "2025-07-25"
+  },
+  "openrouter/qwen/qwen3-30b-a3b": {
+    "c": {
+      "i": 0.09,
+      "o": 0.45
+    },
+    "l": {
+      "c": 40960,
+      "o": 20000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "qwen",
+    "k": "2025-03-31",
+    "rd": "2025-04-28"
+  },
+  "openrouter/qwen/qwen3-30b-a3b-instruct-2507": {
+    "c": {
+      "i": 0.09,
+      "o": 0.3
+    },
+    "l": {
+      "c": 262144,
+      "o": 262144
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "qwen",
+    "k": "2025-06-30",
+    "rd": "2025-07-29"
+  },
+  "openrouter/qwen/qwen3-30b-a3b-thinking-2507": {
+    "c": {
+      "i": 0.08,
+      "o": 0.4,
+      "r": 0.08
+    },
+    "l": {
+      "c": 131072,
+      "o": 131072
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "qwen",
+    "k": "2025-06-30",
+    "rd": "2025-08-28"
+  },
+  "openrouter/qwen/qwen3-32b": {
+    "c": {
+      "i": 0.08,
+      "o": 0.28
+    },
+    "l": {
+      "c": 40960,
+      "o": 16384
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "qwen",
+    "k": "2025-03-31",
+    "rd": "2025-04-28"
+  },
+  "openrouter/qwen/qwen3-8b": {
+    "c": {
+      "i": 0.05,
+      "o": 0.4,
+      "r": 0.05
+    },
+    "l": {
+      "c": 40960,
+      "o": 8192
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "qwen",
+    "k": "2025-03-31",
+    "rd": "2025-04-28"
+  },
+  "openrouter/qwen/qwen3-coder": {
+    "c": {
+      "i": 0.22,
+      "o": 1.8
+    },
+    "l": {
+      "c": 262144,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "qwen",
+    "k": "2025-06-30",
+    "rd": "2025-07-23"
+  },
+  "openrouter/qwen/qwen3-coder-30b-a3b-instruct": {
+    "c": {
+      "i": 0.07,
+      "o": 0.27
+    },
+    "l": {
+      "c": 160000,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "qwen",
+    "k": "2025-06-30",
+    "rd": "2025-07-31"
+  },
+  "openrouter/qwen/qwen3-coder-flash": {
+    "c": {
+      "i": 0.195,
+      "o": 0.975,
+      "r": 0.039,
+      "w": 0.24375
+    },
+    "l": {
+      "c": 1000000,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "qwen",
+    "k": "2025-06-30",
+    "rd": "2025-09-17"
+  },
+  "openrouter/qwen/qwen3-coder-next": {
+    "c": {
+      "i": 0.11,
+      "o": 0.8,
+      "r": 0.07
+    },
+    "l": {
+      "c": 262144,
+      "o": 262144
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "qwen",
+    "rd": "2026-02-04"
+  },
+  "openrouter/qwen/qwen3-coder-plus": {
+    "c": {
+      "i": 0.65,
+      "o": 3.25,
+      "r": 0.13,
+      "w": 0.8125
+    },
+    "l": {
+      "c": 1000000,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "qwen",
+    "k": "2025-06-30",
+    "rd": "2025-09-23"
+  },
+  "openrouter/qwen/qwen3-coder:free": {
+    "c": {
+      "i": 0,
+      "o": 0
+    },
+    "l": {
+      "c": 262000,
+      "o": 262000
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "qwen",
+    "k": "2025-06-30",
+    "rd": "2025-07-23"
+  },
+  "openrouter/qwen/qwen3-max": {
+    "c": {
+      "i": 0.78,
+      "o": 3.9,
+      "r": 0.156,
+      "w": 0.975
+    },
+    "l": {
+      "c": 262144,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "qwen",
+    "k": "2025-06-30",
+    "rd": "2025-09-23"
+  },
+  "openrouter/qwen/qwen3-max-thinking": {
+    "c": {
+      "i": 0.78,
+      "o": 3.9
+    },
+    "l": {
+      "c": 262144,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "qwen",
+    "rd": "2026-02-09"
+  },
+  "openrouter/qwen/qwen3-next-80b-a3b-instruct": {
+    "c": {
+      "i": 0.09,
+      "o": 1.1
+    },
+    "l": {
+      "c": 262144,
+      "o": 16384
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "qwen",
+    "k": "2025-09-30",
+    "rd": "2025-09-11"
+  },
+  "openrouter/qwen/qwen3-next-80b-a3b-instruct:free": {
+    "c": {
+      "i": 0,
+      "o": 0
+    },
+    "l": {
+      "c": 262144,
+      "o": 262144
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "qwen",
+    "k": "2025-09-30",
+    "rd": "2025-09-11"
+  },
+  "openrouter/qwen/qwen3-next-80b-a3b-thinking": {
+    "c": {
+      "i": 0.0975,
+      "o": 0.78
+    },
+    "l": {
+      "c": 131072,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "qwen",
+    "k": "2025-09-30",
+    "rd": "2025-09-11"
+  },
+  "openrouter/qwen/qwen3-vl-235b-a22b-instruct": {
+    "c": {
+      "i": 0.2,
+      "o": 0.88,
+      "r": 0.11
+    },
+    "l": {
+      "c": 262144,
+      "o": 16384
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "qwen",
+    "k": "2025-03-31",
+    "rd": "2025-09-23"
+  },
+  "openrouter/qwen/qwen3-vl-235b-a22b-thinking": {
+    "c": {
+      "i": 0.26,
+      "o": 2.6
+    },
+    "l": {
+      "c": 131072,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "qwen",
+    "k": "2025-03-31",
+    "rd": "2025-09-23"
+  },
+  "openrouter/qwen/qwen3-vl-30b-a3b-instruct": {
+    "c": {
+      "i": 0.13,
+      "o": 0.52
+    },
+    "l": {
+      "c": 131072,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "qwen",
+    "k": "2025-03-31",
+    "rd": "2025-10-06"
+  },
+  "openrouter/qwen/qwen3-vl-30b-a3b-thinking": {
+    "c": {
+      "i": 0.13,
+      "o": 1.56
+    },
+    "l": {
+      "c": 131072,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "qwen",
+    "k": "2025-03-31",
+    "rd": "2025-10-06"
+  },
+  "openrouter/qwen/qwen3-vl-32b-instruct": {
+    "c": {
+      "i": 0.104,
+      "o": 0.416
+    },
+    "l": {
+      "c": 131072,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "qwen",
+    "rd": "2025-10-23"
+  },
+  "openrouter/qwen/qwen3-vl-8b-instruct": {
+    "c": {
+      "i": 0.08,
+      "o": 0.5
+    },
+    "l": {
+      "c": 131072,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "image",
+      "text"
+    ],
+    "fam": "qwen",
+    "rd": "2025-10-14"
+  },
+  "openrouter/qwen/qwen3-vl-8b-thinking": {
+    "c": {
+      "i": 0.117,
+      "o": 1.365
+    },
+    "l": {
+      "c": 131072,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "image",
+      "text"
+    ],
+    "fam": "qwen",
+    "rd": "2025-10-14"
+  },
+  "openrouter/qwen/qwen3.5-122b-a10b": {
+    "c": {
+      "i": 0.26,
+      "o": 2.08
+    },
+    "l": {
+      "c": 262144,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "video"
+    ],
+    "fam": "qwen3.5",
+    "rd": "2026-02-25"
+  },
+  "openrouter/qwen/qwen3.5-27b": {
+    "c": {
+      "i": 0.195,
+      "o": 1.56
+    },
+    "l": {
+      "c": 262144,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "video"
+    ],
+    "fam": "qwen3.5",
+    "rd": "2026-02-25"
+  },
+  "openrouter/qwen/qwen3.5-35b-a3b": {
+    "c": {
+      "i": 0.14,
+      "o": 1,
+      "r": 0.05
+    },
+    "l": {
+      "c": 262144,
+      "o": 81920
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "video"
+    ],
+    "fam": "qwen3.5",
+    "rd": "2026-02-25"
+  },
+  "openrouter/qwen/qwen3.5-397b-a17b": {
+    "c": {
+      "i": 0.39,
+      "o": 2.34,
+      "r": 0.195
+    },
+    "l": {
+      "c": 262144,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "video"
+    ],
+    "fam": "qwen",
+    "k": "2025-04",
+    "rd": "2026-02-16"
+  },
+  "openrouter/qwen/qwen3.5-9b": {
+    "c": {
+      "i": 0.04,
+      "o": 0.15
+    },
+    "l": {
+      "c": 262144,
+      "o": 81920
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "video"
+    ],
+    "fam": "qwen3.5",
+    "rd": "2026-03-10"
+  },
+  "openrouter/qwen/qwen3.5-flash-02-23": {
+    "c": {
+      "i": 0.065,
+      "o": 0.26,
+      "w": 0.08125
+    },
+    "l": {
+      "c": 1000000,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "video"
+    ],
+    "fam": "qwen",
+    "rd": "2026-02-25"
+  },
+  "openrouter/qwen/qwen3.5-plus-02-15": {
+    "c": {
+      "i": 0.26,
+      "o": 1.56,
+      "w": 0.325
+    },
+    "l": {
+      "c": 1000000,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "video"
+    ],
+    "fam": "qwen",
+    "k": "2025-04",
+    "rd": "2026-02-16"
+  },
+  "openrouter/qwen/qwen3.5-plus-20260420": {
+    "c": {
+      "i": 0.3,
+      "o": 1.8
+    },
+    "l": {
+      "c": 1000000,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "video"
+    ],
+    "fam": "qwen3.5",
+    "rd": "2026-04-27"
+  },
+  "openrouter/qwen/qwen3.6-27b": {
+    "c": {
+      "i": 0.32,
+      "o": 3.2
+    },
+    "l": {
+      "c": 262144,
+      "o": 81920
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "video"
+    ],
+    "fam": "qwen3.6",
+    "rd": "2026-04-27"
+  },
+  "openrouter/qwen/qwen3.6-35b-a3b": {
+    "c": {
+      "i": 0.15,
+      "o": 1,
+      "r": 0.05
+    },
+    "l": {
+      "c": 262144,
+      "o": 262144
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "video"
+    ],
+    "fam": "qwen3.6",
+    "rd": "2026-04-27"
+  },
+  "openrouter/qwen/qwen3.6-flash": {
+    "c": {
+      "i": 0.1875,
+      "o": 1.125,
+      "w": 0.234375
+    },
+    "l": {
+      "c": 1000000,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "video"
+    ],
+    "fam": "qwen3.6",
+    "rd": "2026-04-27"
+  },
+  "openrouter/qwen/qwen3.6-max-preview": {
+    "c": {
+      "i": 1.04,
+      "o": 6.24,
+      "w": 1.3
+    },
+    "l": {
+      "c": 262144,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "qwen3.6",
+    "rd": "2026-04-27"
+  },
+  "openrouter/qwen/qwen3.6-plus": {
+    "c": {
+      "i": 0.325,
+      "o": 1.95,
+      "w": 0.40625
+    },
+    "l": {
+      "c": 1000000,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "video"
+    ],
+    "fam": "qwen",
+    "k": "2025-04",
+    "rd": "2026-04-02"
+  },
+  "openrouter/rekaai/reka-edge": {
+    "c": {
+      "i": 0.1,
+      "o": 0.1
+    },
+    "l": {
+      "c": 16384,
+      "o": 16384
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "image",
+      "text",
+      "video"
+    ],
+    "fam": "reka",
+    "rd": "2026-03-20"
+  },
+  "openrouter/rekaai/reka-flash-3": {
+    "c": {
+      "i": 0.1,
+      "o": 0.2
+    },
+    "l": {
+      "c": 65536,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "reka",
+    "k": "2025-01-31",
+    "rd": "2025-03-12"
+  },
+  "openrouter/relace/relace-apply-3": {
+    "c": {
+      "i": 0.85,
+      "o": 1.25
+    },
+    "l": {
+      "c": 256000,
+      "o": 128000
+    },
+    "f": {
+      "t": false,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "rd": "2025-09-26"
+  },
+  "openrouter/relace/relace-search": {
+    "c": {
+      "i": 1,
+      "o": 3
+    },
+    "l": {
+      "c": 256000,
+      "o": 128000
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "rd": "2025-12-08"
+  },
+  "openrouter/sao10k/l3-euryale-70b": {
+    "c": {
+      "i": 1.48,
+      "o": 1.48
+    },
+    "l": {
+      "c": 8192,
+      "o": 8192
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "llama",
+    "k": "2023-12-31",
+    "rd": "2024-06-18"
+  },
+  "openrouter/sao10k/l3-lunaris-8b": {
+    "c": {
+      "i": 0.04,
+      "o": 0.05
+    },
+    "l": {
+      "c": 8192,
+      "o": 16384
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "llama",
+    "k": "2023-12-31",
+    "rd": "2024-08-13"
+  },
+  "openrouter/sao10k/l3.1-70b-hanami-x1": {
+    "c": {
+      "i": 3,
+      "o": 3
+    },
+    "l": {
+      "c": 16000,
+      "o": 16000
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "llama",
+    "k": "2023-12-31",
+    "rd": "2025-01-08"
+  },
+  "openrouter/sao10k/l3.1-euryale-70b": {
+    "c": {
+      "i": 0.85,
+      "o": 0.85
+    },
+    "l": {
+      "c": 131072,
+      "o": 16384
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "llama",
+    "k": "2023-12-31",
+    "rd": "2024-08-28"
+  },
+  "openrouter/sao10k/l3.3-euryale-70b": {
+    "c": {
+      "i": 0.65,
+      "o": 0.75
+    },
+    "l": {
+      "c": 131072,
+      "o": 16384
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "llama",
+    "k": "2023-12-31",
+    "rd": "2024-12-18"
+  },
+  "openrouter/stepfun/step-3.5-flash": {
+    "c": {
+      "i": 0.1,
+      "o": 0.3
+    },
+    "l": {
+      "c": 262144,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "step",
+    "k": "2025-01",
+    "rd": "2026-01-29"
+  },
+  "openrouter/switchpoint/router": {
+    "c": {
+      "i": 0.85,
+      "o": 3.4
+    },
+    "l": {
+      "c": 131072,
+      "o": 131072
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "rd": "2025-07-11"
+  },
+  "openrouter/tencent/hunyuan-a13b-instruct": {
+    "c": {
+      "i": 0.14,
+      "o": 0.57
+    },
+    "l": {
+      "c": 131072,
+      "o": 131072
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "hunyuan",
+    "k": "2025-03-31",
+    "rd": "2025-07-08"
+  },
+  "openrouter/tencent/hy3-preview": {
+    "c": {
+      "i": 0.066,
+      "o": 0.26,
+      "r": 0.029
+    },
+    "l": {
+      "c": 262144,
+      "o": 262144
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "Hy",
+    "rd": "2026-04-22"
+  },
+  "openrouter/thedrummer/cydonia-24b-v4.1": {
+    "c": {
+      "i": 0.3,
+      "o": 0.5,
+      "r": 0.15
+    },
+    "l": {
+      "c": 131072,
+      "o": 131072
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "k": "2024-04-30",
+    "rd": "2025-09-27"
+  },
+  "openrouter/thedrummer/rocinante-12b": {
+    "c": {
+      "i": 0.17,
+      "o": 0.43
+    },
+    "l": {
+      "c": 32768,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "k": "2024-04-30",
+    "rd": "2024-09-30"
+  },
+  "openrouter/thedrummer/skyfall-36b-v2": {
+    "c": {
+      "i": 0.55,
+      "o": 0.8,
+      "r": 0.25
+    },
+    "l": {
+      "c": 32768,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "k": "2024-06-30",
+    "rd": "2025-03-10"
+  },
+  "openrouter/thedrummer/unslopnemo-12b": {
+    "c": {
+      "i": 0.4,
+      "o": 0.4
+    },
+    "l": {
+      "c": 32768,
+      "o": 32768
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "k": "2024-04-30",
+    "rd": "2024-11-08"
+  },
+  "openrouter/undi95/remm-slerp-l2-13b": {
+    "c": {
+      "i": 0.45,
+      "o": 0.65
+    },
+    "l": {
+      "c": 6144,
+      "o": 4096
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "k": "2023-06-30",
+    "rd": "2023-07-22"
+  },
+  "openrouter/upstage/solar-pro-3": {
+    "c": {
+      "i": 0.15,
+      "o": 0.6,
+      "r": 0.015
+    },
+    "l": {
+      "c": 128000,
+      "o": 128000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "solar-pro",
+    "rd": "2026-01-27"
+  },
+  "openrouter/writer/palmyra-x5": {
+    "c": {
+      "i": 0.6,
+      "o": 6
+    },
+    "l": {
+      "c": 1040000,
+      "o": 8192
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": false,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "palmyra",
+    "rd": "2026-01-21"
+  },
+  "openrouter/x-ai/grok-4.20": {
+    "c": {
+      "i": 1.25,
+      "o": 2.5,
+      "r": 0.2
+    },
+    "l": {
+      "c": 2000000,
+      "o": 2000000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "grok",
+    "k": "2025-09-01",
+    "rd": "2026-03-31"
+  },
+  "openrouter/x-ai/grok-4.20-multi-agent": {
+    "c": {
+      "i": 2,
+      "o": 6,
+      "r": 0.2
+    },
+    "l": {
+      "c": 2000000,
+      "o": 2000000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": false,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "grok",
+    "k": "2025-09-01",
+    "rd": "2026-03-31"
+  },
+  "openrouter/x-ai/grok-4.3": {
+    "c": {
+      "i": 1.25,
+      "o": 2.5,
+      "r": 0.2
+    },
+    "l": {
+      "c": 1000000,
+      "o": 1000000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "grok",
+    "rd": "2026-04-30"
+  },
+  "openrouter/xiaomi/mimo-v2-flash": {
+    "c": {
+      "i": 0.1,
+      "o": 0.3,
+      "r": 0.01
+    },
+    "l": {
+      "c": 262144,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "mimo",
+    "rd": "2025-12-14"
+  },
+  "openrouter/xiaomi/mimo-v2-omni": {
+    "c": {
+      "i": 0.4,
+      "o": 2,
+      "r": 0.08
+    },
+    "l": {
+      "c": 262144,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "audio",
+      "image",
+      "video"
+    ],
+    "fam": "mimo-v2-omni",
+    "rd": "2026-03-18"
+  },
+  "openrouter/xiaomi/mimo-v2-pro": {
+    "c": {
+      "i": 1,
+      "o": 3,
+      "r": 0.2
+    },
+    "l": {
+      "c": 1048576,
+      "o": 131072
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "mimo-v2-pro",
+    "rd": "2026-03-18"
+  },
+  "openrouter/xiaomi/mimo-v2.5": {
+    "c": {
+      "i": 0.4,
+      "o": 2,
+      "r": 0.08
+    },
+    "l": {
+      "c": 1048576,
+      "o": 131072
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "audio",
+      "image",
+      "video"
+    ],
+    "fam": "mimo-v2.5",
+    "rd": "2026-04-22"
+  },
+  "openrouter/xiaomi/mimo-v2.5-pro": {
+    "c": {
+      "i": 1,
+      "o": 3,
+      "r": 0.2
+    },
+    "l": {
+      "c": 1048576,
+      "o": 16384
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "mimo-v2.5-pro",
+    "rd": "2026-04-22"
+  },
+  "openrouter/z-ai/glm-4-32b": {
+    "c": {
+      "i": 0.1,
+      "o": 0.1
+    },
+    "l": {
+      "c": 128000,
+      "o": 128000
+    },
+    "f": {
+      "t": true,
+      "r": false,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "glm",
+    "k": "2024-06-30",
+    "rd": "2025-07-24"
+  },
+  "openrouter/z-ai/glm-4.5": {
+    "c": {
+      "i": 0.6,
+      "o": 2.2,
+      "r": 0.11
+    },
+    "l": {
+      "c": 131072,
+      "o": 98304
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "glm",
+    "k": "2024-12-31",
+    "rd": "2025-07-25"
+  },
+  "openrouter/z-ai/glm-4.5-air": {
+    "c": {
+      "i": 0.13,
+      "o": 0.85,
+      "r": 0.025
+    },
+    "l": {
+      "c": 131072,
+      "o": 98304
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "glm-air",
+    "k": "2024-12-31",
+    "rd": "2025-07-25"
+  },
+  "openrouter/z-ai/glm-4.5-air:free": {
+    "c": {
+      "i": 0,
+      "o": 0
+    },
+    "l": {
+      "c": 131072,
+      "o": 96000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "glm-air",
+    "k": "2024-12-31",
+    "rd": "2025-07-25"
+  },
+  "openrouter/z-ai/glm-4.5v": {
+    "c": {
+      "i": 0.6,
+      "o": 1.8,
+      "r": 0.11
+    },
+    "l": {
+      "c": 65536,
+      "o": 16384
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "glm",
+    "k": "2024-12-31",
+    "rd": "2025-08-11"
+  },
+  "openrouter/z-ai/glm-4.6": {
+    "c": {
+      "i": 0.43,
+      "o": 1.74,
+      "r": 0.08
+    },
+    "l": {
+      "c": 202752,
+      "o": 131072
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "glm",
+    "k": "2025-03-31",
+    "rd": "2025-09-30"
+  },
+  "openrouter/z-ai/glm-4.6v": {
+    "c": {
+      "i": 0.3,
+      "o": 0.9,
+      "r": 0.05
+    },
+    "l": {
+      "c": 131072,
+      "o": 24000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "image",
+      "text",
+      "video"
+    ],
+    "fam": "glm",
+    "rd": "2025-12-08"
+  },
+  "openrouter/z-ai/glm-4.7": {
+    "c": {
+      "i": 0.4,
+      "o": 1.75,
+      "r": 0.08
+    },
+    "l": {
+      "c": 202752,
+      "o": 131072
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "glm",
+    "k": "2025-04",
+    "rd": "2025-12-22"
+  },
+  "openrouter/z-ai/glm-4.7-flash": {
+    "c": {
+      "i": 0.06,
+      "o": 0.4,
+      "r": 0.01
+    },
+    "l": {
+      "c": 202752,
+      "o": 16384
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "glm",
+    "rd": "2026-01-19"
+  },
+  "openrouter/z-ai/glm-5": {
+    "c": {
+      "i": 0.6,
+      "o": 1.92,
+      "r": 0.12
+    },
+    "l": {
+      "c": 202752,
+      "o": 131000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "glm",
+    "rd": "2026-02-11"
+  },
+  "openrouter/z-ai/glm-5-turbo": {
+    "c": {
+      "i": 1.2,
+      "o": 4,
+      "r": 0.24
+    },
+    "l": {
+      "c": 202752,
+      "o": 131072
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "glm",
+    "rd": "2026-03-15"
+  },
+  "openrouter/z-ai/glm-5.1": {
+    "c": {
+      "i": 0.98,
+      "o": 3.08,
+      "r": 0.182
+    },
+    "l": {
+      "c": 202752,
+      "o": 131072
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": false
+    },
+    "m": [
+      "text"
+    ],
+    "fam": "glm",
+    "rd": "2026-04-07"
+  },
+  "openrouter/z-ai/glm-5v-turbo": {
+    "c": {
+      "i": 1.2,
+      "o": 4,
+      "r": 0.24
+    },
+    "l": {
+      "c": 202752,
+      "o": 131072
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "image",
+      "text",
+      "video"
+    ],
+    "fam": "glm",
+    "rd": "2026-04-01"
+  },
+  "openrouter/~anthropic/claude-haiku-latest": {
+    "c": {
+      "i": 1,
+      "o": 5,
+      "r": 0.1,
+      "w": 1.25
+    },
+    "l": {
+      "c": 200000,
+      "o": 64000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "claude-haiku",
+    "rd": "2026-04-27"
+  },
+  "openrouter/~anthropic/claude-opus-latest": {
+    "c": {
+      "i": 5,
+      "o": 25,
+      "r": 0.5,
+      "w": 6.25
+    },
+    "l": {
+      "c": 1000000,
+      "o": 128000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "claude-opus",
+    "rd": "2026-04-21"
+  },
+  "openrouter/~anthropic/claude-sonnet-latest": {
+    "c": {
+      "i": 3,
+      "o": 15,
+      "r": 0.3,
+      "w": 3.75
+    },
+    "l": {
+      "c": 1000000,
+      "o": 128000
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf"
+    ],
+    "fam": "claude-sonnet",
+    "rd": "2026-04-27"
+  },
+  "openrouter/~google/gemini-flash-latest": {
+    "c": {
+      "i": 0.5,
+      "o": 3,
+      "r": 0.05,
+      "w": 0.083333
+    },
+    "l": {
+      "c": 1048576,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "pdf",
+      "audio",
+      "video"
+    ],
+    "fam": "gemini-flash",
+    "rd": "2026-04-27"
+  },
+  "openrouter/~google/gemini-pro-latest": {
+    "c": {
+      "i": 2,
+      "o": 12,
+      "r": 0.2,
+      "w": 0.375
+    },
+    "l": {
+      "c": 1048576,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "audio",
+      "pdf",
+      "image",
+      "text",
+      "video"
+    ],
+    "fam": "gemini-pro",
+    "rd": "2026-04-27"
+  },
+  "openrouter/~moonshotai/kimi-latest": {
+    "c": {
+      "i": 0.73,
+      "o": 3.49,
+      "r": 0.25
+    },
+    "l": {
+      "c": 262142,
+      "o": 262142
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image"
+    ],
+    "fam": "kimi",
+    "rd": "2026-04-27"
+  },
+  "openrouter/~openai/gpt-latest": {
+    "c": {
+      "i": 5,
+      "o": 30,
+      "r": 0.5
+    },
+    "l": {
+      "c": 1050000,
+      "o": 128000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "pdf",
+      "image",
+      "text"
+    ],
+    "fam": "gpt",
+    "k": "2025-12-01",
+    "rd": "2026-04-27"
+  },
+  "openrouter/~openai/gpt-mini-latest": {
+    "c": {
+      "i": 0.75,
+      "o": 4.5,
+      "r": 0.075
+    },
+    "l": {
+      "c": 400000,
+      "o": 128000
+    },
+    "f": {
+      "t": false,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "pdf",
+      "image",
+      "text"
+    ],
+    "fam": "gpt-mini",
+    "k": "2025-08-31",
+    "rd": "2026-04-27"
+  }
+}
