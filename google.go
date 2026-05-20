@@ -214,7 +214,7 @@ func (m *googleModel) handleStreaming(
 		if lastResponse == nil {
 			lastResponse = resp
 			// Clean the first candidate's parts of any empty parts
-			if len(lastResponse.Candidates) > 0 {
+			if len(lastResponse.Candidates) > 0 && lastResponse.Candidates[0].Content != nil {
 				var cleanParts []*genai.Part
 				for _, p := range lastResponse.Candidates[0].Content.Parts {
 					if !m.isPartEmpty(p) {
@@ -226,11 +226,13 @@ func (m *googleModel) handleStreaming(
 		} else {
 			// Merge candidates from chunks
 			if len(resp.Candidates) > 0 && len(lastResponse.Candidates) > 0 {
-				for _, p := range resp.Candidates[0].Content.Parts {
-					if m.isPartEmpty(p) {
-						continue
+				if resp.Candidates[0].Content != nil && lastResponse.Candidates[0].Content != nil {
+					for _, p := range resp.Candidates[0].Content.Parts {
+						if m.isPartEmpty(p) {
+							continue
+						}
+						lastResponse.Candidates[0].Content.Parts = append(lastResponse.Candidates[0].Content.Parts, p)
 					}
-					lastResponse.Candidates[0].Content.Parts = append(lastResponse.Candidates[0].Content.Parts, p)
 				}
 
 				finishReason := resp.Candidates[0].FinishReason
