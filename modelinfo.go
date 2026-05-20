@@ -1,5 +1,7 @@
 package llms
 
+import "strings"
+
 //go:generate go run ./cmd/genmodelinfo
 
 // ModelInfo holds the embedded, build-time-generated metadata for a model.
@@ -113,18 +115,44 @@ func (mi ModelInfo) resolveMaxTokens(requested, fallback int) int {
 	return fallback
 }
 
-// messagesContainImages reports whether any message part requires image input
-// support (image URLs or inline binary data).
-func messagesContainImages(messages []*Message) bool {
+// partModality returns the models.dev input modality required by a part
+// ("image", "audio", "pdf", "video"), or "" for parts that don't gate on
+// modality (text, tool calls, thinking, etc.).
+func partModality(part MessagePart) string {
+	switch p := part.(type) {
+	case *ImagePart:
+		return "image"
+	case *BinaryPart:
+		switch {
+		case strings.HasPrefix(p.MediaType, "image/"):
+			return "image"
+		case strings.HasPrefix(p.MediaType, "audio/"):
+			return "audio"
+		case strings.HasPrefix(p.MediaType, "video/"):
+			return "video"
+		case p.MediaType == "application/pdf":
+			return "pdf"
+		}
+	}
+	return ""
+}
+
+// firstUnsupportedModality scans messages for the first part whose required
+// input modality is not allowed by the model. It returns "" if every part is
+// acceptable.
+func firstUnsupportedModality(messages []*Message, info ModelInfo) string {
 	for _, msg := range messages {
 		for _, part := range msg.Parts {
-			switch part.(type) {
-			case *ImagePart, *BinaryPart:
-				return true
+			modality := partModality(part)
+			if modality == "" {
+				continue
+			}
+			if !info.allowsModality(modality) {
+				return modality
 			}
 		}
 	}
-	return false
+	return ""
 }
 
 // LookupModelInfo returns the embedded ModelInfo for a fully qualified model

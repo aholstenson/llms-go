@@ -85,20 +85,52 @@ func TestModelInfoClampMaxTokens(t *testing.T) {
 	}
 }
 
-func TestMessagesContainImages(t *testing.T) {
-	textOnly := []*Message{NewMessage(RoleUser, NewTextPart("hi"))}
-	if messagesContainImages(textOnly) {
-		t.Error("text-only messages should not be detected as containing images")
+func TestPartModality(t *testing.T) {
+	cases := []struct {
+		name string
+		part MessagePart
+		want string
+	}{
+		{"text", NewTextPart("hi"), ""},
+		{"image url", NewImagePart("http://x/y.png"), "image"},
+		{"binary image", NewBinaryPart("image/png", []byte{1}), "image"},
+		{"binary audio", NewBinaryPart("audio/mpeg", []byte{1}), "audio"},
+		{"binary video", NewBinaryPart("video/mp4", []byte{1}), "video"},
+		{"binary pdf", NewBinaryPart("application/pdf", []byte{1}), "pdf"},
+		{"binary unknown", NewBinaryPart("application/octet-stream", []byte{1}), ""},
+	}
+	for _, tc := range cases {
+		if got := partModality(tc.part); got != tc.want {
+			t.Errorf("%s: partModality = %q, want %q", tc.name, got, tc.want)
+		}
+	}
+}
+
+func TestFirstUnsupportedModality(t *testing.T) {
+	imageOnly := knownInfo(Capabilities{}, "text", "image")
+	pdfOnly := knownInfo(Capabilities{}, "text", "pdf")
+
+	textMsgs := []*Message{NewMessage(RoleUser, NewTextPart("hi"))}
+	if got := firstUnsupportedModality(textMsgs, imageOnly); got != "" {
+		t.Errorf("text-only on image-capable model should be ok, got %q", got)
 	}
 
-	withImage := []*Message{NewMessage(RoleUser, NewTextPart("look"), NewImagePart("http://x/y.png"))}
-	if !messagesContainImages(withImage) {
-		t.Error("messages with an ImagePart should be detected")
+	// A PDF binary on an image-only model must not be falsely accepted as
+	// image, nor rejected as image — it should be rejected as pdf.
+	pdfMsgs := []*Message{NewMessage(RoleUser, NewBinaryPart("application/pdf", []byte{1}))}
+	if got := firstUnsupportedModality(pdfMsgs, imageOnly); got != "pdf" {
+		t.Errorf("PDF on image-only model should report pdf, got %q", got)
 	}
 
-	withBinary := []*Message{NewMessage(RoleUser, NewBinaryPart("image/png", []byte{1}))}
-	if !messagesContainImages(withBinary) {
-		t.Error("messages with a BinaryPart should be detected")
+	// An image binary on a PDF-only model should report image (not pdf).
+	imageMsgs := []*Message{NewMessage(RoleUser, NewBinaryPart("image/png", []byte{1}))}
+	if got := firstUnsupportedModality(imageMsgs, pdfOnly); got != "image" {
+		t.Errorf("image on pdf-only model should report image, got %q", got)
+	}
+
+	// PDF on a PDF-capable model is fine.
+	if got := firstUnsupportedModality(pdfMsgs, pdfOnly); got != "" {
+		t.Errorf("PDF on pdf-capable model should be ok, got %q", got)
 	}
 }
 

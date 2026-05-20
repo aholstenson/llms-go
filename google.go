@@ -120,8 +120,8 @@ func (m *googleModel) newSession(options ...GenerateOption) (*Session, error) {
 	if len(opts.Tools) > 0 && !m.info.allowsToolCall() {
 		return nil, fmt.Errorf("model %s does not support tool calling", m.statsModel)
 	}
-	if messagesContainImages(opts.Messages) && !m.info.allowsModality("image") {
-		return nil, fmt.Errorf("model %s does not support image input", m.statsModel)
+	if modality := firstUnsupportedModality(opts.Messages, m.info); modality != "" {
+		return nil, fmt.Errorf("model %s does not support %s input", m.statsModel, modality)
 	}
 	if clamped, didClamp := m.info.clampMaxTokens(opts.MaxTokens); didClamp {
 		m.logger.Warn("Clamping max tokens to model output limit",
