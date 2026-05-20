@@ -504,6 +504,20 @@ func (t *openaiTurn) Next(ctx context.Context) (TurnOutput, error) {
 		return TurnOutput{}, errors.New("no completed response from OpenAI")
 	}
 
+	if finalResponse.Status == responses.ResponseStatusFailed {
+		if metrics := GetMetrics(ctx); metrics != nil {
+			metrics.RecordFailure(m.statsModel, collector)
+		}
+		respErr := finalResponse.Error
+		err := errors.Newf("OpenAI response failed: %s: %s", respErr.Code, respErr.Message)
+		if respErr.Code == "rate_limit_exceeded" {
+			m.metrics.RecordCallDuration(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeUnavailable)
+			return TurnOutput{}, errors.Mark(errors.Wrap(err, "OpenAI model unavailable"), ErrModelUnavailable)
+		}
+		m.metrics.RecordCallDuration(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeInternal)
+		return TurnOutput{}, err
+	}
+
 	// Walk the response output, capturing neutral results and stashing the
 	// native items so Observe can replay them on the next turn.
 	var textBuilder strings.Builder
