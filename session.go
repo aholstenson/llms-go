@@ -37,6 +37,11 @@ type StepInfo struct {
 // model turn; the caller drives the loop and may interpose between turns
 // (inspect/approve tool calls, inject a message, fork a sub-agent).
 // GenerateContent is a Session run to completion internally.
+//
+// A Session is not safe for concurrent use. All methods must be called from a
+// single goroutine. To inject messages from another goroutine (e.g. an
+// operator-steering UI), send them over a channel and have the driving
+// goroutine call Inject between Steps.
 type Session struct {
 	turn    Turn
 	tracker *ExecutionTracker
