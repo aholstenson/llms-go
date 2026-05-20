@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"mime"
+	"net/http"
 	"strings"
 	"time"
 
@@ -18,6 +19,19 @@ import (
 	"github.com/openai/openai-go/responses"
 	"github.com/openai/openai-go/shared"
 )
+
+// openaiResponseFromError pulls the *http.Response out of an OpenAI SDK
+// error so callers can read Retry-After-style headers.
+func openaiResponseFromError(err error) *http.Response {
+	if err == nil {
+		return nil
+	}
+	var oe *openai.Error
+	if errors.As(err, &oe) && oe != nil {
+		return oe.Response
+	}
+	return nil
+}
 
 type openaiModel struct {
 	logger            *slog.Logger
@@ -31,9 +45,12 @@ type openaiModel struct {
 
 // NewOpenAIModel creates a new OpenAI model using the official OpenAI Go SDK
 // against the Responses API. info carries embedded model metadata used to
-// gate request parameters; the zero value is treated permissively.
-func NewOpenAIModel(logger *slog.Logger, metrics *Metrics, apiKey string, model string, registry map[string]SubParserConfig, info ModelInfo) Model {
-	client := openai.NewClient(option.WithAPIKey(apiKey))
+// gate request parameters; the zero value is treated permissively. Optional
+// SDK request options can be passed for customization (e.g.
+// option.WithBaseURL for testing).
+func NewOpenAIModel(logger *slog.Logger, metrics *Metrics, apiKey string, model string, registry map[string]SubParserConfig, info ModelInfo, opts ...option.RequestOption) Model {
+	allOpts := append([]option.RequestOption{option.WithAPIKey(apiKey)}, opts...)
+	client := openai.NewClient(allOpts...)
 	return &openaiModel{
 		logger:            logger.With(slog.String("provider", "openai")),
 		metrics:           metrics,
@@ -403,8 +420,9 @@ func (t *openaiTurn) Next(ctx context.Context) (TurnOutput, error) {
 	}
 
 	streamHasErrored := false
+	streamingEmitted := false
 
-	stream := m.client.Responses.NewStreaming(ctx, t.params)
+	stream := m.client.Responses.NewStreaming(ctx, t.params, option.WithMaxRetries(t.opts.MaxRetries))
 
 	var finalResponse *responses.Response
 
@@ -439,6 +457,7 @@ func (t *openaiTurn) Next(ctx context.Context) (TurnOutput, error) {
 			}
 
 			if t.opts.StreamingFunc != nil && !streamHasErrored {
+				streamingEmitted = true
 				if err := t.opts.StreamingFunc(ctx, StreamingEventTextChunk{Text: delta}); err != nil {
 					m.logger.Error("Error handling OpenAI response", slog.Any("error", err))
 					streamHasErrored = true
@@ -449,6 +468,7 @@ func (t *openaiTurn) Next(ctx context.Context) (TurnOutput, error) {
 			if streamHasErrored || t.opts.StreamingFunc == nil {
 				continue
 			}
+			streamingEmitted = true
 			if err := t.opts.StreamingFunc(ctx, StreamingEventThinking{Text: ev.Delta}); err != nil {
 				m.logger.Error("Error handling OpenAI thinking", slog.Any("error", err))
 				streamHasErrored = true
@@ -505,7 +525,22 @@ func (t *openaiTurn) Next(ctx context.Context) (TurnOutput, error) {
 		openaiError := &openai.Error{}
 		if errors.As(stream.Err(), &openaiError) && isUnavailableStatusCode(openaiError.StatusCode) {
 			m.metrics.RecordCallDuration(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeUnavailable)
-			return TurnOutput{}, errors.Mark(errors.Wrap(stream.Err(), "OpenAI model unavailable"), ErrModelUnavailable)
+			ra, hasRA := extractRetryAfter("openai", stream.Err(), nil)
+			if hasRA && t.opts.RetryAfterCap > 0 && ra > t.opts.RetryAfterCap {
+				ra = t.opts.RetryAfterCap
+			}
+			ue := &UnavailableError{
+				StatusCode:    openaiError.StatusCode,
+				RetryAfter:    ra,
+				HasRetryAfter: hasRA,
+				Attempts:      t.opts.MaxRetries + 1,
+				PartialOutput: streamingEmitted,
+				Cause:         stream.Err(),
+			}
+			if streamingEmitted {
+				return TurnOutput{}, errors.Join(ue, ErrStreamingPartialOutput)
+			}
+			return TurnOutput{}, ue
 		}
 		m.metrics.RecordCallDuration(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeInternal)
 		return TurnOutput{}, errors.Wrap(stream.Err(), "got error from OpenAI while streaming")
@@ -527,7 +562,16 @@ func (t *openaiTurn) Next(ctx context.Context) (TurnOutput, error) {
 		err := errors.Newf("OpenAI response failed: %s: %s", respErr.Code, respErr.Message)
 		if respErr.Code == "rate_limit_exceeded" {
 			m.metrics.RecordCallDuration(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeUnavailable)
-			return TurnOutput{}, errors.Mark(errors.Wrap(err, "OpenAI model unavailable"), ErrModelUnavailable)
+			ue := &UnavailableError{
+				StatusCode:    0,
+				Attempts:      t.opts.MaxRetries + 1,
+				PartialOutput: streamingEmitted,
+				Cause:         err,
+			}
+			if streamingEmitted {
+				return TurnOutput{}, errors.Join(ue, ErrStreamingPartialOutput)
+			}
+			return TurnOutput{}, ue
 		}
 		m.metrics.RecordCallDuration(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeInternal)
 		return TurnOutput{}, err

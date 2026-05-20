@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
 	"strings"
 	"time"
 
@@ -58,6 +59,16 @@ type openrouterModel struct {
 	info              ModelInfo
 	subParserRegistry map[string]SubParserConfig
 	provider          *openrouter.ChatProvider
+	headerCapture     *headerCapturingTransport
+}
+
+// lastCapturedHeaders returns the most recent response headers seen by the
+// transport, or nil if no response has been observed yet.
+func (m *openrouterModel) lastCapturedHeaders() http.Header {
+	if m.headerCapture == nil {
+		return nil
+	}
+	return m.headerCapture.LastHeaders()
 }
 
 // NewOpenRouterModel creates a new model that routes requests through
@@ -76,8 +87,20 @@ func NewOpenRouterModel(logger *slog.Logger, metrics *Metrics, apiKey string, mo
 	for _, opt := range opts {
 		opt(m)
 	}
-	m.client = openrouter.NewClient(apiKey, m.clientOpts...)
+	transport := newHeaderCapturingTransport(http.DefaultTransport)
+	m.headerCapture = transport
+	httpClient := &http.Client{Transport: transport}
+	clientOpts := append([]openrouter.Option{withOpenRouterHTTPClient(httpClient)}, m.clientOpts...)
+	m.client = openrouter.NewClient(apiKey, clientOpts...)
 	return m
+}
+
+// withOpenRouterHTTPClient installs a custom http.Client on the OpenRouter
+// ClientConfig so we can capture Retry-After headers on errors.
+func withOpenRouterHTTPClient(c *http.Client) openrouter.Option {
+	return func(cfg *openrouter.ClientConfig) {
+		cfg.HTTPClient = c
+	}
 }
 
 func (m *openrouterModel) GenerateContent(ctx context.Context, options ...GenerateOption) (Result, error) {
@@ -416,9 +439,23 @@ func (t *openrouterTurn) nextNonStreaming(ctx context.Context, start time.Time, 
 	t.params.Stream = false
 	t.params.StreamOptions = nil
 
-	response, err := m.client.CreateChatCompletion(ctx, t.params)
+	classify := func(err error) (bool, int, time.Duration, bool) {
+		if err == nil {
+			return false, 0, 0, false
+		}
+		status, ok := openrouter.HTTPStatusCode(err)
+		if !ok || !isUnavailableStatusCode(status) {
+			return false, status, 0, false
+		}
+		ra, hasRA := extractRetryAfter("openrouter", err, m.lastCapturedHeaders())
+		return true, status, ra, hasRA
+	}
+
+	response, err := retryLoop(ctx, t.opts, classify, func(ctx context.Context) (openrouter.ChatCompletionResponse, error) {
+		return m.client.CreateChatCompletion(ctx, t.params)
+	})
 	if err != nil {
-		return t.reportError(ctx, err, start, collector)
+		return t.reportError(ctx, err, start, collector, false, false)
 	}
 
 	if len(response.Choices) == 0 {
@@ -508,12 +545,13 @@ func (t *openrouterTurn) nextStreaming(ctx context.Context, start time.Time, col
 
 	stream, err := m.client.CreateChatCompletionStream(ctx, params)
 	if err != nil {
-		return t.reportError(ctx, err, start, collector)
+		return t.reportError(ctx, err, start, collector, true, false)
 	}
 	defer stream.Close()
 
 	hasRecordedFirstToken := false
 	streamHasErrored := false
+	streamingEmitted := false
 
 	var textContent strings.Builder
 
@@ -580,6 +618,7 @@ func (t *openrouterTurn) nextStreaming(ctx context.Context, start time.Time, col
 			}
 
 			if t.opts.StreamingFunc != nil {
+				streamingEmitted = true
 				if perr := t.opts.StreamingFunc(ctx, StreamingEventTextChunk{Text: delta.Content}); perr != nil {
 					m.logger.Error("Error handling OpenRouter response", slog.Any("error", perr))
 					streamHasErrored = true
@@ -590,6 +629,7 @@ func (t *openrouterTurn) nextStreaming(ctx context.Context, start time.Time, col
 		if delta.Reasoning != nil && *delta.Reasoning != "" {
 			reasoningText.WriteString(*delta.Reasoning)
 			if t.opts.StreamingFunc != nil && !streamHasErrored {
+				streamingEmitted = true
 				if perr := t.opts.StreamingFunc(ctx, StreamingEventThinking{Text: *delta.Reasoning}); perr != nil {
 					m.logger.Error("Error handling OpenRouter reasoning", slog.Any("error", perr))
 					streamHasErrored = true
@@ -598,6 +638,7 @@ func (t *openrouterTurn) nextStreaming(ctx context.Context, start time.Time, col
 		} else if delta.ReasoningContent != "" {
 			reasoningText.WriteString(delta.ReasoningContent)
 			if t.opts.StreamingFunc != nil && !streamHasErrored {
+				streamingEmitted = true
 				if perr := t.opts.StreamingFunc(ctx, StreamingEventThinking{Text: delta.ReasoningContent}); perr != nil {
 					m.logger.Error("Error handling OpenRouter reasoning", slog.Any("error", perr))
 					streamHasErrored = true
@@ -654,7 +695,7 @@ func (t *openrouterTurn) nextStreaming(ctx context.Context, start time.Time, col
 		return TurnOutput{}, cockerrors.New("stream handling failed")
 	}
 	if err != nil {
-		return t.reportError(ctx, err, start, collector)
+		return t.reportError(ctx, err, start, collector, true, streamingEmitted)
 	}
 
 	// Rebuild assistant message + neutral tool calls in deterministic order.
@@ -738,14 +779,43 @@ func (t *openrouterTurn) nextStreaming(ctx context.Context, start time.Time, col
 	}, nil
 }
 
-func (t *openrouterTurn) reportError(ctx context.Context, err error, start time.Time, collector Collector) (TurnOutput, error) {
+func (t *openrouterTurn) reportError(ctx context.Context, err error, start time.Time, collector Collector, streaming bool, partialEmitted bool) (TurnOutput, error) {
 	m := t.m
 	if metrics := GetMetrics(ctx); metrics != nil {
 		metrics.RecordFailure(m.statsModel, collector)
 	}
+
+	// retryLoop already wrapped non-streaming retryable errors in
+	// UnavailableError; just stamp PartialOutput and re-attach the streaming
+	// sentinel where applicable.
+	var ue *UnavailableError
+	if cockerrors.As(err, &ue) {
+		ue.PartialOutput = partialEmitted
+		m.metrics.RecordCallDuration(ctx, GenAISystemOpenRouter, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeUnavailable)
+		if partialEmitted {
+			return TurnOutput{}, cockerrors.Join(ue, ErrStreamingPartialOutput)
+		}
+		return TurnOutput{}, ue
+	}
+
 	if status, ok := openrouter.HTTPStatusCode(err); ok && isUnavailableStatusCode(status) {
 		m.metrics.RecordCallDuration(ctx, GenAISystemOpenRouter, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeUnavailable)
-		return TurnOutput{}, cockerrors.Mark(cockerrors.Wrap(err, "OpenRouter model unavailable"), ErrModelUnavailable)
+		ra, hasRA := extractRetryAfter("openrouter", err, m.lastCapturedHeaders())
+		if hasRA && t.opts.RetryAfterCap > 0 && ra > t.opts.RetryAfterCap {
+			ra = t.opts.RetryAfterCap
+		}
+		newUE := &UnavailableError{
+			StatusCode:    status,
+			RetryAfter:    ra,
+			HasRetryAfter: hasRA,
+			Attempts:      1,
+			PartialOutput: partialEmitted,
+			Cause:         err,
+		}
+		if partialEmitted {
+			return TurnOutput{}, cockerrors.Join(newUE, ErrStreamingPartialOutput)
+		}
+		return TurnOutput{}, newUE
 	}
 	m.metrics.RecordCallDuration(ctx, GenAISystemOpenRouter, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeInternal)
 	return TurnOutput{}, cockerrors.Wrap(err, "error from OpenRouter")

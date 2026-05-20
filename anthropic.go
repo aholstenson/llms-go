@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"log/slog"
+	"net/http"
 	"strings"
 	"time"
 
@@ -15,6 +16,19 @@ import (
 	"github.com/cockroachdb/errors"
 	"github.com/invopop/jsonschema"
 )
+
+// anthropicResponseFromError pulls the *http.Response out of an Anthropic
+// SDK error so callers can read Retry-After-style headers.
+func anthropicResponseFromError(err error) *http.Response {
+	if err == nil {
+		return nil
+	}
+	var ae *anthropic.Error
+	if errors.As(err, &ae) && ae != nil {
+		return ae.Response
+	}
+	return nil
+}
 
 type anthropicModel struct {
 	logger            *slog.Logger
@@ -211,10 +225,13 @@ func (m *anthropicModel) handleStreaming(
 	structuredStreamingFunc StructuredStreamingFunc,
 	jsParser *jsonstream.Parser,
 	structuredContentBuilder *strings.Builder,
+	streamingEmitted *bool,
+	reqOpts ...option.RequestOption,
 ) (*anthropic.BetaMessage, error) {
-	stream := m.client.Beta.Messages.NewStreaming(ctx, params,
+	allOpts := append([]option.RequestOption{
 		option.WithHeader("anthropic-beta", "structured-outputs-2025-11-13"),
-	)
+	}, reqOpts...)
+	stream := m.client.Beta.Messages.NewStreaming(ctx, params, allOpts...)
 	defer func() {
 		err := stream.Close()
 		if err != nil {
@@ -261,6 +278,9 @@ func (m *anthropicModel) handleStreaming(
 					}
 
 					if streamingFunc != nil {
+						if streamingEmitted != nil {
+							*streamingEmitted = true
+						}
 						err := streamingFunc(ctx, StreamingEventTextChunk{Text: blockType.Text})
 						if err != nil {
 							return nil, err
@@ -269,6 +289,9 @@ func (m *anthropicModel) handleStreaming(
 				}
 			case anthropic.BetaThinkingBlock:
 				if streamingFunc != nil && blockType.Thinking != "" {
+					if streamingEmitted != nil {
+						*streamingEmitted = true
+					}
 					if err := streamingFunc(ctx, StreamingEventThinking{Text: blockType.Thinking}); err != nil {
 						return nil, err
 					}
@@ -277,6 +300,9 @@ func (m *anthropicModel) handleStreaming(
 				currentTool = "web_search"
 			case anthropic.BetaWebSearchToolResultBlock:
 				if streamingFunc != nil {
+					if streamingEmitted != nil {
+						*streamingEmitted = true
+					}
 					err := streamingFunc(ctx, StreamingEventToolResult{ToolID: currentTool, Result: &searchToolResult{
 						count: -1,
 						items: nil,
@@ -306,6 +332,9 @@ func (m *anthropicModel) handleStreaming(
 				}
 
 				if streamingFunc != nil {
+					if streamingEmitted != nil {
+						*streamingEmitted = true
+					}
 					err := streamingFunc(ctx, StreamingEventTextChunk{Text: deltaVariant.Text})
 					if err != nil {
 						return nil, err
@@ -313,6 +342,9 @@ func (m *anthropicModel) handleStreaming(
 				}
 			case anthropic.BetaThinkingDelta:
 				if streamingFunc != nil {
+					if streamingEmitted != nil {
+						*streamingEmitted = true
+					}
 					if err := streamingFunc(ctx, StreamingEventThinking{Text: deltaVariant.Thinking}); err != nil {
 						return nil, err
 					}
@@ -349,6 +381,9 @@ func (m *anthropicModel) handleStreaming(
 					}
 
 					if streamingFunc != nil {
+						if streamingEmitted != nil {
+							*streamingEmitted = true
+						}
 						err = streamingFunc(ctx, StreamingEventToolUse{ToolID: currentTool, Arguments: &searchToolArgs})
 						if err != nil {
 							return nil, err
@@ -359,6 +394,9 @@ func (m *anthropicModel) handleStreaming(
 		case anthropic.BetaRawContentBlockStopEvent:
 			for _, citation := range citations {
 				if streamingFunc != nil {
+					if streamingEmitted != nil {
+						*streamingEmitted = true
+					}
 					err := streamingFunc(ctx, citation)
 					if err != nil {
 						return nil, err
@@ -698,12 +736,14 @@ func (t *anthropicTurn) Next(ctx context.Context) (TurnOutput, error) {
 
 	var response *anthropic.BetaMessage
 	var err error
+	var streamingEmitted bool
 
 	if t.opts.StreamingFunc != nil || t.opts.StructuredStreamingFunc != nil {
-		response, err = m.handleStreaming(ctx, t.params, t.opts.StreamingFunc, t.opts.StructuredStreamingFunc, t.jsParser, &t.structuredContentBuilder)
+		response, err = m.handleStreaming(ctx, t.params, t.opts.StreamingFunc, t.opts.StructuredStreamingFunc, t.jsParser, &t.structuredContentBuilder, &streamingEmitted, option.WithMaxRetries(t.opts.MaxRetries))
 	} else {
 		response, err = m.client.Beta.Messages.New(ctx, t.params,
 			option.WithHeader("anthropic-beta", "structured-outputs-2025-11-13"),
+			option.WithMaxRetries(t.opts.MaxRetries),
 		)
 	}
 
@@ -715,7 +755,22 @@ func (t *anthropicTurn) Next(ctx context.Context) (TurnOutput, error) {
 
 		if isUnavailableStatusCode(anthropicError.StatusCode) {
 			m.metrics.RecordCallDuration(ctx, GenAISystemAnthropic, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeUnavailable)
-			return TurnOutput{}, errors.Mark(errors.Wrap(err, "Anthropic model unavailable"), ErrModelUnavailable)
+			ra, hasRA := extractRetryAfter("anthropic", err, nil)
+			if hasRA && t.opts.RetryAfterCap > 0 && ra > t.opts.RetryAfterCap {
+				ra = t.opts.RetryAfterCap
+			}
+			ue := &UnavailableError{
+				StatusCode:    anthropicError.StatusCode,
+				RetryAfter:    ra,
+				HasRetryAfter: hasRA,
+				Attempts:      t.opts.MaxRetries + 1,
+				PartialOutput: streamingEmitted,
+				Cause:         err,
+			}
+			if streamingEmitted {
+				return TurnOutput{}, errors.Join(ue, ErrStreamingPartialOutput)
+			}
+			return TurnOutput{}, ue
 		}
 
 		m.metrics.RecordCallDuration(ctx, GenAISystemAnthropic, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeInternal)

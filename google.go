@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"net/http"
 	"strings"
 	"time"
 
@@ -13,6 +14,58 @@ import (
 	"google.golang.org/genai"
 )
 
+// lastCapturedHeaders returns the most recent response headers seen by the
+// transport, or nil if no response has been observed yet.
+func (m *googleModel) lastCapturedHeaders() http.Header {
+	if m.headerCapture == nil {
+		return nil
+	}
+	return m.headerCapture.LastHeaders()
+}
+
+// googleErrorDetails inspects an error from the genai SDK and reports
+// (retryAfter, retryable, statusCode). retryAfter is the duration parsed
+// from the SDK error (Details), if any. retryable is true when the status
+// is one of the unavailable codes (429/503/529). statusCode is 0 when no
+// APIError is found in the chain.
+func googleErrorDetails(err error) (time.Duration, bool, int) {
+	if err == nil {
+		return 0, false, 0
+	}
+	var apiErr genai.APIError
+	if !errors.As(err, &apiErr) {
+		return 0, false, 0
+	}
+	d, _ := googleRetryDelayFromError(err)
+	return d, isUnavailableStatusCode(apiErr.Code), apiErr.Code
+}
+
+// googleRetryDelayFromError walks genai.APIError.Details looking for a
+// google.rpc.RetryInfo entry and decodes its retryDelay field.
+func googleRetryDelayFromError(err error) (time.Duration, bool) {
+	if err == nil {
+		return 0, false
+	}
+	var apiErr genai.APIError
+	if !errors.As(err, &apiErr) {
+		return 0, false
+	}
+	for _, d := range apiErr.Details {
+		t, _ := d["@type"].(string)
+		if !strings.HasSuffix(t, "google.rpc.RetryInfo") {
+			continue
+		}
+		delay, ok := d["retryDelay"].(string)
+		if !ok {
+			continue
+		}
+		if dur, perr := time.ParseDuration(delay); perr == nil {
+			return dur, true
+		}
+	}
+	return 0, false
+}
+
 type googleModel struct {
 	logger            *slog.Logger
 	metrics           *Metrics
@@ -21,6 +74,7 @@ type googleModel struct {
 	model             string
 	info              ModelInfo
 	subParserRegistry map[string]SubParserConfig
+	headerCapture     *headerCapturingTransport
 }
 
 // NewGoogleModel creates a new Google Gemini model. info carries embedded
@@ -28,9 +82,12 @@ type googleModel struct {
 // permissively.
 func NewGoogleModel(logger *slog.Logger, metrics *Metrics, apiKey string, model string, registry map[string]SubParserConfig, info ModelInfo) (Model, error) {
 	ctx := context.Background()
+	transport := newHeaderCapturingTransport(http.DefaultTransport)
+	httpClient := &http.Client{Transport: transport}
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
-		APIKey:  apiKey,
-		Backend: genai.BackendGeminiAPI,
+		APIKey:     apiKey,
+		Backend:    genai.BackendGeminiAPI,
+		HTTPClient: httpClient,
 	})
 	if err != nil {
 		return nil, err
@@ -43,6 +100,7 @@ func NewGoogleModel(logger *slog.Logger, metrics *Metrics, apiKey string, model 
 		model:             model,
 		info:              info,
 		subParserRegistry: registry,
+		headerCapture:     transport,
 	}, nil
 }
 
@@ -155,6 +213,7 @@ func (m *googleModel) handleStreaming(
 	structuredContentBuilder *strings.Builder,
 	start time.Time,
 	hasRecordedFirstToken *bool,
+	streamingEmitted *bool,
 ) (*genai.GenerateContentResponse, error) {
 	var lastResponse *genai.GenerateContentResponse
 
@@ -171,6 +230,9 @@ func (m *googleModel) handleStreaming(
 
 				if p.Thought {
 					if streamingFunc != nil {
+						if streamingEmitted != nil {
+							*streamingEmitted = true
+						}
 						if err := streamingFunc(ctx, StreamingEventThinking{Text: p.Text}); err != nil {
 							return nil, err
 						}
@@ -198,6 +260,9 @@ func (m *googleModel) handleStreaming(
 					}
 
 					if streamingFunc != nil {
+						if streamingEmitted != nil {
+							*streamingEmitted = true
+						}
 						if err := streamingFunc(ctx, StreamingEventTextChunk{Text: p.Text}); err != nil {
 							return nil, err
 						}
@@ -515,11 +580,26 @@ func (t *googleTurn) Next(ctx context.Context) (TurnOutput, error) {
 
 	var response *genai.GenerateContentResponse
 	var err error
+	streamingEmitted := false
+	streamingPath := t.opts.StreamingFunc != nil || t.opts.StructuredStreamingFunc != nil
 
-	if t.opts.StreamingFunc != nil || t.opts.StructuredStreamingFunc != nil {
-		response, err = m.handleStreaming(ctx, t.config, t.messages, t.opts.StreamingFunc, t.opts.StructuredStreamingFunc, t.jsParser, &t.structuredContentBuilder, start, &hasRecordedFirstToken)
+	if streamingPath {
+		response, err = m.handleStreaming(ctx, t.config, t.messages, t.opts.StreamingFunc, t.opts.StructuredStreamingFunc, t.jsParser, &t.structuredContentBuilder, start, &hasRecordedFirstToken, &streamingEmitted)
 	} else {
-		response, err = m.client.Models.GenerateContent(ctx, m.model, t.messages, t.config)
+		classify := func(err error) (bool, int, time.Duration, bool) {
+			if err == nil {
+				return false, 0, 0, false
+			}
+			_, retryable, status := googleErrorDetails(err)
+			if !retryable {
+				return false, status, 0, false
+			}
+			ra, hasRA := extractRetryAfter("google", err, m.lastCapturedHeaders())
+			return true, status, ra, hasRA
+		}
+		response, err = retryLoop(ctx, t.opts, classify, func(ctx context.Context) (*genai.GenerateContentResponse, error) {
+			return m.client.Models.GenerateContent(ctx, m.model, t.messages, t.config)
+		})
 	}
 
 	if err != nil {
@@ -527,13 +607,42 @@ func (t *googleTurn) Next(ctx context.Context) (TurnOutput, error) {
 			metrics.RecordFailure(m.statsModel, collector)
 		}
 
-		var apiErr *genai.APIError
-		if errors.As(err, &apiErr) {
-			if isUnavailableStatusCode(apiErr.Code) {
-				m.metrics.RecordCallDuration(ctx, GenAISystemGoogle, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeUnavailable)
-				return TurnOutput{}, errors.Mark(errors.Wrap(err, "Google model unavailable"), ErrModelUnavailable)
+		var ue *UnavailableError
+		if errors.As(err, &ue) {
+			ue.PartialOutput = streamingEmitted
+			m.metrics.RecordCallDuration(ctx, GenAISystemGoogle, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeUnavailable)
+			if streamingEmitted {
+				return TurnOutput{}, errors.Join(ue, ErrStreamingPartialOutput)
 			}
+			return TurnOutput{}, ue
+		}
 
+		// Streaming path: build UnavailableError ourselves since retryLoop
+		// is bypassed.
+		if streamingPath {
+			if _, retryable, status := googleErrorDetails(err); retryable {
+				ra, hasRA := extractRetryAfter("google", err, m.lastCapturedHeaders())
+				if hasRA && t.opts.RetryAfterCap > 0 && ra > t.opts.RetryAfterCap {
+					ra = t.opts.RetryAfterCap
+				}
+				se := &UnavailableError{
+					StatusCode:    status,
+					RetryAfter:    ra,
+					HasRetryAfter: hasRA,
+					Attempts:      1,
+					PartialOutput: streamingEmitted,
+					Cause:         err,
+				}
+				m.metrics.RecordCallDuration(ctx, GenAISystemGoogle, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeUnavailable)
+				if streamingEmitted {
+					return TurnOutput{}, errors.Join(se, ErrStreamingPartialOutput)
+				}
+				return TurnOutput{}, se
+			}
+		}
+
+		var apiErr genai.APIError
+		if errors.As(err, &apiErr) {
 			m.logger.Error("Google API error", slog.Any("error", err), slog.Any("messages", t.messages))
 		}
 

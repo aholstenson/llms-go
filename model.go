@@ -119,6 +119,11 @@ type generateContentOptions struct {
 	WebSearch         bool
 	ToolCallTimeout   time.Duration
 	ParentExecution   ExecutionContext
+	// Retry options
+	MaxRetries     int
+	RetryAfterCap  time.Duration
+	RetryBackoff   BackoffPolicy
+	maxRetriesUser bool
 	// Structured output options
 	ResponseSchema                   *ResponseSchema
 	StructuredStreamingFunc          StructuredStreamingFunc
@@ -126,6 +131,15 @@ type generateContentOptions struct {
 	StructuredStreamingSchemaAuto    bool               // True if schema was auto-generated
 	StructuredStreamingSchemaBuilder structuredStreamingSchemaBuilder
 }
+
+// DefaultMaxRetries is the default number of retries applied to failing
+// requests. Matches the Anthropic and OpenAI SDK defaults so behavior is
+// uniform across providers out of the box.
+const DefaultMaxRetries = 2
+
+// DefaultRetryAfterCap clamps server-supplied Retry-After hints so a
+// pathological hint cannot stall a request for minutes.
+const DefaultRetryAfterCap = 60 * time.Second
 
 // DefaultToolCallTimeout is the timeout applied to a single tool call when no
 // timeout is configured via WithToolCallTimeout.
@@ -142,6 +156,15 @@ func resolveGenerateContentOptions(registry map[string]SubParserConfig, opts ...
 	}
 	if o.ToolCallTimeout == 0 {
 		o.ToolCallTimeout = DefaultToolCallTimeout
+	}
+	if !o.maxRetriesUser {
+		o.MaxRetries = DefaultMaxRetries
+	}
+	if o.RetryAfterCap == 0 {
+		o.RetryAfterCap = DefaultRetryAfterCap
+	}
+	if o.RetryBackoff == nil {
+		o.RetryBackoff = defaultBackoffPolicy()
 	}
 	if o.StructuredStreamingSchemaBuilder != nil && o.StructuredStreamingSchema == nil {
 		o.StructuredStreamingSchema = o.StructuredStreamingSchemaBuilder(registry)
@@ -211,6 +234,55 @@ func WithToolCallTimeout(timeout time.Duration) GenerateOption {
 func WithParentExecution(parent ExecutionContext) GenerateOption {
 	return func(opts *generateContentOptions) {
 		opts.ParentExecution = parent
+	}
+}
+
+// WithMaxRetries sets the maximum number of retry attempts after the initial
+// request. The total number of attempts is n+1. Default is DefaultMaxRetries
+// (2). Passing 0 disables retries; n < 0 panics.
+//
+// For Anthropic and OpenAI this is forwarded to the SDK, which runs its own
+// retry loop (with its own backoff policy — see WithRetryBackoff). For
+// Google and OpenRouter the retry loop is owned by llms-go and obeys
+// WithRetryBackoff.
+//
+// Streaming generations are never retried at the body level by any
+// provider — once a stream has begun emitting events, mid-stream failures
+// surface to the caller with ErrStreamingPartialOutput.
+func WithMaxRetries(n int) GenerateOption {
+	if n < 0 {
+		panic("llms.WithMaxRetries: n must be >= 0")
+	}
+	return func(opts *generateContentOptions) {
+		opts.MaxRetries = n
+		opts.maxRetriesUser = true
+	}
+}
+
+// WithRetryAfterCap clamps server-supplied Retry-After hints to the given
+// upper bound. Default is DefaultRetryAfterCap (60s). The cap is applied to
+// both the internal sleep duration and to the value surfaced on
+// UnavailableError.RetryAfter.
+func WithRetryAfterCap(d time.Duration) GenerateOption {
+	return func(opts *generateContentOptions) {
+		opts.RetryAfterCap = d
+	}
+}
+
+// WithRetryBackoff overrides the BackoffPolicy used by the llms-go-owned
+// retry loop (Google and OpenRouter, non-streaming only).
+//
+// NOTE: This option does not affect Anthropic or OpenAI. Those SDKs run
+// their own internal backoff and llms-go cannot inject a policy into them;
+// only WithMaxRetries is plumbed through. The default ExponentialBackoff
+// parameters are chosen to match the SDK defaults so behavior is uniform
+// across all four providers out of the box. If you need identical custom
+// backoff for all providers, install a custom HTTP transport on the
+// Anthropic/OpenAI clients yourself, or set MaxRetries to 0 there and own
+// retries via an outer loop.
+func WithRetryBackoff(p BackoffPolicy) GenerateOption {
+	return func(opts *generateContentOptions) {
+		opts.RetryBackoff = p
 	}
 }
 
