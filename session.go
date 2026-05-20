@@ -136,11 +136,6 @@ func NewSession(m Model, options ...GenerateOption) (*Session, error) {
 // cancelled. A non-nil error is returned for genuine failures (provider
 // error, context cancellation); step-limit termination is reported via
 // done=true with Result() returning a *MaxStepsError.
-//
-// Step is the composition of StepPlan, in-process parallel tool execution,
-// and StepObserve; its observable behaviour (StepInfo shapes, streaming-event
-// ordering, budget accounting) is byte-for-byte identical to the previous
-// monolithic implementation.
 func (s *Session) Step(ctx context.Context) (StepInfo, bool, error) {
 	plan, done, err := s.StepPlan(ctx)
 	if err != nil {
@@ -150,12 +145,7 @@ func (s *Session) Step(ctx context.Context) (StepInfo, bool, error) {
 		return StepInfo{Step: plan.Step, Output: plan.Output, Exec: plan.Exec}, true, nil
 	}
 
-	// plan.NeedsTools is true here. Run tools in-process, preserving the
-	// previous monolithic behaviour on a runTools error: fail and return a
-	// StepInfo without Outcomes. The execution tracker must be visible to
-	// tools here just as in the previous monolithic Step.
-	ctx = WithExecutionContext(ctx, s.tracker)
-	outcomes, err := s.runTools(ctx, plan.ToolCalls)
+	outcomes, err := s.RunTools(ctx, plan.ToolCalls)
 	if err != nil {
 		s.fail(err)
 		return StepInfo{Step: s.step, Output: plan.Output, Exec: s.tracker}, true, err
@@ -310,9 +300,18 @@ func (s *Session) ResumeForToolResults(calls []ToolCall) error {
 	return nil
 }
 
-// runTools executes the turn's tool calls in parallel, preserving call order
-// in the returned slice. Cancellation mid-fan-in surfaces ctx.Err().
-func (s *Session) runTools(ctx context.Context, calls []ToolCall) ([]ToolOutcome, error) {
+// RunTools executes the given tool calls in parallel using the session's
+// tool registry, preserving call order in the returned slice. Cancellation
+// mid-fan-in surfaces ctx.Err(). The session's ExecutionContext is attached
+// to ctx so tools (and any sub-agents they spawn) can see it.
+//
+// RunTools is the standard tool-execution path used by Step. Call it
+// directly when you want to interpose between StepPlan and StepObserve —
+// for example, to gate or audit calls before they run — while still using
+// the session's tool dispatch and parallelism.
+func (s *Session) RunTools(ctx context.Context, calls []ToolCall) ([]ToolOutcome, error) {
+	ctx = WithExecutionContext(ctx, s.tracker)
+
 	outcomes := make([]ToolOutcome, len(calls))
 
 	type indexed struct {

@@ -10,7 +10,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-// drive runs a Session to completion using the split StepPlan / runTools /
+// drive runs a Session to completion using the split StepPlan / RunTools /
 // StepObserve API, mirroring what runSession does via Step.
 func drive(ctx context.Context, s *Session) (Result, error) {
 	for {
@@ -21,7 +21,7 @@ func drive(ctx context.Context, s *Session) (Result, error) {
 		if done {
 			break
 		}
-		outcomes, err := s.runTools(WithExecutionContext(ctx, s.tracker), plan.ToolCalls)
+		outcomes, err := s.RunTools(ctx, plan.ToolCalls)
 		if err != nil {
 			s.fail(err)
 			return nil, err
