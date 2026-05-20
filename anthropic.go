@@ -653,7 +653,7 @@ func (t *anthropicTurn) ObserveToolResults(_ context.Context, _ []ToolCall, outc
 				Content: []anthropic.BetaToolResultBlockParamContentUnion{
 					{OfText: &anthropic.BetaTextBlockParam{Text: result}},
 				},
-				IsError:      anthropic.Bool(false),
+				IsError:      anthropic.Bool(o.Error != ""),
 				CacheControl: cacheControl,
 			},
 		})
