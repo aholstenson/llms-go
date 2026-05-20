@@ -551,6 +551,7 @@ func (t *openrouterTurn) nextStreaming(ctx context.Context, start time.Time, col
 	hasRecordedFirstToken := false
 	streamHasErrored := false
 	streamingEmitted := false
+	var structuredStreamErr error
 
 	var textContent strings.Builder
 
@@ -600,16 +601,16 @@ func (t *openrouterTurn) nextStreaming(ctx context.Context, start time.Time, col
 
 			textContent.WriteString(delta.Content)
 
-			if t.jsParser != nil && t.opts.StructuredStreamingFunc != nil {
+			if structuredStreamErr == nil && t.jsParser != nil && t.opts.StructuredStreamingFunc != nil {
 				t.structuredContentBuilder.WriteString(delta.Content)
 				events, perr := t.jsParser.Feed(delta.Content)
 				if perr != nil {
-					m.logger.Error("Error parsing structured JSON stream", slog.Any("error", perr))
+					structuredStreamErr = fmt.Errorf("%w: %w", ErrStructuredStreamParse, perr)
 				} else {
 					for _, event := range events {
+						streamingEmitted = true
 						if perr := t.opts.StructuredStreamingFunc(ctx, event); perr != nil {
-							m.logger.Error("Error handling structured streaming event", slog.Any("error", perr))
-							streamHasErrored = true
+							structuredStreamErr = perr
 							break
 						}
 					}
@@ -672,18 +673,30 @@ func (t *openrouterTurn) nextStreaming(ctx context.Context, start time.Time, col
 		}
 	}
 
-	if t.jsParser != nil && t.opts.StructuredStreamingFunc != nil {
+	if structuredStreamErr == nil && t.jsParser != nil && t.opts.StructuredStreamingFunc != nil {
 		events, ferr := t.jsParser.Flush()
 		if ferr != nil {
-			m.logger.Error("Error flushing structured JSON stream", slog.Any("error", ferr))
+			structuredStreamErr = fmt.Errorf("%w: %w", ErrStructuredStreamParse, ferr)
 		} else {
 			for _, event := range events {
+				streamingEmitted = true
 				if ferr := t.opts.StructuredStreamingFunc(ctx, event); ferr != nil {
-					m.logger.Error("Error handling structured streaming event", slog.Any("error", ferr))
+					structuredStreamErr = ferr
 					break
 				}
 			}
 		}
+	}
+
+	if structuredStreamErr != nil {
+		if metrics := GetMetrics(ctx); metrics != nil {
+			metrics.RecordFailure(m.statsModel, collector)
+		}
+		m.metrics.RecordCallDuration(ctx, GenAISystemOpenRouter, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeStreamProcessing)
+		if streamingEmitted {
+			return TurnOutput{}, errors.Join(ErrStreamingPartialOutput, structuredStreamErr)
+		}
+		return TurnOutput{}, structuredStreamErr
 	}
 
 	if streamHasErrored {

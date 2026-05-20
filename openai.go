@@ -421,6 +421,7 @@ func (t *openaiTurn) Next(ctx context.Context) (TurnOutput, error) {
 
 	streamHasErrored := false
 	streamingEmitted := false
+	var structuredStreamErr error
 
 	stream := m.client.Responses.NewStreaming(ctx, t.params, option.WithMaxRetries(t.opts.MaxRetries))
 
@@ -440,16 +441,16 @@ func (t *openaiTurn) Next(ctx context.Context) (TurnOutput, error) {
 			}
 
 			delta := ev.Delta
-			if t.jsParser != nil && t.opts.StructuredStreamingFunc != nil {
+			if structuredStreamErr == nil && t.jsParser != nil && t.opts.StructuredStreamingFunc != nil {
 				t.structuredContentBuilder.WriteString(delta)
 				parsed, err := t.jsParser.Feed(delta)
 				if err != nil {
-					m.logger.Error("Error parsing structured JSON stream", slog.Any("error", err))
+					structuredStreamErr = fmt.Errorf("%w: %w", ErrStructuredStreamParse, err)
 				} else {
 					for _, e := range parsed {
+						streamingEmitted = true
 						if err := t.opts.StructuredStreamingFunc(ctx, e); err != nil {
-							m.logger.Error("Error handling structured streaming event", slog.Any("error", err))
-							streamHasErrored = true
+							structuredStreamErr = err
 							break
 						}
 					}
@@ -497,18 +498,30 @@ func (t *openaiTurn) Next(ctx context.Context) (TurnOutput, error) {
 		m.logger.Warn("Error closing OpenAI stream", slog.Any("error", err))
 	}
 
-	if t.jsParser != nil && t.opts.StructuredStreamingFunc != nil {
+	if structuredStreamErr == nil && t.jsParser != nil && t.opts.StructuredStreamingFunc != nil {
 		parsed, err := t.jsParser.Flush()
 		if err != nil {
-			m.logger.Error("Error flushing structured JSON stream", slog.Any("error", err))
+			structuredStreamErr = fmt.Errorf("%w: %w", ErrStructuredStreamParse, err)
 		} else {
 			for _, e := range parsed {
+				streamingEmitted = true
 				if err := t.opts.StructuredStreamingFunc(ctx, e); err != nil {
-					m.logger.Error("Error handling structured streaming event", slog.Any("error", err))
+					structuredStreamErr = err
 					break
 				}
 			}
 		}
+	}
+
+	if structuredStreamErr != nil {
+		if metrics := GetMetrics(ctx); metrics != nil {
+			metrics.RecordFailure(m.statsModel, collector)
+		}
+		m.metrics.RecordCallDuration(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeStreamProcessing)
+		if streamingEmitted {
+			return TurnOutput{}, errors.Join(ErrStreamingPartialOutput, structuredStreamErr)
+		}
+		return TurnOutput{}, structuredStreamErr
 	}
 
 	if streamHasErrored {

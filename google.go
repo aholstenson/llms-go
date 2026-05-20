@@ -215,6 +215,7 @@ func (m *googleModel) handleStreaming(
 	streamingEmitted *bool,
 ) (*genai.GenerateContentResponse, error) {
 	var lastResponse *genai.GenerateContentResponse
+	var structuredStreamErr error
 
 	for resp, err := range m.client.Models.GenerateContentStream(ctx, m.model, messages, config) {
 		if err != nil {
@@ -243,15 +244,18 @@ func (m *googleModel) handleStreaming(
 					}
 
 					// Handle structured streaming
-					if structuredStreamingFunc != nil && jsParser != nil {
+					if structuredStreamErr == nil && structuredStreamingFunc != nil && jsParser != nil {
 						structuredContentBuilder.WriteString(p.Text)
 						events, err := jsParser.Feed(p.Text)
 						if err != nil {
-							m.logger.Error("Error parsing structured JSON stream", slog.Any("error", err))
+							structuredStreamErr = fmt.Errorf("%w: %w", ErrStructuredStreamParse, err)
 						} else {
 							for _, evt := range events {
+								if streamingEmitted != nil {
+									*streamingEmitted = true
+								}
 								if err := structuredStreamingFunc(ctx, evt); err != nil {
-									m.logger.Error("Error handling structured streaming event", slog.Any("error", err))
+									structuredStreamErr = err
 									break
 								}
 							}
@@ -313,18 +317,28 @@ func (m *googleModel) handleStreaming(
 	}
 
 	// Flush jsonstream parser
-	if structuredStreamingFunc != nil && jsParser != nil {
+	if structuredStreamErr == nil && structuredStreamingFunc != nil && jsParser != nil {
 		events, err := jsParser.Flush()
 		if err != nil {
-			m.logger.Error("Error flushing structured JSON stream", slog.Any("error", err))
+			structuredStreamErr = fmt.Errorf("%w: %w", ErrStructuredStreamParse, err)
 		} else {
 			for _, evt := range events {
+				if streamingEmitted != nil {
+					*streamingEmitted = true
+				}
 				if err := structuredStreamingFunc(ctx, evt); err != nil {
-					m.logger.Error("Error handling structured streaming event", slog.Any("error", err))
+					structuredStreamErr = err
 					break
 				}
 			}
 		}
+	}
+
+	if structuredStreamErr != nil {
+		if streamingEmitted != nil && *streamingEmitted {
+			return nil, errors.Join(ErrStreamingPartialOutput, structuredStreamErr)
+		}
+		return nil, structuredStreamErr
 	}
 
 	if lastResponse == nil {

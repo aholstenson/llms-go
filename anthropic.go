@@ -243,6 +243,7 @@ func (m *anthropicModel) handleStreaming(
 	currentTool := ""
 	partialJSON := ""
 	citations := []StreamingEventCitation{}
+	var structuredStreamErr error
 
 	for stream.Next() {
 		event := stream.Current()
@@ -262,15 +263,18 @@ func (m *anthropicModel) handleStreaming(
 			case anthropic.BetaTextBlock:
 				if blockType.Text != "" {
 					// Handle structured streaming
-					if structuredStreamingFunc != nil && jsParser != nil {
+					if structuredStreamErr == nil && structuredStreamingFunc != nil && jsParser != nil {
 						structuredContentBuilder.WriteString(blockType.Text)
 						events, err := jsParser.Feed(blockType.Text)
 						if err != nil {
-							m.logger.Error("Error parsing structured JSON stream", slog.Any("error", err))
+							structuredStreamErr = fmt.Errorf("%w: %w", ErrStructuredStreamParse, err)
 						} else {
 							for _, evt := range events {
+								if streamingEmitted != nil {
+									*streamingEmitted = true
+								}
 								if err := structuredStreamingFunc(ctx, evt); err != nil {
-									m.logger.Error("Error handling structured streaming event", slog.Any("error", err))
+									structuredStreamErr = err
 									break
 								}
 							}
@@ -316,15 +320,18 @@ func (m *anthropicModel) handleStreaming(
 			switch deltaVariant := eventVariant.Delta.AsAny().(type) {
 			case anthropic.BetaTextDelta:
 				// Handle structured streaming
-				if structuredStreamingFunc != nil && jsParser != nil {
+				if structuredStreamErr == nil && structuredStreamingFunc != nil && jsParser != nil {
 					structuredContentBuilder.WriteString(deltaVariant.Text)
 					events, err := jsParser.Feed(deltaVariant.Text)
 					if err != nil {
-						m.logger.Error("Error parsing structured JSON stream", slog.Any("error", err))
+						structuredStreamErr = fmt.Errorf("%w: %w", ErrStructuredStreamParse, err)
 					} else {
 						for _, evt := range events {
+							if streamingEmitted != nil {
+								*streamingEmitted = true
+							}
 							if err := structuredStreamingFunc(ctx, evt); err != nil {
-								m.logger.Error("Error handling structured streaming event", slog.Any("error", err))
+								structuredStreamErr = err
 								break
 							}
 						}
@@ -407,14 +414,17 @@ func (m *anthropicModel) handleStreaming(
 	}
 
 	// Flush jsonstream parser
-	if structuredStreamingFunc != nil && jsParser != nil {
+	if structuredStreamErr == nil && structuredStreamingFunc != nil && jsParser != nil {
 		events, err := jsParser.Flush()
 		if err != nil {
-			m.logger.Error("Error flushing structured JSON stream", slog.Any("error", err))
+			structuredStreamErr = fmt.Errorf("%w: %w", ErrStructuredStreamParse, err)
 		} else {
 			for _, evt := range events {
+				if streamingEmitted != nil {
+					*streamingEmitted = true
+				}
 				if err := structuredStreamingFunc(ctx, evt); err != nil {
-					m.logger.Error("Error handling structured streaming event", slog.Any("error", err))
+					structuredStreamErr = err
 					break
 				}
 			}
@@ -423,7 +433,14 @@ func (m *anthropicModel) handleStreaming(
 
 	if stream.Err() != nil {
 		return nil, fmt.Errorf("streaming error from Anthropic: %w", stream.Err())
-	} else if message.Content == nil {
+	}
+	if structuredStreamErr != nil {
+		if streamingEmitted != nil && *streamingEmitted {
+			return nil, errors.Join(ErrStreamingPartialOutput, structuredStreamErr)
+		}
+		return nil, structuredStreamErr
+	}
+	if message.Content == nil {
 		return nil, errors.New("no content in message")
 	}
 

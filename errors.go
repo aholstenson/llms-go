@@ -10,10 +10,18 @@ import (
 
 // ErrStreamingPartialOutput sentinels an error returned from a streaming
 // generation where at least one content event had already been dispatched
-// to the caller's StreamingFunc before the underlying stream errored.
-// Callers should use errors.Is to detect this case and avoid blind retries
-// that would replay tokens already shown to the user.
+// to the caller's StreamingFunc or StructuredStreamingFunc before the
+// underlying stream errored. Callers should use errors.Is to detect this
+// case and avoid blind retries that would replay tokens already shown to
+// the user.
 var ErrStreamingPartialOutput = errors.New("streaming output was partially delivered before error")
+
+// ErrStructuredStreamParse sentinels an error returned when the jsonstream
+// parser rejects mid-stream content during structured streaming. The parser
+// state is unreliable after such an error, so the generation is aborted.
+// Callers detect this via errors.Is; the underlying parser error is wrapped
+// for diagnostics.
+var ErrStructuredStreamParse = errors.New("structured stream parse failed")
 
 // UnavailableError is the structured error returned by providers when a
 // generation fails with a transient unavailability condition (rate limit,
