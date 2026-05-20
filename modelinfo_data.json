@@ -1276,6 +1276,33 @@
     "k": "2025-01",
     "rd": "2026-02-19"
   },
+  "google/gemini-3.5-flash": {
+    "c": {
+      "i": 1.5,
+      "o": 9,
+      "r": 0.15
+    },
+    "l": {
+      "c": 1048576,
+      "o": 65536
+    },
+    "f": {
+      "t": true,
+      "r": true,
+      "tc": true,
+      "a": true
+    },
+    "m": [
+      "text",
+      "image",
+      "video",
+      "audio",
+      "pdf"
+    ],
+    "fam": "gemini-flash",
+    "k": "2025-01",
+    "rd": "2026-05-19"
+  },
   "google/gemini-embedding-001": {
     "c": {
       "i": 0.15,
