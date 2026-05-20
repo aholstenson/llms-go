@@ -93,7 +93,7 @@ func doToolCall(ctx context.Context, logger *slog.Logger, streamingFunc Streamin
 
 	defer func() {
 		if r := recover(); r != nil {
-			logger.Error("Tool call panicked", slog.String("tool", tool.Name()), slog.String("toolCallID", id), slog.String("input", arguments), slog.Any("panic", r))
+			logger.Error("Tool call panicked", slog.String("tool", tool.Name()), slog.String("toolCallID", id), slog.Int("inputLength", len(arguments)), slog.Any("panic", r))
 			err = fmt.Errorf("tool execution failed due to panic: %v", r)
 		}
 	}()
@@ -110,14 +110,14 @@ func doToolCall(ctx context.Context, logger *slog.Logger, streamingFunc Streamin
 	schemaType := reflect.TypeOf(tool.Schema()).Elem()
 	args := reflect.New(schemaType).Interface()
 	if err := json.Unmarshal([]byte(arguments), args); err != nil {
-		logger.Error("Tool call failed, could not parse arguments", slog.String("tool", tool.Name()), slog.String("toolCallID", id), slog.String("input", arguments), slog.Any("error", err))
+		logger.Error("Tool call failed, could not parse arguments", slog.String("tool", tool.Name()), slog.String("toolCallID", id), slog.Int("inputLength", len(arguments)), slog.Any("error", err))
 		return "", fmt.Errorf("invalid arguments: %w", err)
 	}
 
 	if streamingFunc != nil {
 		err := streamingFunc(ctx, StreamingEventToolUse{ID: eventID, ToolID: tool.Name(), Arguments: args})
 		if err != nil {
-			logger.Error("Tool notify failed", slog.String("tool", tool.Name()), slog.String("toolCallID", id), slog.String("input", arguments), slog.Any("error", err))
+			logger.Error("Tool notify failed", slog.String("tool", tool.Name()), slog.String("toolCallID", id), slog.Int("inputLength", len(arguments)), slog.Any("error", err))
 		}
 	}
 
@@ -125,7 +125,7 @@ func doToolCall(ctx context.Context, logger *slog.Logger, streamingFunc Streamin
 	var out any
 	out, err = tool.Execute(ctx, args)
 	if err != nil {
-		logger.Error("Tool call failed", slog.String("tool", tool.Name()), slog.String("toolCallID", id), slog.String("input", arguments), slog.Any("error", err))
+		logger.Error("Tool call failed", slog.String("tool", tool.Name()), slog.String("toolCallID", id), slog.Int("inputLength", len(arguments)), slog.Any("error", err))
 		return "", fmt.Errorf("tool execution failed: %w", err)
 	}
 
@@ -135,7 +135,7 @@ func doToolCall(ctx context.Context, logger *slog.Logger, streamingFunc Streamin
 	if streamingFunc != nil {
 		err := streamingFunc(ctx, StreamingEventToolResult{ID: eventID, ToolID: tool.Name(), Result: out})
 		if err != nil {
-			logger.Error("Tool notify failed", slog.String("tool", tool.Name()), slog.String("input", arguments), slog.Any("error", err))
+			logger.Error("Tool notify failed", slog.String("tool", tool.Name()), slog.Int("inputLength", len(arguments)), slog.Any("error", err))
 		}
 	}
 
