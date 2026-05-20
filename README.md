@@ -70,6 +70,49 @@ manager.RegisterAlias("fast", "anthropic/claude-haiku-4-5")
 model, _ := manager.GetModel("fast") // or set LLM_MODEL_FAST=openai/gpt-4o
 ```
 
+### Driving the loop with `Session`
+
+`GenerateContent` runs the agentic loop to completion. `Session` exposes the
+same loop one step at a time, so you can inspect what the model did, inject
+operator steering, or gate tool calls between turns:
+
+```go
+s, err := llms.NewSession(model,
+    llms.WithMessages(llms.NewMessage(llms.RoleUser, llms.NewTextPart("..."))),
+    llms.WithTools(llms.NewToolDef(deployTool{})),
+    llms.WithMaxSteps(8),
+)
+if err != nil {
+    log.Fatal(err)
+}
+
+for {
+    info, done, err := s.Step(ctx)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    for _, tc := range info.Output.ToolCalls {
+        fmt.Printf("step %d: model called %q\n", info.Step, tc.Name)
+    }
+
+    if done {
+        break
+    }
+
+    // Steer the next turn based on what just happened.
+    s.Inject(llms.NewMessage(llms.RoleUser,
+        llms.NewTextPart("Operator: skip deploy, summarize instead.")))
+}
+
+res, err := s.Result()
+```
+
+For finer control, `StepPlan` returns the model's tool calls without
+executing them and `RunTools` runs them on demand, useful when tools
+require approval or run out of process. See
+[`examples/agent`](./examples/agent) for the full pattern.
+
 ## Examples
 
 Runnable programs live in [`examples/`](./examples):
