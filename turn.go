@@ -110,6 +110,25 @@ type MaxStepsError struct {
 
 func (e *MaxStepsError) Error() string { return "max steps reached" }
 
+// MaxTokensError is returned by GenerateContent / Session.Result when the
+// final turn stopped because the model hit the output-token cap mid-generation.
+// Callers can errors.As it to recover the partial text and usage that was
+// produced before truncation.
+type MaxTokensError struct {
+	Result *LoopResult
+}
+
+func (e *MaxTokensError) Error() string { return "max tokens reached" }
+
+// RefusalError is returned by GenerateContent / Session.Result when the model
+// declined to produce content. errors.As recovers any partial trajectory the
+// model emitted before refusing.
+type RefusalError struct {
+	Result *LoopResult
+}
+
+func (e *RefusalError) Error() string { return "llm refused to generate content" }
+
 // StreamScope identifies which agent/run a stream of events belongs to. It is
 // carried out-of-band on the context so sub-agents can be distinguished
 // without changing the StreamingEvent types.

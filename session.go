@@ -2,6 +2,7 @@ package llms
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 )
@@ -408,25 +409,22 @@ func (s *Session) Inject(msgs ...*Message) {
 }
 
 // Result returns the terminal Result for the session. It returns a
-// *MaxStepsError when the run was step-limited, or the underlying error if
-// the run failed.
+// *MaxStepsError when the run was step-limited, a *MaxTokensError when the
+// final turn was truncated by the output-token cap, a *RefusalError when the
+// model declined to produce content, or the underlying error if the run
+// failed.
 func (s *Session) Result() (Result, error) {
 	if s.lastErr != nil {
 		return nil, s.lastErr
 	}
 
-	if s.stopReason == StopReasonMaxSteps {
-		return nil, &MaxStepsError{Result: &LoopResult{
-			StopReason: StopReasonMaxSteps,
-			Steps:      s.step,
-			FinalText:  s.turn.FinalText(),
-			Messages:   s.Messages(),
-			Usage: TurnUsage{
-				InputTokens:      s.tracker.InputTokens(),
-				OutputTokens:     s.tracker.OutputTokens(),
-				CachedReadTokens: s.tracker.CachedTokens(),
-			},
-		}}
+	switch s.stopReason {
+	case StopReasonMaxSteps:
+		return nil, &MaxStepsError{Result: s.loopResult()}
+	case StopReasonMaxTokens:
+		return nil, &MaxTokensError{Result: s.loopResult()}
+	case StopReasonRefusal:
+		return nil, &RefusalError{Result: s.loopResult()}
 	}
 
 	text := s.turn.FinalText()
@@ -439,6 +437,20 @@ func (s *Session) Result() (Result, error) {
 	}
 
 	return TextResult{Text: text}, nil
+}
+
+func (s *Session) loopResult() *LoopResult {
+	return &LoopResult{
+		StopReason: s.stopReason,
+		Steps:      s.step,
+		FinalText:  s.turn.FinalText(),
+		Messages:   s.Messages(),
+		Usage: TurnUsage{
+			InputTokens:      s.tracker.InputTokens(),
+			OutputTokens:     s.tracker.OutputTokens(),
+			CachedReadTokens: s.tracker.CachedTokens(),
+		},
+	}
 }
 
 // Messages returns the neutral accumulated transcript.

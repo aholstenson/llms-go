@@ -3,15 +3,12 @@ package llms
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"reflect"
 	"strings"
 	"time"
 
 	jsonstream "github.com/aholstenson/llms-go/jsonstream"
 )
-
-var ErrRefusal = errors.New("llm refused to generate content")
 
 // Result is returned by GenerateContent.
 type Result interface {
