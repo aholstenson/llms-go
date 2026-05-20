@@ -2,12 +2,12 @@ package llms
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 	"strings"
 	"sync"
-
-	"github.com/cockroachdb/errors"
 )
 
 // Manager is used to get access to different LLM models, with support for
@@ -84,7 +84,7 @@ func (m *Manager) resolveModelNameLocked(name string) (string, error) {
 		}
 
 		if visited[current] {
-			return "", errors.Newf("alias loop detected: %s", name)
+			return "", fmt.Errorf("alias loop detected: %s", name)
 		}
 		visited[current] = true
 
@@ -107,7 +107,7 @@ func (m *Manager) resolveModelNameLocked(name string) (string, error) {
 			continue
 		}
 
-		return "", errors.Newf("could not resolve model name: %s", current)
+		return "", fmt.Errorf("could not resolve model name: %s", current)
 	}
 }
 
@@ -128,7 +128,7 @@ func (m *Manager) GetModel(name string) (Model, error) {
 
 	slashIdx := strings.Index(name, "/")
 	if slashIdx == -1 {
-		return nil, errors.Newf("invalid model name: %s", name)
+		return nil, fmt.Errorf("invalid model name: %s", name)
 	}
 
 	registry := m.subParserRegistrySnapshot()
@@ -176,7 +176,7 @@ func (m *Manager) GetModel(name string) (Model, error) {
 	case "test":
 		model = &testModel{name: modelName}
 	default:
-		return nil, errors.Newf("unknown model provider: %s", modelProvider)
+		return nil, fmt.Errorf("unknown model provider: %s", modelProvider)
 	}
 
 	m.logger.Info("Loaded model", slog.String("name", name), slog.String("model", modelName))

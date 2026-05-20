@@ -2,9 +2,9 @@ package llms
 
 import (
 	"context"
+	"fmt"
 	"time"
 
-	"github.com/cockroachdb/errors"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/metric/noop"
@@ -64,7 +64,7 @@ func NewMetrics(meter metric.Meter) (*Metrics, error) {
 		metric.WithUnit("{requests}"),
 	)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create requests counter")
+		return nil, fmt.Errorf("failed to create requests counter: %w", err)
 	}
 
 	requests, err := meter.Int64Counter("gen_ai.requests",
@@ -72,7 +72,7 @@ func NewMetrics(meter metric.Meter) (*Metrics, error) {
 		metric.WithUnit("{requests}"),
 	)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create requests total counter")
+		return nil, fmt.Errorf("failed to create requests total counter: %w", err)
 	}
 
 	requestsDuration, err := meter.Float64Histogram("gen_ai.requests.duration",
@@ -81,7 +81,7 @@ func NewMetrics(meter metric.Meter) (*Metrics, error) {
 		metric.WithExplicitBucketBoundaries(0.001, 0.005, 0.01, 0.02, 0.04, 0.06, 0.08, 0.1, 0.25, 0.5, 0.75, 1.0, 2.5, 5.0, 7.5, 10.0),
 	)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create requests duration histogram")
+		return nil, fmt.Errorf("failed to create requests duration histogram: %w", err)
 	}
 
 	timeToFirstToken, err := meter.Float64Histogram("gen_ai.time_to_first_token",
@@ -90,7 +90,7 @@ func NewMetrics(meter metric.Meter) (*Metrics, error) {
 		metric.WithExplicitBucketBoundaries(0.001, 0.005, 0.01, 0.02, 0.04, 0.06, 0.08, 0.1, 0.25, 0.5, 0.75, 1.0, 2.5, 5.0, 7.5, 10.0),
 	)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create time to first token histogram")
+		return nil, fmt.Errorf("failed to create time to first token histogram: %w", err)
 	}
 
 	tokens, err := meter.Int64Counter("gen_ai.tokens",
@@ -98,7 +98,7 @@ func NewMetrics(meter metric.Meter) (*Metrics, error) {
 		metric.WithUnit("{tokens}"),
 	)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create prompt tokens counter")
+		return nil, fmt.Errorf("failed to create prompt tokens counter: %w", err)
 	}
 
 	return &Metrics{

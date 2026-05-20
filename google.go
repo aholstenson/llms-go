@@ -3,13 +3,14 @@ package llms
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/aholstenson/llms-go/jsonstream"
-	"github.com/cockroachdb/errors"
 	"github.com/invopop/jsonschema"
 	"google.golang.org/genai"
 )
@@ -117,10 +118,10 @@ func (m *googleModel) newSession(options ...GenerateOption) (*Session, error) {
 
 	// Gate request parameters against the model's known capabilities.
 	if len(opts.Tools) > 0 && !m.info.allowsToolCall() {
-		return nil, errors.Newf("model %s does not support tool calling", m.statsModel)
+		return nil, fmt.Errorf("model %s does not support tool calling", m.statsModel)
 	}
 	if messagesContainImages(opts.Messages) && !m.info.allowsModality("image") {
-		return nil, errors.Newf("model %s does not support image input", m.statsModel)
+		return nil, fmt.Errorf("model %s does not support image input", m.statsModel)
 	}
 	if clamped, didClamp := m.info.clampMaxTokens(opts.MaxTokens); didClamp {
 		m.logger.Warn("Clamping max tokens to model output limit",
@@ -396,7 +397,7 @@ func (m *googleModel) convertMessages(messages []*Message) ([]*genai.Content, er
 				var args map[string]any
 				if part.Arguments != "" {
 					if err := json.Unmarshal([]byte(part.Arguments), &args); err != nil {
-						return nil, errors.Wrapf(err, "invalid tool call arguments for %s", part.Name)
+						return nil, fmt.Errorf("invalid tool call arguments for %s: %w", part.Name, err)
 					}
 				}
 				p = &genai.Part{
@@ -440,7 +441,7 @@ func (m *googleModel) convertMessages(messages []*Message) ([]*genai.Content, er
 					Parts: parts,
 				})
 			default:
-				return nil, errors.Newf("unsupported message role for Google: %s", message.Role)
+				return nil, fmt.Errorf("unsupported message role for Google: %s", message.Role)
 			}
 		}
 	}

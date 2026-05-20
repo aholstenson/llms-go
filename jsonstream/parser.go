@@ -5,8 +5,6 @@ import (
 	"strconv"
 	"strings"
 	"unicode/utf8"
-
-	"github.com/cockroachdb/errors"
 )
 
 // isIncompleteUTF8Start checks if the byte at the start of data could be the
@@ -213,7 +211,7 @@ func (p *Parser) processState(frame *stateFrame) (int, error) {
 	case stateLiteral:
 		return p.processLiteral(frame)
 	default:
-		return 0, errors.Newf("unknown state: %d", frame.state)
+		return 0, fmt.Errorf("unknown state: %d", frame.state)
 	}
 }
 

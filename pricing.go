@@ -2,11 +2,10 @@ package llms
 
 import (
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"math"
 	"os"
-
-	"github.com/cockroachdb/errors"
 )
 
 // PricingManager resolves model pricing.
@@ -61,7 +60,7 @@ func (pm *PricingManager) loadPricingFile(path string) error {
 
 	var pricing map[string]Cost
 	if err := json.Unmarshal(data, &pricing); err != nil {
-		return errors.Wrap(err, "failed to parse pricing file")
+		return fmt.Errorf("failed to parse pricing file: %w", err)
 	}
 
 	// Loaded pricing takes precedence over the embedded data.

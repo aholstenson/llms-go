@@ -2,10 +2,10 @@ package llms
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"sync"
 
-	"github.com/cockroachdb/errors"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )

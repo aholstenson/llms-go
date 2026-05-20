@@ -2,8 +2,7 @@ package llms
 
 import (
 	"encoding/json"
-
-	"github.com/cockroachdb/errors"
+	"fmt"
 )
 
 type Role string
@@ -145,7 +144,7 @@ func partTypeName(p MessagePart) (string, error) {
 	case *ThinkingPart:
 		return "thinking", nil
 	default:
-		return "", errors.Newf("cannot marshal unknown message part type %T", p)
+		return "", fmt.Errorf("cannot marshal unknown message part type %T", p)
 	}
 }
 
@@ -206,7 +205,7 @@ func (m *Message) UnmarshalJSON(data []byte) error {
 		case "thinking":
 			part = new(ThinkingPart)
 		default:
-			return errors.Newf("cannot unmarshal unknown message part type %q", env.Type)
+			return fmt.Errorf("cannot unmarshal unknown message part type %q", env.Type)
 		}
 		if err := json.Unmarshal(rp, part); err != nil {
 			return err

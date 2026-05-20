@@ -3,11 +3,11 @@ package llms
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"reflect"
 	"time"
 
-	"github.com/cockroachdb/errors"
 	"github.com/google/uuid"
 	"github.com/invopop/jsonschema"
 )
@@ -94,7 +94,7 @@ func doToolCall(ctx context.Context, logger *slog.Logger, streamingFunc Streamin
 	defer func() {
 		if r := recover(); r != nil {
 			logger.Error("Tool call panicked", slog.String("tool", tool.Name()), slog.String("toolCallID", id), slog.String("input", arguments), slog.Any("panic", r))
-			err = errors.Newf("tool execution failed due to panic: %v", r)
+			err = fmt.Errorf("tool execution failed due to panic: %v", r)
 		}
 	}()
 
@@ -111,7 +111,7 @@ func doToolCall(ctx context.Context, logger *slog.Logger, streamingFunc Streamin
 	args := reflect.New(schemaType).Interface()
 	if err := json.Unmarshal([]byte(arguments), args); err != nil {
 		logger.Error("Tool call failed, could not parse arguments", slog.String("tool", tool.Name()), slog.String("toolCallID", id), slog.String("input", arguments), slog.Any("error", err))
-		return "", errors.Newf("invalid arguments: %w", err)
+		return "", fmt.Errorf("invalid arguments: %w", err)
 	}
 
 	if streamingFunc != nil {
@@ -126,7 +126,7 @@ func doToolCall(ctx context.Context, logger *slog.Logger, streamingFunc Streamin
 	out, err = tool.Execute(ctx, args)
 	if err != nil {
 		logger.Error("Tool call failed", slog.String("tool", tool.Name()), slog.String("toolCallID", id), slog.String("input", arguments), slog.Any("error", err))
-		return "", errors.Newf("tool execution failed: %w", err)
+		return "", fmt.Errorf("tool execution failed: %w", err)
 	}
 
 	result = tool.ToString(out)

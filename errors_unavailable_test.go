@@ -1,10 +1,11 @@
 package llms
 
 import (
+	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
-	"github.com/cockroachdb/errors"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -67,7 +68,7 @@ var _ = Describe("UnavailableError", func() {
 			Attempts:      3,
 			PartialOutput: true,
 		}
-		wrapped := errors.Wrap(original, "boom")
+		wrapped := fmt.Errorf("boom: %w", original)
 		var recovered *UnavailableError
 		Expect(errors.As(wrapped, &recovered)).To(BeTrue())
 		Expect(recovered).To(Equal(original))

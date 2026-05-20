@@ -1,12 +1,11 @@
 package llms
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 	"time"
-
-	"github.com/cockroachdb/errors"
 )
 
 // ErrStreamingPartialOutput sentinels an error returned from a streaming

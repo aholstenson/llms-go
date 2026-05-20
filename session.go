@@ -2,9 +2,8 @@ package llms
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
-
-	"github.com/cockroachdb/errors"
 )
 
 // defaultMaxSteps is used when WithMaxSteps was not set (or set to 0).
@@ -125,7 +124,7 @@ type sessionModel interface {
 func NewSession(m Model, options ...GenerateOption) (*Session, error) {
 	sm, ok := m.(sessionModel)
 	if !ok {
-		return nil, errors.Newf("model %T does not support driveable sessions", m)
+		return nil, fmt.Errorf("model %T does not support driveable sessions", m)
 	}
 	return sm.newSession(options...)
 }
@@ -434,10 +433,7 @@ func (s *Session) Result() (Result, error) {
 	if s.opts.ResponseSchema != nil {
 		result, err := s.opts.ResponseSchema.ParseInto([]byte(text))
 		if err != nil {
-			return nil, errors.WithDetail(
-				errors.Wrap(err, "structured output parsing failed"),
-				text,
-			)
+			return nil, fmt.Errorf("structured output parsing failed (raw: %s): %w", text, err)
 		}
 		return result.(Result), nil
 	}

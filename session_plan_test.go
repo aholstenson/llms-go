@@ -3,9 +3,9 @@ package llms
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"sync"
 
-	"github.com/cockroachdb/errors"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )

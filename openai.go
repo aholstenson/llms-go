@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"mime"
@@ -12,7 +13,6 @@ import (
 	"time"
 
 	"github.com/aholstenson/llms-go/jsonstream"
-	"github.com/cockroachdb/errors"
 	"github.com/invopop/jsonschema"
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
@@ -74,10 +74,10 @@ func (m *openaiModel) newSession(options ...GenerateOption) (*Session, error) {
 	opts := resolveGenerateContentOptions(m.subParserRegistry, options...)
 
 	if len(opts.Tools) > 0 && !m.info.allowsToolCall() {
-		return nil, errors.Newf("model %s does not support tool calling", m.statsModel)
+		return nil, fmt.Errorf("model %s does not support tool calling", m.statsModel)
 	}
 	if messagesContainImages(opts.Messages) && !m.info.allowsModality("image") {
-		return nil, errors.Newf("model %s does not support image input", m.statsModel)
+		return nil, fmt.Errorf("model %s does not support image input", m.statsModel)
 	}
 	if clamped, didClamp := m.info.clampMaxTokens(opts.MaxTokens); didClamp {
 		m.logger.Warn("Clamping max tokens to model output limit",
@@ -125,11 +125,11 @@ func (m *openaiModel) newSession(options ...GenerateOption) (*Session, error) {
 	if opts.ResponseSchema != nil {
 		schemaBytes, err := json.Marshal(opts.ResponseSchema.Schema.(*jsonschema.Schema))
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to marshal response schema")
+			return nil, fmt.Errorf("failed to marshal response schema: %w", err)
 		}
 		var rawJSON map[string]any
 		if err := json.Unmarshal(schemaBytes, &rawJSON); err != nil {
-			return nil, errors.Wrap(err, "failed to unmarshal response schema")
+			return nil, fmt.Errorf("failed to unmarshal response schema: %w", err)
 		}
 		params.Text = responses.ResponseTextConfigParam{
 			Format: responses.ResponseFormatTextConfigUnionParam{
@@ -174,7 +174,7 @@ func (m *openaiModel) convertMessages(messages []*Message) (responses.ResponseIn
 				for _, part := range msg.Parts {
 					trp, ok := part.(*ToolResultPart)
 					if !ok {
-						return nil, errors.Newf("cannot mix tool-result and %T parts for OpenAI", part)
+						return nil, fmt.Errorf("cannot mix tool-result and %T parts for OpenAI", part)
 					}
 					text := trp.Text
 					if trp.Error != "" {
@@ -221,7 +221,7 @@ func (m *openaiModel) convertMessages(messages []*Message) (responses.ResponseIn
 						Arguments: p.Arguments,
 					})
 				default:
-					return nil, errors.Newf("unsupported assistant part type for OpenAI: %T", part)
+					return nil, fmt.Errorf("unsupported assistant part type for OpenAI: %T", part)
 				}
 			}
 			if textBuf.Len() > 0 {
@@ -234,7 +234,7 @@ func (m *openaiModel) convertMessages(messages []*Message) (responses.ResponseIn
 			}
 
 		default:
-			return nil, errors.Newf("unsupported message role for OpenAI: %s", msg.Role)
+			return nil, fmt.Errorf("unsupported message role for OpenAI: %s", msg.Role)
 		}
 	}
 
@@ -288,7 +288,7 @@ func convertUserParts(parts []MessagePart) (responses.ResponseInputMessageConten
 				})
 			}
 		default:
-			return nil, errors.Newf("unsupported part type for OpenAI: %T", part)
+			return nil, fmt.Errorf("unsupported part type for OpenAI: %T", part)
 		}
 	}
 	return out, nil
@@ -310,12 +310,12 @@ func (m *openaiModel) convertTools(tools []ToolDef) ([]responses.ToolUnionParam,
 		schema := jsonSchemaReflector.Reflect(tool.Schema())
 		schemaBytes, err := json.Marshal(schema)
 		if err != nil {
-			return nil, nil, errors.Newf("failed to marshal tool schema: %w", err)
+			return nil, nil, fmt.Errorf("failed to marshal tool schema: %w", err)
 		}
 
 		var rawJSON map[string]any
 		if err := json.Unmarshal(schemaBytes, &rawJSON); err != nil {
-			return nil, nil, errors.Newf("failed to unmarshal tool schema: %w", err)
+			return nil, nil, fmt.Errorf("failed to unmarshal tool schema: %w", err)
 		}
 
 		result = append(result, responses.ToolUnionParam{
@@ -543,7 +543,7 @@ func (t *openaiTurn) Next(ctx context.Context) (TurnOutput, error) {
 			return TurnOutput{}, ue
 		}
 		m.metrics.RecordCallDuration(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeInternal)
-		return TurnOutput{}, errors.Wrap(stream.Err(), "got error from OpenAI while streaming")
+		return TurnOutput{}, fmt.Errorf("got error from OpenAI while streaming: %w", stream.Err())
 	}
 
 	if finalResponse == nil {
@@ -559,7 +559,7 @@ func (t *openaiTurn) Next(ctx context.Context) (TurnOutput, error) {
 			metrics.RecordFailure(m.statsModel, collector)
 		}
 		respErr := finalResponse.Error
-		err := errors.Newf("OpenAI response failed: %s: %s", respErr.Code, respErr.Message)
+		err := fmt.Errorf("OpenAI response failed: %s: %s", respErr.Code, respErr.Message)
 		if respErr.Code == "rate_limit_exceeded" {
 			m.metrics.RecordCallDuration(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeUnavailable)
 			ue := &UnavailableError{

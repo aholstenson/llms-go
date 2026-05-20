@@ -1,7 +1,9 @@
 package llms
 
 import (
-	"github.com/cockroachdb/errors"
+	"errors"
+	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -45,7 +47,7 @@ var _ = Describe("Streaming partial output sentinel", func() {
 
 	It("PartialOutput survives an additional wrap", func() {
 		ue := &UnavailableError{PartialOutput: true}
-		wrapped := errors.Wrap(errors.Join(ue, ErrStreamingPartialOutput), "downstream")
+		wrapped := fmt.Errorf("downstream: %w", errors.Join(ue, ErrStreamingPartialOutput))
 
 		Expect(errors.Is(wrapped, ErrStreamingPartialOutput)).To(BeTrue())
 		var recovered *UnavailableError

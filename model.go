@@ -3,11 +3,10 @@ package llms
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"reflect"
 	"strings"
 	"time"
-
-	"github.com/cockroachdb/errors"
 
 	jsonstream "github.com/aholstenson/llms-go/jsonstream"
 )

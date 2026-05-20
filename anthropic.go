@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -13,7 +15,6 @@ import (
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
 	"github.com/anthropics/anthropic-sdk-go/shared/constant"
-	"github.com/cockroachdb/errors"
 	"github.com/invopop/jsonschema"
 )
 
@@ -120,10 +121,10 @@ func (m *anthropicModel) newSession(options ...GenerateOption) (*Session, error)
 
 	// Gate request parameters against the model's known capabilities.
 	if len(opts.Tools) > 0 && !m.info.allowsToolCall() {
-		return nil, errors.Newf("model %s does not support tool calling", m.statsModel)
+		return nil, fmt.Errorf("model %s does not support tool calling", m.statsModel)
 	}
 	if messagesContainImages(opts.Messages) && !m.info.allowsModality("image") {
-		return nil, errors.Newf("model %s does not support image input", m.statsModel)
+		return nil, fmt.Errorf("model %s does not support image input", m.statsModel)
 	}
 	if clamped, didClamp := m.info.clampMaxTokens(opts.MaxTokens); didClamp {
 		m.logger.Warn("Clamping max tokens to model output limit",
@@ -192,12 +193,12 @@ func (m *anthropicModel) newSession(options ...GenerateOption) (*Session, error)
 	if opts.ResponseSchema != nil {
 		schemaBytes, err := json.Marshal(opts.ResponseSchema.Schema.(*jsonschema.Schema))
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to marshal response schema")
+			return nil, fmt.Errorf("failed to marshal response schema: %w", err)
 		}
 
 		var rawJSON map[string]any
 		if err := json.Unmarshal(schemaBytes, &rawJSON); err != nil {
-			return nil, errors.Wrap(err, "failed to unmarshal response schema")
+			return nil, fmt.Errorf("failed to unmarshal response schema: %w", err)
 		}
 
 		params.OutputFormat = anthropic.BetaJSONOutputFormatParam{Schema: rawJSON}
@@ -422,7 +423,7 @@ func (m *anthropicModel) handleStreaming(
 	}
 
 	if stream.Err() != nil {
-		return nil, errors.Wrap(stream.Err(), "streaming error from Anthropic")
+		return nil, fmt.Errorf("streaming error from Anthropic: %w", stream.Err())
 	} else if message.Content == nil {
 		return nil, errors.New("no content in message")
 	}
@@ -508,7 +509,7 @@ func (m *anthropicModel) convertMessages(systemPrompt string, messages []*Messag
 						},
 					})
 				default:
-					return nil, "", errors.Newf("unsupported part type for Anthropic: %T", part)
+					return nil, "", fmt.Errorf("unsupported part type for Anthropic: %T", part)
 				}
 			}
 
@@ -551,7 +552,7 @@ func (m *anthropicModel) convertMessages(systemPrompt string, messages []*Messag
 					var input any
 					if content.Arguments != "" {
 						if err := json.Unmarshal([]byte(content.Arguments), &input); err != nil {
-							return nil, "", errors.Wrapf(err, "invalid tool call arguments for %s", content.Name)
+							return nil, "", fmt.Errorf("invalid tool call arguments for %s: %w", content.Name, err)
 						}
 					}
 					contentParts = append(contentParts, anthropic.BetaContentBlockParamUnion{
@@ -562,14 +563,14 @@ func (m *anthropicModel) convertMessages(systemPrompt string, messages []*Messag
 						},
 					})
 				default:
-					return nil, "", errors.Newf("unsupported assistant part type for Anthropic: %T", part)
+					return nil, "", fmt.Errorf("unsupported assistant part type for Anthropic: %T", part)
 				}
 			}
 
 			msgParam = newBetaAssistantMessage(contentParts...)
 
 		default:
-			return nil, "", errors.Newf("unsupported message role for Anthropic: %s", msg.Role)
+			return nil, "", fmt.Errorf("unsupported message role for Anthropic: %s", msg.Role)
 		}
 
 		result = append(result, msgParam)
@@ -774,7 +775,7 @@ func (t *anthropicTurn) Next(ctx context.Context) (TurnOutput, error) {
 		}
 
 		m.metrics.RecordCallDuration(ctx, GenAISystemAnthropic, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeInternal)
-		return TurnOutput{}, errors.Wrap(err, "error from Anthropic")
+		return TurnOutput{}, fmt.Errorf("error from Anthropic: %w", err)
 	} else if err != nil {
 		if metrics := GetMetrics(ctx); metrics != nil {
 			metrics.RecordFailure(m.statsModel, collector)

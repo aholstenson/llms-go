@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/aholstenson/llms-go/jsonstream"
-	cockerrors "github.com/cockroachdb/errors"
 	"github.com/invopop/jsonschema"
 	openrouter "github.com/revrost/go-openrouter"
 )
@@ -115,10 +114,10 @@ func (m *openrouterModel) newSession(options ...GenerateOption) (*Session, error
 	opts := resolveGenerateContentOptions(m.subParserRegistry, options...)
 
 	if len(opts.Tools) > 0 && !m.info.allowsToolCall() {
-		return nil, cockerrors.Newf("model %s does not support tool calling", m.statsModel)
+		return nil, fmt.Errorf("model %s does not support tool calling", m.statsModel)
 	}
 	if messagesContainImages(opts.Messages) && !m.info.allowsModality("image") {
-		return nil, cockerrors.Newf("model %s does not support image input", m.statsModel)
+		return nil, fmt.Errorf("model %s does not support image input", m.statsModel)
 	}
 	if clamped, didClamp := m.info.clampMaxTokens(opts.MaxTokens); didClamp {
 		m.logger.Warn("Clamping max tokens to model output limit",
@@ -164,7 +163,7 @@ func (m *openrouterModel) newSession(options ...GenerateOption) (*Session, error
 	if opts.ResponseSchema != nil {
 		schemaBytes, err := json.Marshal(opts.ResponseSchema.Schema.(*jsonschema.Schema))
 		if err != nil {
-			return nil, cockerrors.Wrap(err, "failed to marshal response schema")
+			return nil, fmt.Errorf("failed to marshal response schema: %w", err)
 		}
 		params.ResponseFormat = &openrouter.ChatCompletionResponseFormat{
 			Type: openrouter.ChatCompletionResponseFormatTypeJSONSchema,
@@ -212,7 +211,7 @@ func (m *openrouterModel) convertMessages(systemPrompt string, messages []*Messa
 		switch msg.Role {
 		case RoleUser:
 			if len(msg.Parts) == 0 {
-				return nil, cockerrors.New("user message has no parts")
+				return nil, errors.New("user message has no parts")
 			}
 
 			// Tool-result messages map to OpenRouter's separate tool role,
@@ -221,7 +220,7 @@ func (m *openrouterModel) convertMessages(systemPrompt string, messages []*Messa
 				for _, part := range msg.Parts {
 					trp, ok := part.(*ToolResultPart)
 					if !ok {
-						return nil, cockerrors.Newf("cannot mix tool-result and %T parts for OpenRouter", part)
+						return nil, fmt.Errorf("cannot mix tool-result and %T parts for OpenRouter", part)
 					}
 					text := trp.Text
 					if trp.Error != "" {
@@ -265,10 +264,10 @@ func (m *openrouterModel) convertMessages(systemPrompt string, messages []*Messa
 							},
 						})
 					} else {
-						return nil, cockerrors.Newf("unsupported binary media type for OpenRouter: %s", p.MediaType)
+						return nil, fmt.Errorf("unsupported binary media type for OpenRouter: %s", p.MediaType)
 					}
 				default:
-					return nil, cockerrors.Newf("unsupported part type for OpenRouter: %T", part)
+					return nil, fmt.Errorf("unsupported part type for OpenRouter: %T", part)
 				}
 			}
 			result = append(result, openrouter.ChatCompletionMessage{
@@ -298,7 +297,7 @@ func (m *openrouterModel) convertMessages(systemPrompt string, messages []*Messa
 						},
 					})
 				default:
-					return nil, cockerrors.Newf("unsupported assistant part type for OpenRouter: %T", part)
+					return nil, fmt.Errorf("unsupported assistant part type for OpenRouter: %T", part)
 				}
 			}
 			assistantMsg := openrouter.ChatCompletionMessage{
@@ -313,7 +312,7 @@ func (m *openrouterModel) convertMessages(systemPrompt string, messages []*Messa
 			result = append(result, assistantMsg)
 
 		default:
-			return nil, cockerrors.Newf("unsupported message role for OpenRouter: %s", msg.Role)
+			return nil, fmt.Errorf("unsupported message role for OpenRouter: %s", msg.Role)
 		}
 	}
 
@@ -336,7 +335,7 @@ func (m *openrouterModel) convertTools(tools []ToolDef) ([]openrouter.Tool, map[
 		schema := jsonSchemaReflector.Reflect(tool.Schema())
 		schemaBytes, err := json.Marshal(schema)
 		if err != nil {
-			return nil, nil, cockerrors.Wrap(err, "failed to marshal tool schema")
+			return nil, nil, fmt.Errorf("failed to marshal tool schema: %w", err)
 		}
 
 		result = append(result, openrouter.Tool{
@@ -463,7 +462,7 @@ func (t *openrouterTurn) nextNonStreaming(ctx context.Context, start time.Time, 
 			metrics.RecordFailure(m.statsModel, collector)
 		}
 		m.metrics.RecordCallDuration(ctx, GenAISystemOpenRouter, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeEmptyResponse)
-		return TurnOutput{}, cockerrors.New("no completion choices returned from OpenRouter")
+		return TurnOutput{}, errors.New("no completion choices returned from OpenRouter")
 	}
 
 	choice := response.Choices[0]
@@ -692,7 +691,7 @@ func (t *openrouterTurn) nextStreaming(ctx context.Context, start time.Time, col
 			metrics.RecordFailure(m.statsModel, collector)
 		}
 		m.metrics.RecordCallDuration(ctx, GenAISystemOpenRouter, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeStreamProcessing)
-		return TurnOutput{}, cockerrors.New("stream handling failed")
+		return TurnOutput{}, errors.New("stream handling failed")
 	}
 	if err != nil {
 		return t.reportError(ctx, err, start, collector, true, streamingEmitted)
@@ -789,11 +788,11 @@ func (t *openrouterTurn) reportError(ctx context.Context, err error, start time.
 	// UnavailableError; just stamp PartialOutput and re-attach the streaming
 	// sentinel where applicable.
 	var ue *UnavailableError
-	if cockerrors.As(err, &ue) {
+	if errors.As(err, &ue) {
 		ue.PartialOutput = partialEmitted
 		m.metrics.RecordCallDuration(ctx, GenAISystemOpenRouter, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeUnavailable)
 		if partialEmitted {
-			return TurnOutput{}, cockerrors.Join(ue, ErrStreamingPartialOutput)
+			return TurnOutput{}, errors.Join(ue, ErrStreamingPartialOutput)
 		}
 		return TurnOutput{}, ue
 	}
@@ -813,12 +812,12 @@ func (t *openrouterTurn) reportError(ctx context.Context, err error, start time.
 			Cause:         err,
 		}
 		if partialEmitted {
-			return TurnOutput{}, cockerrors.Join(newUE, ErrStreamingPartialOutput)
+			return TurnOutput{}, errors.Join(newUE, ErrStreamingPartialOutput)
 		}
 		return TurnOutput{}, newUE
 	}
 	m.metrics.RecordCallDuration(ctx, GenAISystemOpenRouter, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeInternal)
-	return TurnOutput{}, cockerrors.Wrap(err, "error from OpenRouter")
+	return TurnOutput{}, fmt.Errorf("error from OpenRouter: %w", err)
 }
 
 func extractOpenRouterThinking(msg *openrouter.ChatCompletionMessage) []ThinkingBlock {
