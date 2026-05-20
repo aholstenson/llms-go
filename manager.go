@@ -161,34 +161,37 @@ func (m *Manager) GetModel(name string) (Model, error) {
 
 	switch modelProvider {
 	case "anthropic":
-		apiToken := os.Getenv("ANTHROPIC_API_TOKEN")
-		if apiToken == "" {
-			return nil, errors.New("ANTHROPIC_API_TOKEN is not set")
+		apiKey := os.Getenv("ANTHROPIC_API_KEY")
+		if apiKey == "" {
+			return nil, errors.New("ANTHROPIC_API_KEY is not set")
 		}
 
-		model = NewAnthropicModel(m.logger, m.metrics, apiToken, modelName, registry, info)
+		model = NewAnthropicModel(m.logger, m.metrics, apiKey, modelName, registry, info)
 	case "openai":
-		apiToken := os.Getenv("OPENAI_API_TOKEN")
-		if apiToken == "" {
-			return nil, errors.New("OPENAI_API_TOKEN is not set")
+		apiKey := os.Getenv("OPENAI_API_KEY")
+		if apiKey == "" {
+			return nil, errors.New("OPENAI_API_KEY is not set")
 		}
 
-		model = NewOpenAIModel(m.logger, m.metrics, apiToken, modelName, registry, info)
+		model = NewOpenAIModel(m.logger, m.metrics, apiKey, modelName, registry, info)
 	case "openrouter":
-		apiToken := os.Getenv("OPENROUTER_API_TOKEN")
-		if apiToken == "" {
-			return nil, errors.New("OPENROUTER_API_TOKEN is not set")
+		apiKey := os.Getenv("OPENROUTER_API_KEY")
+		if apiKey == "" {
+			return nil, errors.New("OPENROUTER_API_KEY is not set")
 		}
 
-		model = NewOpenRouterModel(m.logger, m.metrics, apiToken, modelName, registry, info)
+		model = NewOpenRouterModel(m.logger, m.metrics, apiKey, modelName, registry, info)
 	case "google":
-		apiToken := os.Getenv("GOOGLE_API_TOKEN")
-		if apiToken == "" {
-			return nil, errors.New("GOOGLE_API_TOKEN is not set")
+		apiKey := os.Getenv("GEMINI_API_KEY")
+		if apiKey == "" {
+			apiKey = os.Getenv("GOOGLE_API_KEY")
+		}
+		if apiKey == "" {
+			return nil, errors.New("GEMINI_API_KEY (or GOOGLE_API_KEY) is not set")
 		}
 
 		var err error
-		model, err = NewGoogleModel(m.logger, m.metrics, apiToken, modelName, registry, info)
+		model, err = NewGoogleModel(m.logger, m.metrics, apiKey, modelName, registry, info)
 		if err != nil {
 			return nil, err
 		}

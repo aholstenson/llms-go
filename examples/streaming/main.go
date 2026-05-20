@@ -3,7 +3,7 @@
 //
 // Run with:
 //
-//	export ANTHROPIC_API_TOKEN=...      # or the token for your provider
+//	export ANTHROPIC_API_KEY=...        # or the key for your provider
 //	go run ./examples/streaming
 package main
 

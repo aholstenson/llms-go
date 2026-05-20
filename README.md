@@ -36,9 +36,9 @@ import llms "github.com/aholstenson/llms-go"
 ## Quick start
 
 Models are resolved through a `Manager` using fully-qualified
-`provider/model` names (e.g. `anthropic/claude-sonnet-4-5`). API tokens are
-read from environment variables: `ANTHROPIC_API_TOKEN`, `OPENAI_API_TOKEN`,
-`OPENROUTER_API_TOKEN`, or `GOOGLE_API_TOKEN`.
+`provider/model` names (e.g. `anthropic/claude-sonnet-4-5`). API keys are
+read from environment variables: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`,
+`OPENROUTER_API_KEY`, or `GEMINI_API_KEY` (also accepts `GOOGLE_API_KEY`).
 
 ```go
 manager := llms.NewManager()
