@@ -88,6 +88,7 @@ func (deployTool) Description() string        { return "Deploy a service to prod
 func (deployTool) Schema() *DeployInput       { return &DeployInput{} }
 func (deployTool) ToString(out string) string { return out }
 func (deployTool) Execute(_ context.Context, in *DeployInput) (string, error) {
+	fmt.Println("deploying", in.Service)
 	return "deployed " + in.Service, nil
 }
 
@@ -128,28 +129,48 @@ func main() {
 
 	var lastExec llms.ExecutionContext
 	for {
-		info, done, err := s.Step(ctx)
+		// StepPlan runs the model turn but stops before any tool executes,
+		// so the operator can decide what to do with the proposed calls.
+		plan, done, err := s.StepPlan(ctx)
 		if err != nil {
-			log.Fatalf("step failed: %v", err)
+			log.Fatalf("plan failed: %v", err)
 		}
-		lastExec = info.Exec
+		lastExec = plan.Exec
 
-		for _, tc := range info.Output.ToolCalls {
-			fmt.Printf("step %d: model called %q\n", info.Step, tc.Name)
-		}
-
-		// Operator steering: the model is not allowed to deploy. Inject a
-		// corrective instruction that the next turn will see.
-		if needsApproval(info.Output.ToolCalls) {
-			fmt.Println("operator: deploy is policy-gated — injecting denial")
-			s.Inject(llms.NewMessage(llms.RoleUser, llms.NewTextPart(
-				"Operator policy: deployments are not permitted in this session. "+
-					"Do not call deploy again; summarize what you found instead.")))
+		for _, tc := range plan.ToolCalls {
+			fmt.Printf("step %d: model wants %q\n", plan.Step, tc.Name)
 		}
 
 		if done {
 			break
 		}
+
+		var outcomes []llms.ToolOutcome
+		if needsApproval(plan.ToolCalls) {
+			// Operator policy: block deploys before they run. Synthesize a
+			// denial outcome for every call this turn and let the model react.
+			fmt.Println("operator: deploy is policy-gated — denying turn")
+			outcomes = make([]llms.ToolOutcome, len(plan.ToolCalls))
+			for i, tc := range plan.ToolCalls {
+				outcomes[i] = llms.ToolOutcome{
+					ID:    tc.ID,
+					Name:  tc.Name,
+					Error: "operator policy: deployments are not permitted in this session; summarize instead",
+				}
+			}
+		} else {
+			// Approved: run the tools via the session's standard dispatch.
+			outcomes, err = s.RunTools(ctx, plan.ToolCalls)
+			if err != nil {
+				log.Fatalf("tool run failed: %v", err)
+			}
+		}
+
+		info, _, err := s.StepObserve(ctx, outcomes)
+		if err != nil {
+			log.Fatalf("observe failed: %v", err)
+		}
+		lastExec = info.Exec
 	}
 
 	res, err := s.Result()
