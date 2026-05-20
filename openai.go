@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"mime"
 	"strings"
 	"time"
 
@@ -223,6 +224,18 @@ func (m *openaiModel) convertMessages(messages []*Message) (responses.ResponseIn
 	return result, nil
 }
 
+// filenameForMediaType returns a synthetic filename for an input_file part.
+// The Responses API requires a filename alongside file_data, but BinaryPart
+// carries only a media type, so we pick an extension from the mime registry
+// and fall back to ".bin" for unknown types.
+func filenameForMediaType(mediaType string) string {
+	exts, _ := mime.ExtensionsByType(mediaType)
+	if len(exts) > 0 {
+		return "file" + exts[0]
+	}
+	return "file.bin"
+}
+
 func convertUserParts(parts []MessagePart) (responses.ResponseInputMessageContentListParam, error) {
 	out := make(responses.ResponseInputMessageContentListParam, 0, len(parts))
 	for _, part := range parts {
@@ -249,9 +262,11 @@ func convertUserParts(parts []MessagePart) (responses.ResponseInputMessageConten
 					},
 				})
 			} else {
+				dataURL := fmt.Sprintf("data:%s;base64,%s", content.MediaType, b64)
 				out = append(out, responses.ResponseInputContentUnionParam{
 					OfInputFile: &responses.ResponseInputFileParam{
-						FileData: openai.String(b64),
+						FileData: openai.String(dataURL),
+						Filename: openai.String(filenameForMediaType(content.MediaType)),
 					},
 				})
 			}
