@@ -101,11 +101,19 @@ func (m *googleModel) newSession(options ...GenerateOption) (*Session, error) {
 	if opts.MaxThinkingTokens != 0 && m.info.allowsReasoning() {
 		thinkingBudget := int32(opts.MaxThinkingTokens) //nolint:gosec
 		config.ThinkingConfig = &genai.ThinkingConfig{
-			ThinkingBudget: &thinkingBudget,
+			ThinkingBudget:  &thinkingBudget,
+			IncludeThoughts: true,
 		}
 
-		// Gemini seems to include thinking tokens in the max output tokens (more testing needed)
+		// Gemini seems to include thinking tokens in the max output tokens
 		config.MaxOutputTokens += int32(opts.MaxThinkingTokens) //nolint:gosec
+	} else {
+		// Some Gemini models enable thinking by default, which silently
+		// includes thinking tokens in the max output tokens.
+		zero := int32(0)
+		config.ThinkingConfig = &genai.ThinkingConfig{
+			ThinkingBudget: &zero,
+		}
 	}
 
 	var toolMap map[string]ToolDef
