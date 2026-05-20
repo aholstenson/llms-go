@@ -41,25 +41,6 @@ func NewOpenAIModel(logger *slog.Logger, metrics *Metrics, apiKey string, model 
 	}
 }
 
-// NewOpenRouterModel creates a new model that passes requests through OpenRouter.
-// info carries embedded model metadata used to gate request parameters; the
-// zero value is treated permissively.
-func NewOpenRouterModel(logger *slog.Logger, metrics *Metrics, apiKey string, model string, registry map[string]SubParserConfig, info ModelInfo) Model {
-	client := openai.NewClient(
-		option.WithAPIKey(apiKey),
-		option.WithBaseURL("https://openrouter.ai/api/v1"),
-	)
-	return &openaiModel{
-		logger:            logger.With(slog.String("provider", "openrouter")),
-		metrics:           metrics,
-		client:            client,
-		statsModel:        "openrouter/" + model,
-		model:             model,
-		info:              info,
-		subParserRegistry: registry,
-	}
-}
-
 func (m *openaiModel) GenerateContent(ctx context.Context, options ...GenerateOption) (Result, error) {
 	s, err := m.newSession(options...)
 	if err != nil {
