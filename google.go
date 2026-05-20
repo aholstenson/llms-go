@@ -151,10 +151,8 @@ func (m *googleModel) newSession(options ...GenerateOption) (*Session, error) {
 		config.Temperature = &t
 	}
 
-	if opts.MaxTokens != 0 {
-		config.MaxOutputTokens = int32(opts.MaxTokens) //nolint:gosec
-	} else {
-		config.MaxOutputTokens = 1000
+	if v := m.info.resolveMaxTokens(opts.MaxTokens, 0); v > 0 {
+		config.MaxOutputTokens = int32(v) //nolint:gosec
 	}
 
 	if opts.MaxThinkingTokens != 0 && m.info.allowsReasoning() {

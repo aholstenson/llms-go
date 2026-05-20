@@ -99,6 +99,20 @@ func (mi ModelInfo) clampMaxTokens(requested int) (int, bool) {
 	return requested, false
 }
 
+// resolveMaxTokens returns the effective max output tokens to send to the
+// provider. A nonzero requested value is returned as-is. Otherwise the
+// model's declared output limit is used. If neither is known, fallback is
+// returned (pass 0 to signal "leave unset on the wire").
+func (mi ModelInfo) resolveMaxTokens(requested, fallback int) int {
+	if requested != 0 {
+		return requested
+	}
+	if mi.Limits.Output > 0 {
+		return mi.Limits.Output
+	}
+	return fallback
+}
+
 // messagesContainImages reports whether any message part requires image input
 // support (image URLs or inline binary data).
 func messagesContainImages(messages []*Message) bool {

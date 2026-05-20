@@ -114,8 +114,8 @@ func (m *openaiModel) newSession(options ...GenerateOption) (*Session, error) {
 		params.Temperature = openai.Float(opts.Temperature)
 	}
 
-	if opts.MaxTokens != 0 {
-		params.MaxOutputTokens = openai.Int(int64(opts.MaxTokens))
+	if v := m.info.resolveMaxTokens(opts.MaxTokens, 0); v > 0 {
+		params.MaxOutputTokens = openai.Int(int64(v))
 	}
 
 	if len(tools) > 0 {

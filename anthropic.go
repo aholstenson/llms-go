@@ -162,11 +162,10 @@ func (m *anthropicModel) newSession(options ...GenerateOption) (*Session, error)
 		params.Temperature = anthropic.Float(opts.Temperature)
 	}
 
-	if opts.MaxTokens != 0 {
-		params.MaxTokens = int64(opts.MaxTokens)
-	} else {
-		params.MaxTokens = 1000
-	}
+	// Anthropic requires max_tokens. Default to the model's declared output
+	// limit; for unknown models fall back to a conservative ceiling that fits
+	// every current Claude model.
+	params.MaxTokens = int64(m.info.resolveMaxTokens(opts.MaxTokens, 4096))
 
 	if opts.MaxThinkingTokens > 0 && m.info.allowsReasoning() {
 		params.Thinking = anthropic.BetaThinkingConfigParamOfEnabled(int64(opts.MaxThinkingTokens))

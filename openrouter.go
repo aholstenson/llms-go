@@ -145,8 +145,8 @@ func (m *openrouterModel) newSession(options ...GenerateOption) (*Session, error
 		params.Temperature = float32(opts.Temperature)
 	}
 
-	if opts.MaxTokens != 0 {
-		params.MaxTokens = opts.MaxTokens
+	if v := m.info.resolveMaxTokens(opts.MaxTokens, 0); v > 0 {
+		params.MaxTokens = v
 	}
 
 	if opts.MaxThinkingTokens > 0 && m.info.allowsReasoning() {
