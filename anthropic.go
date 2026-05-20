@@ -699,18 +699,13 @@ func (t *anthropicTurn) Next(ctx context.Context) (TurnOutput, error) {
 	var response *anthropic.BetaMessage
 	var err error
 
-	func() {
-		ctx, cancel := context.WithTimeout(ctx, 120*time.Second)
-		defer cancel()
-
-		if t.opts.StreamingFunc != nil || t.opts.StructuredStreamingFunc != nil {
-			response, err = m.handleStreaming(ctx, t.params, t.opts.StreamingFunc, t.opts.StructuredStreamingFunc, t.jsParser, &t.structuredContentBuilder)
-		} else {
-			response, err = m.client.Beta.Messages.New(ctx, t.params,
-				option.WithHeader("anthropic-beta", "structured-outputs-2025-11-13"),
-			)
-		}
-	}()
+	if t.opts.StreamingFunc != nil || t.opts.StructuredStreamingFunc != nil {
+		response, err = m.handleStreaming(ctx, t.params, t.opts.StreamingFunc, t.opts.StructuredStreamingFunc, t.jsParser, &t.structuredContentBuilder)
+	} else {
+		response, err = m.client.Beta.Messages.New(ctx, t.params,
+			option.WithHeader("anthropic-beta", "structured-outputs-2025-11-13"),
+		)
+	}
 
 	anthropicError := &anthropic.Error{}
 	if errors.As(err, &anthropicError) {
