@@ -88,10 +88,10 @@ func (mi ModelInfo) allowsModality(modality string) bool {
 	return false
 }
 
-// clampMaxTokens clamps a requested max output token count to the model's
+// clampMaxOutputTokens clamps a requested max output token count to the model's
 // declared output limit. It returns the (possibly reduced) value; a value of
 // 0 (caller default) and unknown models are passed through unchanged.
-func (mi ModelInfo) clampMaxTokens(requested int) (int, bool) {
+func (mi ModelInfo) clampMaxOutputTokens(requested int) (int, bool) {
 	if mi.isUnknown() || requested == 0 || mi.Limits.Output == 0 {
 		return requested, false
 	}
@@ -101,11 +101,11 @@ func (mi ModelInfo) clampMaxTokens(requested int) (int, bool) {
 	return requested, false
 }
 
-// resolveMaxTokens returns the effective max output tokens to send to the
-// provider. A nonzero requested value is returned as-is. Otherwise the
+// resolveMaxOutputTokens returns the effective max output tokens to send to
+// the provider. A nonzero requested value is returned as-is. Otherwise the
 // model's declared output limit is used. If neither is known, fallback is
 // returned (pass 0 to signal "leave unset on the wire").
-func (mi ModelInfo) resolveMaxTokens(requested, fallback int) int {
+func (mi ModelInfo) resolveMaxOutputTokens(requested, fallback int) int {
 	if requested != 0 {
 		return requested
 	}

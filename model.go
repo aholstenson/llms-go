@@ -104,7 +104,7 @@ type StreamingFunc func(ctx context.Context, event StreamingEvent) error
 type structuredStreamingSchemaBuilder func(registry map[string]SubParserConfig) *jsonstream.Schema
 
 type generateContentOptions struct {
-	MaxTokens         int
+	MaxOutputTokens   int
 	MaxThinkingTokens int
 	Temperature       float64
 	Tools             []ToolDef
@@ -173,10 +173,13 @@ type Model interface {
 	GenerateContent(ctx context.Context, opts ...GenerateOption) (Result, error)
 }
 
-// WithMaxTokens sets the maximum number of tokens to generate.
-func WithMaxTokens(maxTokens int) GenerateOption {
+// WithMaxOutputTokens sets the maximum number of output tokens the model may
+// produce in a single response. This cap covers visible output only; any
+// thinking budget configured via WithMaxThinkingTokens is added on top by
+// providers that count thinking against the output limit.
+func WithMaxOutputTokens(maxOutputTokens int) GenerateOption {
 	return func(opts *generateContentOptions) {
-		opts.MaxTokens = maxTokens
+		opts.MaxOutputTokens = maxOutputTokens
 	}
 }
 

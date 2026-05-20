@@ -38,7 +38,7 @@ func TestModelInfoGatesPermissiveWhenUnknown(t *testing.T) {
 	if !zero.allowsModality("image") {
 		t.Error("unknown model should permit any modality")
 	}
-	if v, clamped := zero.clampMaxTokens(1_000_000); clamped || v != 1_000_000 {
+	if v, clamped := zero.clampMaxOutputTokens(1_000_000); clamped || v != 1_000_000 {
 		t.Errorf("unknown model should not clamp max tokens, got %d clamped=%v", v, clamped)
 	}
 }
@@ -70,17 +70,17 @@ func TestModelInfoGatesRespectKnownCaps(t *testing.T) {
 	}
 }
 
-func TestModelInfoClampMaxTokens(t *testing.T) {
+func TestModelInfoClampMaxOutputTokens(t *testing.T) {
 	info := knownInfo(Capabilities{})
 	info.Limits = Limits{Output: 4096}
 
-	if v, clamped := info.clampMaxTokens(8000); !clamped || v != 4096 {
+	if v, clamped := info.clampMaxOutputTokens(8000); !clamped || v != 4096 {
 		t.Errorf("expected clamp to 4096, got %d clamped=%v", v, clamped)
 	}
-	if v, clamped := info.clampMaxTokens(1000); clamped || v != 1000 {
+	if v, clamped := info.clampMaxOutputTokens(1000); clamped || v != 1000 {
 		t.Errorf("expected no clamp, got %d clamped=%v", v, clamped)
 	}
-	if v, clamped := info.clampMaxTokens(0); clamped || v != 0 {
+	if v, clamped := info.clampMaxOutputTokens(0); clamped || v != 0 {
 		t.Errorf("expected pass-through of 0, got %d clamped=%v", v, clamped)
 	}
 }

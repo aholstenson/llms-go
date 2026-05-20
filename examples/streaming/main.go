@@ -54,7 +54,7 @@ func main() {
 				llms.NewTextPart("Write a short haiku about concurrency in Go.")),
 		),
 		llms.WithStreamingFunc(stream),
-		llms.WithMaxTokens(256),
+		llms.WithMaxOutputTokens(256),
 	)
 	if err != nil {
 		log.Fatalf("generation failed: %v", err)

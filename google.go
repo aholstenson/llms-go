@@ -123,11 +123,6 @@ func (m *googleModel) newSession(options ...GenerateOption) (*Session, error) {
 	if modality := firstUnsupportedModality(opts.Messages, m.info); modality != "" {
 		return nil, fmt.Errorf("model %s does not support %s input", m.statsModel, modality)
 	}
-	if clamped, didClamp := m.info.clampMaxTokens(opts.MaxTokens); didClamp {
-		m.logger.Warn("Clamping max tokens to model output limit",
-			slog.Int("requested", opts.MaxTokens), slog.Int("limit", clamped))
-		opts.MaxTokens = clamped
-	}
 
 	messages, err := m.convertMessages(opts.Messages)
 	if err != nil {
@@ -151,9 +146,7 @@ func (m *googleModel) newSession(options ...GenerateOption) (*Session, error) {
 		config.Temperature = &t
 	}
 
-	if v := m.info.resolveMaxTokens(opts.MaxTokens, 0); v > 0 {
-		config.MaxOutputTokens = int32(v) //nolint:gosec
-	}
+	maxOutput := m.info.resolveMaxOutputTokens(opts.MaxOutputTokens, 0)
 
 	if opts.MaxThinkingTokens != 0 && m.info.allowsReasoning() {
 		thinkingBudget := int32(opts.MaxThinkingTokens) //nolint:gosec
@@ -162,8 +155,11 @@ func (m *googleModel) newSession(options ...GenerateOption) (*Session, error) {
 			IncludeThoughts: true,
 		}
 
-		// Gemini seems to include thinking tokens in the max output tokens
-		config.MaxOutputTokens += int32(opts.MaxThinkingTokens) //nolint:gosec
+		// Gemini counts thinking tokens against the max output tokens, so add
+		// the budget before clamping below.
+		if maxOutput > 0 {
+			maxOutput += opts.MaxThinkingTokens
+		}
 	} else {
 		// Some Gemini models enable thinking by default, which silently
 		// includes thinking tokens in the max output tokens.
@@ -171,6 +167,15 @@ func (m *googleModel) newSession(options ...GenerateOption) (*Session, error) {
 		config.ThinkingConfig = &genai.ThinkingConfig{
 			ThinkingBudget: &zero,
 		}
+	}
+
+	if maxOutput > 0 {
+		if clamped, didClamp := m.info.clampMaxOutputTokens(maxOutput); didClamp {
+			m.logger.Warn("Clamping max tokens to model output limit",
+				slog.Int("requested", maxOutput), slog.Int("limit", clamped))
+			maxOutput = clamped
+		}
+		config.MaxOutputTokens = int32(maxOutput) //nolint:gosec
 	}
 
 	var toolMap map[string]ToolDef

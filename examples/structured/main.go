@@ -50,7 +50,7 @@ func main() {
 				llms.NewTextPart("Give me a simple recipe for pancakes.")),
 		),
 		llms.WithResponseSchema[Recipe](),
-		llms.WithMaxTokens(1024),
+		llms.WithMaxOutputTokens(1024),
 	)
 	if err != nil {
 		log.Fatalf("generation failed: %v", err)

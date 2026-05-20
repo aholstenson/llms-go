@@ -79,11 +79,6 @@ func (m *openaiModel) newSession(options ...GenerateOption) (*Session, error) {
 	if modality := firstUnsupportedModality(opts.Messages, m.info); modality != "" {
 		return nil, fmt.Errorf("model %s does not support %s input", m.statsModel, modality)
 	}
-	if clamped, didClamp := m.info.clampMaxTokens(opts.MaxTokens); didClamp {
-		m.logger.Warn("Clamping max tokens to model output limit",
-			slog.Int("requested", opts.MaxTokens), slog.Int("limit", clamped))
-		opts.MaxTokens = clamped
-	}
 
 	inputItems, err := m.convertMessages(opts.Messages)
 	if err != nil {
@@ -114,7 +109,12 @@ func (m *openaiModel) newSession(options ...GenerateOption) (*Session, error) {
 		params.Temperature = openai.Float(opts.Temperature)
 	}
 
-	if v := m.info.resolveMaxTokens(opts.MaxTokens, 0); v > 0 {
+	if v := m.info.resolveMaxOutputTokens(opts.MaxOutputTokens, 0); v > 0 {
+		if clamped, didClamp := m.info.clampMaxOutputTokens(v); didClamp {
+			m.logger.Warn("Clamping max tokens to model output limit",
+				slog.Int("requested", v), slog.Int("limit", clamped))
+			v = clamped
+		}
 		params.MaxOutputTokens = openai.Int(int64(v))
 	}
 

@@ -40,7 +40,7 @@ func main() {
 			llms.NewMessage(llms.RoleUser,
 				llms.NewTextPart("Explain what a Go interface is in two sentences.")),
 		),
-		llms.WithMaxTokens(256),
+		llms.WithMaxOutputTokens(256),
 	)
 	if err != nil {
 		log.Fatalf("generation failed: %v", err)

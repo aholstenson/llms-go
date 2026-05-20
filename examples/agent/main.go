@@ -62,7 +62,7 @@ func (t researchTool) Execute(ctx context.Context, in *ResearchInput) (string, e
 		llms.WithMessages(llms.NewMessage(llms.RoleUser,
 			llms.NewTextPart("Answer in two sentences: "+in.Topic))),
 		llms.WithMaxSteps(maxSteps),
-		llms.WithMaxTokens(256),
+		llms.WithMaxOutputTokens(256),
 		llms.WithParentExecution(parent),
 	)
 	if err != nil {
@@ -121,7 +121,7 @@ func main() {
 			llms.NewToolDef(deployTool{}),
 		),
 		llms.WithMaxSteps(8),
-		llms.WithMaxTokens(512),
+		llms.WithMaxOutputTokens(512),
 	)
 	if err != nil {
 		log.Fatalf("could not create session: %v", err)

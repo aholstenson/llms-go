@@ -75,7 +75,7 @@ func main() {
 		),
 		llms.WithTools(llms.NewToolDef(weatherTool{})),
 		llms.WithMaxSteps(5),
-		llms.WithMaxTokens(512),
+		llms.WithMaxOutputTokens(512),
 	)
 	if err != nil {
 		log.Fatalf("generation failed: %v", err)

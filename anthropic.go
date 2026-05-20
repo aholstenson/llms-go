@@ -126,11 +126,6 @@ func (m *anthropicModel) newSession(options ...GenerateOption) (*Session, error)
 	if modality := firstUnsupportedModality(opts.Messages, m.info); modality != "" {
 		return nil, fmt.Errorf("model %s does not support %s input", m.statsModel, modality)
 	}
-	if clamped, didClamp := m.info.clampMaxTokens(opts.MaxTokens); didClamp {
-		m.logger.Warn("Clamping max tokens to model output limit",
-			slog.Int("requested", opts.MaxTokens), slog.Int("limit", clamped))
-		opts.MaxTokens = clamped
-	}
 
 	// Convert messages to Anthropic format
 	messages, systemPrompt, err := m.convertMessages(opts.SystemPrompt, opts.Messages)
@@ -164,18 +159,26 @@ func (m *anthropicModel) newSession(options ...GenerateOption) (*Session, error)
 
 	// Anthropic requires max_tokens. Default to the model's declared output
 	// limit; for unknown models fall back to a conservative ceiling that fits
-	// every current Claude model.
-	params.MaxTokens = int64(m.info.resolveMaxTokens(opts.MaxTokens, 4096))
+	// every current Claude model. Thinking tokens count against this cap, so
+	// they're added before clamping against the model's output limit.
+	maxOutput := m.info.resolveMaxOutputTokens(opts.MaxOutputTokens, 4096)
 
 	if opts.MaxThinkingTokens > 0 && m.info.allowsReasoning() {
 		params.Thinking = anthropic.BetaThinkingConfigParamOfEnabled(int64(opts.MaxThinkingTokens))
-		params.MaxTokens += int64(opts.MaxThinkingTokens)
+		maxOutput += opts.MaxThinkingTokens
 
 		// Thinking mode requires a temperature of 1.0
 		if m.info.allowsTemperature() {
 			params.Temperature = anthropic.Float(1.0)
 		}
 	}
+
+	if clamped, didClamp := m.info.clampMaxOutputTokens(maxOutput); didClamp {
+		m.logger.Warn("Clamping max tokens to model output limit",
+			slog.Int("requested", maxOutput), slog.Int("limit", clamped))
+		maxOutput = clamped
+	}
+	params.MaxTokens = int64(maxOutput)
 
 	if opts.WebSearch {
 		// Enable the built-in web search tool
