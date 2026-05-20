@@ -22,15 +22,34 @@ type Manager struct {
 	subParsers map[string]SubParserConfig
 }
 
-func NewManager(logger *slog.Logger, metrics *Metrics) *Manager {
-	return &Manager{
-		logger:     logger,
-		metrics:    metrics,
+// ManagerOption configures a Manager during construction.
+type ManagerOption func(*Manager)
+
+// WithManagerLogger sets the logger used by the Manager and the models it
+// creates. Defaults to slog.Default() if not provided.
+func WithManagerLogger(logger *slog.Logger) ManagerOption {
+	return func(m *Manager) { m.logger = logger }
+}
+
+// WithManagerMetrics sets the metrics used by the Manager and the models it
+// creates. Defaults to NewNoopMetrics() if not provided.
+func WithManagerMetrics(metrics *Metrics) ManagerOption {
+	return func(m *Manager) { m.metrics = metrics }
+}
+
+func NewManager(opts ...ManagerOption) *Manager {
+	m := &Manager{
+		logger:     slog.Default(),
+		metrics:    NewNoopMetrics(),
 		models:     make(map[string]Model),
 		aliases:    map[string]string{},
 		overrides:  make(map[string]string),
 		subParsers: make(map[string]SubParserConfig),
 	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
 }
 
 func (m *Manager) RegisterAlias(alias, target string) {

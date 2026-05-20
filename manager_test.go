@@ -17,7 +17,7 @@ var _ = Describe("Manager", func() {
 	BeforeEach(func() {
 		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 		metrics = llms.NewNoopMetrics()
-		manager = llms.NewManager(logger, metrics)
+		manager = llms.NewManager(llms.WithManagerLogger(logger), llms.WithManagerMetrics(metrics))
 
 		// Clear relevant env vars using GinkgoT() for automatic cleanup
 		GinkgoT().Setenv("LLM_MODEL_TESTING", "")

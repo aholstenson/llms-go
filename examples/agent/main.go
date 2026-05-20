@@ -15,7 +15,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"log/slog"
 	"os"
 
 	llms "github.com/aholstenson/llms-go"
@@ -105,7 +104,7 @@ func needsApproval(calls []llms.ToolCall) bool {
 func main() {
 	ctx := context.Background()
 
-	manager := llms.NewManager(slog.Default(), llms.NewNoopMetrics())
+	manager := llms.NewManager()
 
 	model, err := manager.GetModel(modelName())
 	if err != nil {

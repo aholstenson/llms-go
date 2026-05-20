@@ -11,7 +11,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"log/slog"
 	"os"
 
 	llms "github.com/aholstenson/llms-go"
@@ -27,7 +26,7 @@ func modelName() string {
 func main() {
 	ctx := context.Background()
 
-	manager := llms.NewManager(slog.Default(), llms.NewNoopMetrics())
+	manager := llms.NewManager()
 
 	model, err := manager.GetModel(modelName())
 	if err != nil {

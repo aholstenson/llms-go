@@ -41,7 +41,7 @@ read from environment variables: `ANTHROPIC_API_TOKEN`, `OPENAI_API_TOKEN`,
 `OPENROUTER_API_TOKEN`, or `GOOGLE_API_TOKEN`.
 
 ```go
-manager := llms.NewManager(slog.Default(), llms.NewNoopMetrics())
+manager := llms.NewManager()
 
 model, err := manager.GetModel("anthropic/claude-sonnet-4-5")
 if err != nil {
