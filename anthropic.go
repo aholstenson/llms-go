@@ -680,8 +680,9 @@ func (t *anthropicTurn) FinalText() string {
 // Anthropic's cache-control rule: only the last tool_result block carries
 // CacheControl, so any earlier tool_result blocks are cleared first.
 func (t *anthropicTurn) Observe(ctx context.Context, _ TurnOutput, outcomes []ToolOutcome) error {
-	// Add assistant message to conversation
-	t.params.Messages = append(t.params.Messages, betaMessageToParam(t.response))
+	if t.response != nil {
+		t.params.Messages = append(t.params.Messages, betaMessageToParam(t.response))
+	}
 	return t.ObserveToolResults(ctx, nil, outcomes)
 }
 
