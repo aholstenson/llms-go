@@ -105,15 +105,20 @@ func newGoogleModel(ctx context.Context, logger *slog.Logger, metrics *Metrics, 
 }
 
 func (m *googleModel) GenerateContent(ctx context.Context, options ...GenerateOption) (Result, error) {
-	s, err := m.newSession(options...)
+	s, err := m.newSession(ctx, options...)
 	if err != nil {
 		return nil, err
 	}
 	return runSession(ctx, s)
 }
 
-func (m *googleModel) newSession(options ...GenerateOption) (*Session, error) {
+func (m *googleModel) newSession(ctx context.Context, options ...GenerateOption) (*Session, error) {
 	opts, err := resolveGenerateContentOptions(m.subParserRegistry, options...)
+	if err != nil {
+		return nil, err
+	}
+
+	opts.Tools, err = filterAvailableTools(ctx, opts.Tools)
 	if err != nil {
 		return nil, err
 	}

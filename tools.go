@@ -38,6 +38,14 @@ type ToolDef interface {
 	ToString(any) string
 }
 
+// ConditionalTool is an optional interface that ToolDef values may implement
+// to signal runtime availability. When IsAvailable returns (false, nil) at
+// session creation, the tool is silently excluded from the LLM's tool list
+// and from the session's toolMap. A non-nil error aborts session creation.
+type ConditionalTool interface {
+	IsAvailable(ctx context.Context) (bool, error)
+}
+
 type toolWrapper[I any, O any] struct {
 	tool Tool[I, O]
 }
@@ -62,8 +70,55 @@ func (tw *toolWrapper[I, O]) ToString(out any) string {
 	return tw.tool.ToString(out.(O))
 }
 
+// IsAvailable delegates to the wrapped Tool when it implements
+// ConditionalTool; otherwise the tool is always available.
+func (tw *toolWrapper[I, O]) IsAvailable(ctx context.Context) (bool, error) {
+	if c, ok := any(tw.tool).(ConditionalTool); ok {
+		return c.IsAvailable(ctx)
+	}
+	return true, nil
+}
+
 func NewToolDef[I any, O any](tool Tool[I, O]) ToolDef {
 	return &toolWrapper[I, O]{tool: tool}
+}
+
+// filterAvailableTools returns the subset of tools whose IsAvailable returns
+// true. Tools that don't implement ConditionalTool are kept. Order is
+// preserved. The input slice is returned unchanged (no allocation) when no
+// tool is filtered out.
+func filterAvailableTools(ctx context.Context, tools []ToolDef) ([]ToolDef, error) {
+	if len(tools) == 0 {
+		return tools, nil
+	}
+	var out []ToolDef
+	for i, t := range tools {
+		c, ok := t.(ConditionalTool)
+		if !ok {
+			if out != nil {
+				out = append(out, t)
+			}
+			continue
+		}
+		avail, err := c.IsAvailable(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("tool %q availability check: %w", t.Name(), err)
+		}
+		if avail {
+			if out != nil {
+				out = append(out, t)
+			}
+			continue
+		}
+		if out == nil {
+			out = make([]ToolDef, 0, len(tools)-1)
+			out = append(out, tools[:i]...)
+		}
+	}
+	if out == nil {
+		return tools, nil
+	}
+	return out, nil
 }
 
 type toolResult struct {

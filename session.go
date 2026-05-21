@@ -122,17 +122,19 @@ func newTracker(opts *generateContentOptions) *ExecutionTracker {
 // sessionModel is implemented by provider models that can construct a
 // driveable Session. It is the seam used by the public NewSession.
 type sessionModel interface {
-	newSession(options ...GenerateOption) (*Session, error)
+	newSession(ctx context.Context, options ...GenerateOption) (*Session, error)
 }
 
 // NewSession creates a driveable Session for the given model. The model must
 // be one of the built-in providers (Anthropic, OpenAI/OpenRouter, Google).
-func NewSession(m Model, options ...GenerateOption) (*Session, error) {
+// The ctx is used for session-creation work such as ConditionalTool
+// availability checks; it is not retained for later turns.
+func NewSession(ctx context.Context, m Model, options ...GenerateOption) (*Session, error) {
 	sm, ok := m.(sessionModel)
 	if !ok {
 		return nil, fmt.Errorf("model %T does not support driveable sessions", m)
 	}
-	return sm.newSession(options...)
+	return sm.newSession(ctx, options...)
 }
 
 // Step advances one model turn: Turn.Next -> (if tool calls) parallel

@@ -108,15 +108,20 @@ func withOpenRouterHTTPClient(c *http.Client) openrouter.Option {
 }
 
 func (m *openrouterModel) GenerateContent(ctx context.Context, options ...GenerateOption) (Result, error) {
-	s, err := m.newSession(options...)
+	s, err := m.newSession(ctx, options...)
 	if err != nil {
 		return nil, err
 	}
 	return runSession(ctx, s)
 }
 
-func (m *openrouterModel) newSession(options ...GenerateOption) (*Session, error) {
+func (m *openrouterModel) newSession(ctx context.Context, options ...GenerateOption) (*Session, error) {
 	opts, err := resolveGenerateContentOptions(m.subParserRegistry, options...)
+	if err != nil {
+		return nil, err
+	}
+
+	opts.Tools, err = filterAvailableTools(ctx, opts.Tools)
 	if err != nil {
 		return nil, err
 	}

@@ -114,7 +114,7 @@ func main() {
 		log.Fatalf("could not load model: %v", err)
 	}
 
-	s, err := llms.NewSession(model,
+	s, err := llms.NewSession(ctx, model,
 		llms.WithSystemPrompt("You are an operations assistant. Use tools when helpful."),
 		llms.WithMessages(llms.NewMessage(llms.RoleUser, llms.NewTextPart(
 			"Research what a blue-green deployment is, then deploy the 'billing' service."))),

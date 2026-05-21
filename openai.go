@@ -63,15 +63,20 @@ func newOpenAIModel(logger *slog.Logger, metrics *Metrics, apiKey string, model 
 }
 
 func (m *openaiModel) GenerateContent(ctx context.Context, options ...GenerateOption) (Result, error) {
-	s, err := m.newSession(options...)
+	s, err := m.newSession(ctx, options...)
 	if err != nil {
 		return nil, err
 	}
 	return runSession(ctx, s)
 }
 
-func (m *openaiModel) newSession(options ...GenerateOption) (*Session, error) {
+func (m *openaiModel) newSession(ctx context.Context, options ...GenerateOption) (*Session, error) {
 	opts, err := resolveGenerateContentOptions(m.subParserRegistry, options...)
+	if err != nil {
+		return nil, err
+	}
+
+	opts.Tools, err = filterAvailableTools(ctx, opts.Tools)
 	if err != nil {
 		return nil, err
 	}
