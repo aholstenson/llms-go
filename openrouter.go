@@ -404,8 +404,8 @@ func (t *openrouterTurn) Observe(ctx context.Context, _ TurnOutput, outcomes []T
 func (t *openrouterTurn) ObserveToolResults(_ context.Context, _ []ToolCall, outcomes []ToolOutcome) error {
 	for _, o := range outcomes {
 		result := o.Text
-		if o.Error != "" {
-			result = o.Error
+		if o.Error != nil {
+			result = o.ModelError()
 		}
 		t.params.Messages = append(t.params.Messages, openrouter.ToolMessage(o.ID, result))
 	}

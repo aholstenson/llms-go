@@ -559,8 +559,8 @@ func (t *googleTurn) ObserveToolResults(_ context.Context, _ []ToolCall, outcome
 	toolResultsMsg := &genai.Content{Role: genai.RoleUser}
 	for _, o := range outcomes {
 		responseMap := make(map[string]any)
-		if o.Error != "" {
-			responseMap["error"] = o.Error
+		if o.Error != nil {
+			responseMap["error"] = o.ModelError()
 		} else {
 			responseMap["output"] = o.Text
 		}

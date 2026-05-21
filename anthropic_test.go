@@ -108,7 +108,7 @@ var _ = Describe("anthropicTurn.Observe cache-control", func() {
 		err := turn.Observe(context.Background(), TurnOutput{}, []ToolOutcome{
 			{ID: "a", Name: "x", Text: "ra"},
 			{ID: "b", Name: "y", Text: "rb"},
-			{ID: "c", Name: "z", Error: "boom"},
+			{ID: "c", Name: "z", Error: NewVisibleToolError("boom")},
 		})
 		Expect(err).NotTo(HaveOccurred())
 

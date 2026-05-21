@@ -1,6 +1,10 @@
 package llms
 
-import "context"
+import (
+	"context"
+	"errors"
+	"fmt"
+)
 
 // StopReason describes why a model turn (or the loop) stopped.
 type StopReason string
@@ -24,14 +28,58 @@ type ToolCall struct {
 }
 
 // ToolOutcome is the result of executing a ToolCall. Exactly one of Text or
-// Error is meaningful: Error is non-empty when the call failed, otherwise
+// Error is meaningful: Error is non-nil when the call failed, otherwise
 // Text holds the rendered tool result.
+//
+// The full error is preserved in Error for callers and logs. The message
+// sent to the model is produced by ModelError, which redacts internal
+// detail unless the error chain contains a VisibleToolError.
 type ToolOutcome struct {
 	ID    string
 	Name  string
 	Text  string
-	Error string
+	Error error
 }
+
+// ModelError returns the message that should be sent to the model for this
+// outcome. It returns "" when the call succeeded. When Error is non-nil but
+// the chain contains no VisibleToolError, a generic placeholder is returned
+// so internal details (paths, secrets, stack traces) are not leaked.
+func (o ToolOutcome) ModelError() string {
+	if o.Error == nil {
+		return ""
+	}
+	var v *VisibleToolError
+	if errors.As(o.Error, &v) {
+		return v.Message
+	}
+	return "tool execution failed"
+}
+
+// VisibleToolError marks an error as safe to surface to the model in the
+// tool-result block. Tools that want the model to read a specific message
+// (for self-correction, etc.) should return a VisibleToolError directly or
+// wrap one in a chain via fmt.Errorf("...: %w", ...).
+//
+// Any error that does not contain a VisibleToolError in its chain is
+// reduced to a generic placeholder when rendered for the model; the full
+// error remains in ToolOutcome.Error for callers and logs.
+type VisibleToolError struct {
+	Message string
+}
+
+func (e *VisibleToolError) Error() string { return e.Message }
+
+// NewVisibleToolError returns a VisibleToolError with a formatted message.
+func NewVisibleToolError(format string, args ...any) *VisibleToolError {
+	return &VisibleToolError{Message: fmt.Sprintf(format, args...)}
+}
+
+// ErrToolNotFound is set on ToolOutcome.Error when a ToolCall references a
+// tool name not present in the session's tool registry. It is a
+// VisibleToolError, so the model sees the message and can recover by
+// calling a different tool.
+var ErrToolNotFound = &VisibleToolError{Message: "requested tool not found"}
 
 // TurnUsage carries per-turn token accounting in neutral form.
 type TurnUsage struct {

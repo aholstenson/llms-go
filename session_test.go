@@ -212,7 +212,7 @@ var _ = Describe("Session", func() {
 			Expect(turn.observed[0]).To(Equal([]ToolOutcome{
 				{ID: "a", Name: "slow", Text: "A"},
 				{ID: "b", Name: "fast", Text: "B"},
-				{ID: "c", Name: "missing", Error: "Requested tool not found"},
+				{ID: "c", Name: "missing", Error: ErrToolNotFound},
 			}))
 		})
 	})

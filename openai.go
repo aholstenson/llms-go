@@ -383,8 +383,8 @@ func (t *openaiTurn) Observe(ctx context.Context, _ TurnOutput, outcomes []ToolO
 func (t *openaiTurn) ObserveToolResults(_ context.Context, _ []ToolCall, outcomes []ToolOutcome) error {
 	for _, o := range outcomes {
 		text := o.Text
-		if o.Error != "" {
-			text = o.Error
+		if o.Error != nil {
+			text = o.ModelError()
 		}
 		t.inputItems = append(t.inputItems, responses.ResponseInputItemUnionParam{
 			OfFunctionCallOutput: &responses.ResponseInputItemFunctionCallOutputParam{

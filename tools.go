@@ -149,7 +149,7 @@ func doToolCall(ctx context.Context, logger *slog.Logger, streamingFunc Streamin
 	defer func() {
 		if r := recover(); r != nil {
 			logger.Error("Tool call panicked", slog.String("tool", tool.Name()), slog.String("toolCallID", id), slog.Int("inputLength", len(arguments)), slog.Any("panic", r))
-			err = fmt.Errorf("tool execution failed due to panic: %v", r)
+			err = fmt.Errorf("%w: %v", NewVisibleToolError("tool execution failed due to panic"), r)
 		}
 	}()
 
@@ -166,7 +166,7 @@ func doToolCall(ctx context.Context, logger *slog.Logger, streamingFunc Streamin
 	args := reflect.New(schemaType).Interface()
 	if err := json.Unmarshal([]byte(arguments), args); err != nil {
 		logger.Error("Tool call failed, could not parse arguments", slog.String("tool", tool.Name()), slog.String("toolCallID", id), slog.Int("inputLength", len(arguments)), slog.Any("error", err))
-		return "", fmt.Errorf("invalid arguments: %w", err)
+		return "", fmt.Errorf("%w: %w", NewVisibleToolError("invalid arguments"), err)
 	}
 
 	if streamingFunc != nil {

@@ -333,7 +333,7 @@ func (s *Session) RunTools(ctx context.Context, calls []ToolCall) ([]ToolOutcome
 	for i, call := range calls {
 		tool, ok := s.toolMap[call.Name]
 		if !ok {
-			outcomes[i] = ToolOutcome{ID: call.ID, Name: call.Name, Error: "Requested tool not found"}
+			outcomes[i] = ToolOutcome{ID: call.ID, Name: call.Name, Error: ErrToolNotFound}
 			continue
 		}
 
@@ -342,7 +342,7 @@ func (s *Session) RunTools(ctx context.Context, calls []ToolCall) ([]ToolOutcome
 			outcome := ToolOutcome{ID: call.ID, Name: call.Name}
 			result, err := doToolCall(ctx, s.logger, s.opts.StreamingFunc, s.opts.ToolCallTimeout, call.ID, tool, call.Arguments)
 			if err != nil {
-				outcome.Error = err.Error()
+				outcome.Error = err
 			} else {
 				outcome.Text = result
 			}
@@ -398,7 +398,7 @@ func assistantMessage(out TurnOutput) *Message {
 func toolOutcomeMessage(outcomes []ToolOutcome) *Message {
 	parts := make([]MessagePart, 0, len(outcomes))
 	for _, o := range outcomes {
-		parts = append(parts, &ToolResultPart{ID: o.ID, Name: o.Name, Text: o.Text, Error: o.Error})
+		parts = append(parts, &ToolResultPart{ID: o.ID, Name: o.Name, Text: o.Text, Error: o.ModelError()})
 	}
 	return NewMessage(RoleUser, parts...)
 }

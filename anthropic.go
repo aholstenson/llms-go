@@ -705,8 +705,8 @@ func (t *anthropicTurn) ObserveToolResults(_ context.Context, _ []ToolCall, outc
 	var toolResultsContent []anthropic.BetaContentBlockParamUnion
 	for i, o := range outcomes {
 		result := o.Text
-		if o.Error != "" {
-			result = o.Error
+		if o.Error != nil {
+			result = o.ModelError()
 		}
 
 		cacheControl := anthropic.BetaCacheControlEphemeralParam{}
@@ -720,7 +720,7 @@ func (t *anthropicTurn) ObserveToolResults(_ context.Context, _ []ToolCall, outc
 				Content: []anthropic.BetaToolResultBlockParamContentUnion{
 					{OfText: &anthropic.BetaTextBlockParam{Text: result}},
 				},
-				IsError:      anthropic.Bool(o.Error != ""),
+				IsError:      anthropic.Bool(o.Error != nil),
 				CacheControl: cacheControl,
 			},
 		})

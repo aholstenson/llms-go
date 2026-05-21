@@ -157,7 +157,7 @@ func main() {
 				outcomes[i] = llms.ToolOutcome{
 					ID:    tc.ID,
 					Name:  tc.Name,
-					Error: "operator policy: deployments are not permitted in this session; summarize instead",
+					Error: llms.NewVisibleToolError("operator policy: deployments are not permitted in this session; summarize instead"),
 				}
 			}
 		} else {
