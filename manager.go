@@ -140,33 +140,33 @@ func (m *Manager) resolveModelNameLocked(name string) (string, error) {
 
 func (m *Manager) GetModel(ctx context.Context, name string) (Model, error) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	name, err := m.resolveModelNameLocked(name)
+	resolved, err := m.resolveModelNameLocked(name)
 	if err != nil {
+		m.mu.Unlock()
 		return nil, err
 	}
-
-	model, ok := m.models[name]
-	if ok {
-		// Model has been loaded
+	if model, ok := m.models[resolved]; ok {
+		m.mu.Unlock()
 		return model, nil
 	}
+	registry := m.subParserRegistrySnapshot()
+	logger := m.logger
+	metrics := m.metrics
+	m.mu.Unlock()
 
-	slashIdx := strings.Index(name, "/")
+	slashIdx := strings.Index(resolved, "/")
 	if slashIdx == -1 {
-		return nil, fmt.Errorf("invalid model name: %s", name)
+		return nil, fmt.Errorf("invalid model name: %s", resolved)
 	}
 
-	registry := m.subParserRegistrySnapshot()
-
-	modelName := name[slashIdx+1:]
-	modelProvider := name[:slashIdx]
+	modelName := resolved[slashIdx+1:]
+	modelProvider := resolved[:slashIdx]
 
 	// Embedded model metadata (pricing/capabilities). A miss yields the zero
 	// ModelInfo, which the behavior gates treat permissively.
-	info, _ := LookupModelInfo(name)
+	info, _ := LookupModelInfo(resolved)
 
+	var model Model
 	switch modelProvider {
 	case "anthropic":
 		apiKey := os.Getenv("ANTHROPIC_API_KEY")
@@ -174,22 +174,21 @@ func (m *Manager) GetModel(ctx context.Context, name string) (Model, error) {
 			return nil, errors.New("ANTHROPIC_API_KEY is not set")
 		}
 
-		model = newAnthropicModel(m.logger, m.metrics, apiKey, modelName, registry, info)
+		model = newAnthropicModel(logger, metrics, apiKey, modelName, registry, info)
 	case "openai":
 		apiKey := os.Getenv("OPENAI_API_KEY")
 		if apiKey == "" {
 			return nil, errors.New("OPENAI_API_KEY is not set")
 		}
 
-		model = newOpenAIModel(m.logger, m.metrics, apiKey, modelName, registry, info)
+		model = newOpenAIModel(logger, metrics, apiKey, modelName, registry, info)
 	case "openrouter":
 		apiKey := os.Getenv("OPENROUTER_API_KEY")
 		if apiKey == "" {
 			return nil, errors.New("OPENROUTER_API_KEY is not set")
 		}
 
-		var err error
-		model, err = newOpenRouterModel(m.logger, m.metrics, apiKey, modelName, registry, info)
+		model, err = newOpenRouterModel(logger, metrics, apiKey, modelName, registry, info)
 		if err != nil {
 			return nil, err
 		}
@@ -202,8 +201,7 @@ func (m *Manager) GetModel(ctx context.Context, name string) (Model, error) {
 			return nil, errors.New("GEMINI_API_KEY (or GOOGLE_API_KEY) is not set")
 		}
 
-		var err error
-		model, err = newGoogleModel(ctx, m.logger, m.metrics, apiKey, modelName, registry, info)
+		model, err = newGoogleModel(ctx, logger, metrics, apiKey, modelName, registry, info)
 		if err != nil {
 			return nil, err
 		}
@@ -213,8 +211,15 @@ func (m *Manager) GetModel(ctx context.Context, name string) (Model, error) {
 		return nil, fmt.Errorf("unknown model provider: %s", modelProvider)
 	}
 
-	m.logger.Info("Loaded model", slog.String("name", name), slog.String("model", modelName))
-	m.models[name] = model
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if existing, ok := m.models[resolved]; ok {
+		// Another goroutine built the same model while we were constructing
+		// ours; discard ours and return the winner.
+		return existing, nil
+	}
+	logger.Info("Loaded model", slog.String("name", resolved), slog.String("model", modelName))
+	m.models[resolved] = model
 	return model, nil
 }
 
