@@ -44,7 +44,7 @@ type StepInfo struct {
 // goroutine call Inject between Steps.
 type Session struct {
 	turn    Turn
-	tracker *ExecutionTracker
+	tracker *executionTracker
 	toolMap map[string]ToolDef
 	opts    *generateContentOptions
 	logger  *slog.Logger
@@ -85,7 +85,7 @@ type PlanInfo struct {
 // newSession is the internal constructor used by providers (and tests). The
 // provider builds its native Turn, an execution tracker and tool map, then
 // hands them here. Token/step rollup and streaming-event emission live here.
-func newSession(turn Turn, tracker *ExecutionTracker, toolMap map[string]ToolDef, opts *generateContentOptions, logger *slog.Logger) *Session {
+func newSession(turn Turn, tracker *executionTracker, toolMap map[string]ToolDef, opts *generateContentOptions, logger *slog.Logger) *Session {
 	maxSteps := opts.MaxSteps
 	if maxSteps <= 0 {
 		maxSteps = defaultMaxSteps
@@ -108,15 +108,15 @@ func newSession(turn Turn, tracker *ExecutionTracker, toolMap map[string]ToolDef
 
 // newTracker builds the execution tracker for a generation, rolling up to a
 // parent when WithParentExecution was supplied (the sub-agent pattern).
-func newTracker(opts *generateContentOptions) *ExecutionTracker {
+func newTracker(opts *generateContentOptions) *executionTracker {
 	maxSteps := opts.MaxSteps
 	if maxSteps <= 0 {
 		maxSteps = defaultMaxSteps
 	}
 	if opts.ParentExecution != nil {
-		return NewChildTracker(maxSteps, opts.ParentExecution)
+		return newChildTracker(maxSteps, opts.ParentExecution)
 	}
-	return NewExecutionTracker(maxSteps)
+	return newExecutionTracker(maxSteps)
 }
 
 // sessionModel is implemented by provider models that can construct a
@@ -182,7 +182,7 @@ func (s *Session) StepPlan(ctx context.Context) (PlanInfo, bool, error) {
 	}
 
 	// Make the execution tracker visible to tools (and sub-agents).
-	ctx = WithExecutionContext(ctx, s.tracker)
+	ctx = withExecutionContext(ctx, s.tracker)
 
 	s.step++
 	// WithMaxSteps(N) permits exactly N model calls.
@@ -263,7 +263,7 @@ func (s *Session) StepObserve(ctx context.Context, outcomes []ToolOutcome) (Step
 			errors.New("StepObserve without pending plan")
 	}
 
-	ctx = WithExecutionContext(ctx, s.tracker)
+	ctx = withExecutionContext(ctx, s.tracker)
 
 	s.messages = append(s.messages, toolOutcomeMessage(outcomes))
 
@@ -317,7 +317,9 @@ func (s *Session) ResumeForToolResults(calls []ToolCall) error {
 // for example, to gate or audit calls before they run — while still using
 // the session's tool dispatch and parallelism.
 func (s *Session) RunTools(ctx context.Context, calls []ToolCall) ([]ToolOutcome, error) {
-	ctx = WithExecutionContext(ctx, s.tracker)
+	ctx = withExecutionContext(ctx, s.tracker)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	outcomes := make([]ToolOutcome, len(calls))
 

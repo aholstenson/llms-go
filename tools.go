@@ -154,7 +154,7 @@ func doToolCall(ctx context.Context, logger *slog.Logger, streamingFunc Streamin
 	}()
 
 	// Record tool call in execution tracker
-	if tracker, ok := ctx.Value(executionContextKey{}).(*ExecutionTracker); ok {
+	if tracker, ok := ctx.Value(executionContextKey{}).(*executionTracker); ok {
 		tracker.RecordToolCall(tool.Name())
 	}
 

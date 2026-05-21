@@ -37,9 +37,10 @@ type ExecutionContext interface {
 	TotalTokens() int64
 }
 
-// ExecutionTracker is the mutable implementation of ExecutionContext used by
-// LLM providers to track execution state.
-type ExecutionTracker struct {
+// executionTracker is the mutable implementation of ExecutionContext used
+// internally to track execution state. It is intentionally unexported:
+// external code only ever reads through the ExecutionContext interface.
+type executionTracker struct {
 	mu sync.RWMutex
 
 	// Step tracking
@@ -57,24 +58,24 @@ type ExecutionTracker struct {
 
 	// parent, when set, receives token and tool-call rollups so a sub-agent's
 	// spend accrues to its caller's budget.
-	parent *ExecutionTracker
+	parent *executionTracker
 }
 
-// NewExecutionTracker creates a new execution tracker with the given max steps.
-func NewExecutionTracker(maxSteps int) *ExecutionTracker {
-	return &ExecutionTracker{
+// newExecutionTracker creates a new execution tracker with the given max steps.
+func newExecutionTracker(maxSteps int) *executionTracker {
+	return &executionTracker{
 		maxSteps:  maxSteps,
 		toolCalls: make(map[string]int),
 	}
 }
 
-// NewChildTracker creates an execution tracker whose token and tool-call
+// newChildTracker creates an execution tracker whose token and tool-call
 // totals also roll up to the given parent. Step counts are deliberately not
 // rolled up: the child keeps its own independent step budget. If parent is
-// not an *ExecutionTracker, the child behaves like a plain tracker.
-func NewChildTracker(maxSteps int, parent ExecutionContext) *ExecutionTracker {
-	t := NewExecutionTracker(maxSteps)
-	if p, ok := parent.(*ExecutionTracker); ok {
+// not an *executionTracker, the child behaves like a plain tracker.
+func newChildTracker(maxSteps int, parent ExecutionContext) *executionTracker {
+	t := newExecutionTracker(maxSteps)
+	if p, ok := parent.(*executionTracker); ok {
 		t.parent = p
 	}
 	return t
@@ -82,71 +83,69 @@ func NewChildTracker(maxSteps int, parent ExecutionContext) *ExecutionTracker {
 
 // Read methods (implement ExecutionContext)
 
-func (t *ExecutionTracker) CurrentStep() int {
+func (t *executionTracker) CurrentStep() int {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 	return t.currentStep
 }
 
-func (t *ExecutionTracker) MaxSteps() int {
+func (t *executionTracker) MaxSteps() int {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 	return t.maxSteps
 }
 
-func (t *ExecutionTracker) RemainingSteps() int {
+func (t *executionTracker) RemainingSteps() int {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 	return t.maxSteps - t.currentStep
 }
 
-func (t *ExecutionTracker) ToolCallCount(toolName string) int {
+func (t *executionTracker) ToolCallCount(toolName string) int {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 	return t.toolCalls[toolName]
 }
 
-func (t *ExecutionTracker) TotalToolCalls() int {
+func (t *executionTracker) TotalToolCalls() int {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 	return t.totalToolCalls
 }
 
-func (t *ExecutionTracker) InputTokens() int64 {
+func (t *executionTracker) InputTokens() int64 {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 	return t.inputTokens
 }
 
-func (t *ExecutionTracker) OutputTokens() int64 {
+func (t *executionTracker) OutputTokens() int64 {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 	return t.outputTokens
 }
 
-func (t *ExecutionTracker) CachedTokens() int64 {
+func (t *executionTracker) CachedTokens() int64 {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 	return t.cachedTokens
 }
 
-func (t *ExecutionTracker) TotalTokens() int64 {
+func (t *executionTracker) TotalTokens() int64 {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 	return t.inputTokens + t.outputTokens
 }
 
-// Write methods (used only by LLM providers)
+// Write methods (used only by the session loop)
 
-// IncrementStep increments the current step counter.
-func (t *ExecutionTracker) IncrementStep() {
+func (t *executionTracker) IncrementStep() {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.currentStep++
 }
 
-// RecordToolCall records that a tool was called.
-func (t *ExecutionTracker) RecordToolCall(toolName string) {
+func (t *executionTracker) RecordToolCall(toolName string) {
 	t.mu.Lock()
 	t.toolCalls[toolName]++
 	t.totalToolCalls++
@@ -157,8 +156,7 @@ func (t *ExecutionTracker) RecordToolCall(toolName string) {
 	}
 }
 
-// AddTokens adds token counts to the cumulative totals.
-func (t *ExecutionTracker) AddTokens(input, output, cached int64) {
+func (t *executionTracker) AddTokens(input, output, cached int64) {
 	t.mu.Lock()
 	t.inputTokens += input
 	t.outputTokens += output
@@ -170,20 +168,20 @@ func (t *ExecutionTracker) AddTokens(input, output, cached int64) {
 	}
 }
 
-// Ensure ExecutionTracker implements ExecutionContext
-var _ ExecutionContext = (*ExecutionTracker)(nil)
+var _ ExecutionContext = (*executionTracker)(nil)
 
 type executionContextKey struct{}
 
-// WithExecutionContext adds an ExecutionContext to the context.
-func WithExecutionContext(ctx context.Context, ec ExecutionContext) context.Context {
-	return context.WithValue(ctx, executionContextKey{}, ec)
+// withExecutionContext attaches the session's tracker to ctx so downstream
+// tool calls can record into it.
+func withExecutionContext(ctx context.Context, tracker *executionTracker) context.Context {
+	return context.WithValue(ctx, executionContextKey{}, tracker)
 }
 
 // GetExecutionContext retrieves the ExecutionContext from the context, or nil if not present.
 func GetExecutionContext(ctx context.Context) ExecutionContext {
-	if ec, ok := ctx.Value(executionContextKey{}).(ExecutionContext); ok {
-		return ec
+	if t, ok := ctx.Value(executionContextKey{}).(*executionTracker); ok {
+		return t
 	}
 	return nil
 }

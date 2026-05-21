@@ -1,19 +1,18 @@
-package llms_test
+package llms
 
 import (
 	"context"
 	"sync"
 
-	"github.com/aholstenson/llms-go"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("ExecutionTracker", func() {
-	var tracker *llms.ExecutionTracker
+var _ = Describe("executionTracker", func() {
+	var tracker *executionTracker
 
 	BeforeEach(func() {
-		tracker = llms.NewExecutionTracker(10)
+		tracker = newExecutionTracker(10)
 	})
 
 	Describe("Step tracking", func() {
@@ -98,7 +97,6 @@ var _ = Describe("ExecutionTracker", func() {
 			var wg sync.WaitGroup
 			iterations := 100
 
-			// Concurrent step increments
 			for range iterations {
 				wg.Add(1)
 				go func() {
@@ -107,7 +105,6 @@ var _ = Describe("ExecutionTracker", func() {
 				}()
 			}
 
-			// Concurrent tool calls
 			for i := range iterations {
 				wg.Add(1)
 				go func(i int) {
@@ -117,7 +114,6 @@ var _ = Describe("ExecutionTracker", func() {
 				}(i)
 			}
 
-			// Concurrent token additions
 			for range iterations {
 				wg.Add(1)
 				go func() {
@@ -126,7 +122,6 @@ var _ = Describe("ExecutionTracker", func() {
 				}()
 			}
 
-			// Concurrent reads
 			for range iterations {
 				wg.Add(1)
 				go func() {
@@ -150,23 +145,23 @@ var _ = Describe("ExecutionTracker", func() {
 
 var _ = Describe("ExecutionContext context helpers", func() {
 	var ctx context.Context
-	var tracker *llms.ExecutionTracker
+	var tracker *executionTracker
 
 	BeforeEach(func() {
 		ctx = context.Background()
-		tracker = llms.NewExecutionTracker(5)
+		tracker = newExecutionTracker(5)
 	})
 
 	It("should store and retrieve ExecutionContext", func() {
-		ctx = llms.WithExecutionContext(ctx, tracker)
-		retrieved := llms.GetExecutionContext(ctx)
+		ctx = withExecutionContext(ctx, tracker)
+		retrieved := GetExecutionContext(ctx)
 
 		Expect(retrieved).NotTo(BeNil())
 		Expect(retrieved.MaxSteps()).To(Equal(5))
 	})
 
 	It("should return nil when context not set", func() {
-		retrieved := llms.GetExecutionContext(ctx)
+		retrieved := GetExecutionContext(ctx)
 		Expect(retrieved).To(BeNil())
 	})
 
@@ -175,8 +170,8 @@ var _ = Describe("ExecutionContext context helpers", func() {
 		tracker.RecordToolCall("test")
 		tracker.AddTokens(100, 50, 10)
 
-		ctx = llms.WithExecutionContext(ctx, tracker)
-		retrieved := llms.GetExecutionContext(ctx)
+		ctx = withExecutionContext(ctx, tracker)
+		retrieved := GetExecutionContext(ctx)
 
 		Expect(retrieved.CurrentStep()).To(Equal(1))
 		Expect(retrieved.ToolCallCount("test")).To(Equal(1))

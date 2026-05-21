@@ -108,7 +108,7 @@ func (t sessTool) Execute(ctx context.Context, in *sessArgs) (string, error) {
 	return in.V, nil
 }
 
-func newTestSession(turn Turn, tools []ToolDef, options ...GenerateOption) (*Session, *ExecutionTracker) {
+func newTestSession(turn Turn, tools []ToolDef, options ...GenerateOption) (*Session, *executionTracker) {
 	opts, err := resolveGenerateContentOptions(nil, options...)
 	if err != nil {
 		panic(err)
@@ -117,7 +117,7 @@ func newTestSession(turn Turn, tools []ToolDef, options ...GenerateOption) (*Ses
 	for _, t := range tools {
 		toolMap[t.Name()] = t
 	}
-	tracker := NewExecutionTracker(func() int {
+	tracker := newExecutionTracker(func() int {
 		if opts.MaxSteps > 0 {
 			return opts.MaxSteps
 		}
@@ -317,7 +317,7 @@ var _ = Describe("Session", func() {
 
 	Describe("sub-agent budget rollup", func() {
 		It("rolls child token and tool spend up to the parent tracker", func() {
-			parent := NewExecutionTracker(10)
+			parent := newExecutionTracker(10)
 
 			child := &fakeTurn{script: []TurnOutput{
 				{
@@ -330,7 +330,7 @@ var _ = Describe("Session", func() {
 			opts, err := resolveGenerateContentOptions(nil)
 			Expect(err).NotTo(HaveOccurred())
 			toolMap := map[string]ToolDef{"echo": echo}
-			childTracker := NewChildTracker(10, parent)
+			childTracker := newChildTracker(10, parent)
 			s := newSession(child, childTracker, toolMap, opts, slog.Default())
 
 			_, err = runSession(context.Background(), s)
