@@ -109,7 +109,10 @@ func (t sessTool) Execute(ctx context.Context, in *sessArgs) (string, error) {
 }
 
 func newTestSession(turn Turn, tools []ToolDef, options ...GenerateOption) (*Session, *ExecutionTracker) {
-	opts := resolveGenerateContentOptions(nil, options...)
+	opts, err := resolveGenerateContentOptions(nil, options...)
+	if err != nil {
+		panic(err)
+	}
 	toolMap := make(map[string]ToolDef, len(tools))
 	for _, t := range tools {
 		toolMap[t.Name()] = t
@@ -324,12 +327,13 @@ var _ = Describe("Session", func() {
 				},
 				{Text: "child answer", StopReason: StopReasonEndTurn, Usage: TurnUsage{InputTokens: 3, OutputTokens: 1}},
 			}}
-			opts := resolveGenerateContentOptions(nil)
+			opts, err := resolveGenerateContentOptions(nil)
+			Expect(err).NotTo(HaveOccurred())
 			toolMap := map[string]ToolDef{"echo": echo}
 			childTracker := NewChildTracker(10, parent)
 			s := newSession(child, childTracker, toolMap, opts, slog.Default())
 
-			_, err := runSession(context.Background(), s)
+			_, err = runSession(context.Background(), s)
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(parent.InputTokens()).To(Equal(int64(7)))

@@ -43,12 +43,12 @@ type openaiModel struct {
 	subParserRegistry map[string]SubParserConfig
 }
 
-// NewOpenAIModel creates a new OpenAI model using the official OpenAI Go SDK
+// newOpenAIModel creates a new OpenAI model using the official OpenAI Go SDK
 // against the Responses API. info carries embedded model metadata used to
 // gate request parameters; the zero value is treated permissively. Optional
 // SDK request options can be passed for customization (e.g.
 // option.WithBaseURL for testing).
-func NewOpenAIModel(logger *slog.Logger, metrics *Metrics, apiKey string, model string, registry map[string]SubParserConfig, info ModelInfo, opts ...option.RequestOption) Model {
+func newOpenAIModel(logger *slog.Logger, metrics *Metrics, apiKey string, model string, registry map[string]SubParserConfig, info ModelInfo, opts ...option.RequestOption) Model {
 	allOpts := append([]option.RequestOption{option.WithAPIKey(apiKey)}, opts...)
 	client := openai.NewClient(allOpts...)
 	return &openaiModel{
@@ -71,7 +71,10 @@ func (m *openaiModel) GenerateContent(ctx context.Context, options ...GenerateOp
 }
 
 func (m *openaiModel) newSession(options ...GenerateOption) (*Session, error) {
-	opts := resolveGenerateContentOptions(m.subParserRegistry, options...)
+	opts, err := resolveGenerateContentOptions(m.subParserRegistry, options...)
+	if err != nil {
+		return nil, err
+	}
 
 	if len(opts.Tools) > 0 && !m.info.allowsToolCall() {
 		return nil, fmt.Errorf("model %s does not support tool calling", m.statsModel)

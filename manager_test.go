@@ -1,6 +1,7 @@
 package llms_test
 
 import (
+	"context"
 	"io"
 	"log/slog"
 
@@ -17,7 +18,9 @@ var _ = Describe("Manager", func() {
 	BeforeEach(func() {
 		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 		metrics = llms.NewNoopMetrics()
-		manager = llms.NewManager(llms.WithManagerLogger(logger), llms.WithManagerMetrics(metrics))
+		var err error
+		manager, err = llms.NewManager(llms.WithManagerLogger(logger), llms.WithManagerMetrics(metrics))
+		Expect(err).NotTo(HaveOccurred())
 
 		// Clear relevant env vars using GinkgoT() for automatic cleanup
 		GinkgoT().Setenv("LLM_MODEL_TESTING", "")
@@ -29,7 +32,7 @@ var _ = Describe("Manager", func() {
 		It("should allow registering and resolving an alias", func() {
 			manager.RegisterAlias("testing", "test/model-name")
 
-			model, err := manager.GetModel("testing")
+			model, err := manager.GetModel(context.Background(), "testing")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(model).NotTo(BeNil())
 		})
@@ -60,7 +63,7 @@ var _ = Describe("Manager", func() {
 			manager.RegisterAlias("alias1", "alias2")
 			manager.RegisterAlias("alias2", "test/model-name")
 
-			model, err := manager.GetModel("alias1")
+			model, err := manager.GetModel(context.Background(), "alias1")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(model).NotTo(BeNil())
 		})
@@ -69,7 +72,7 @@ var _ = Describe("Manager", func() {
 			manager.RegisterAlias("loop1", "loop2")
 			manager.RegisterAlias("loop2", "loop1")
 
-			_, err := manager.GetModel("loop1")
+			_, err := manager.GetModel(context.Background(), "loop1")
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("alias loop detected"))
 		})
@@ -77,7 +80,7 @@ var _ = Describe("Manager", func() {
 		It("should resolve from environment variables", func() {
 			GinkgoT().Setenv("LLM_MODEL_TESTING", "test/model-name")
 
-			model, err := manager.GetModel("testing")
+			model, err := manager.GetModel(context.Background(), "testing")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(model).NotTo(BeNil())
 		})
@@ -86,7 +89,7 @@ var _ = Describe("Manager", func() {
 			manager.RegisterAlias("testing", "openai/gpt-4")         // Register as openai
 			GinkgoT().Setenv("LLM_MODEL_TESTING", "test/model-name") // Override with test
 
-			model, err := manager.GetModel("testing")
+			model, err := manager.GetModel(context.Background(), "testing")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(model).NotTo(BeNil())
 		})
@@ -95,7 +98,7 @@ var _ = Describe("Manager", func() {
 			manager.RegisterAlias("start", "env_alias")
 			GinkgoT().Setenv("LLM_MODEL_ENV_ALIAS", "test/model-name")
 
-			model, err := manager.GetModel("start")
+			model, err := manager.GetModel(context.Background(), "start")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(model).NotTo(BeNil())
 		})

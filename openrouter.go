@@ -20,31 +20,34 @@ import (
 // GenAISystemOpenRouter identifies OpenRouter as the GenAI system for metrics.
 const GenAISystemOpenRouter GenAISystem = "openrouter"
 
-// OpenRouterOption configures an OpenRouter model at construction time.
-type OpenRouterOption func(*openrouterModel)
+// openRouterOption configures an OpenRouter model at construction time.
+type openRouterOption func(*openrouterModel) error
 
-// WithOpenRouterProvider attaches an OpenRouter provider routing configuration
+// withOpenRouterProvider attaches an OpenRouter provider routing configuration
 // (provider ordering, fallbacks, data collection, quantization filters, etc.)
 // to every request issued by this model.
-func WithOpenRouterProvider(provider *openrouter.ChatProvider) OpenRouterOption {
-	return func(m *openrouterModel) {
+func withOpenRouterProvider(provider *openrouter.ChatProvider) openRouterOption {
+	return func(m *openrouterModel) error {
 		m.provider = provider
+		return nil
 	}
 }
 
-// WithOpenRouterReferer sets the HTTP-Referer header forwarded to OpenRouter,
+// withOpenRouterReferer sets the HTTP-Referer header forwarded to OpenRouter,
 // used for app attribution on openrouter.ai/rankings.
-func WithOpenRouterReferer(referer string) OpenRouterOption {
-	return func(m *openrouterModel) {
+func withOpenRouterReferer(referer string) openRouterOption {
+	return func(m *openrouterModel) error {
 		m.clientOpts = append(m.clientOpts, openrouter.WithHTTPReferer(referer))
+		return nil
 	}
 }
 
-// WithOpenRouterXTitle sets the X-Title header forwarded to OpenRouter, used
+// withOpenRouterXTitle sets the X-Title header forwarded to OpenRouter, used
 // alongside the referer for app attribution.
-func WithOpenRouterXTitle(title string) OpenRouterOption {
-	return func(m *openrouterModel) {
+func withOpenRouterXTitle(title string) openRouterOption {
+	return func(m *openrouterModel) error {
 		m.clientOpts = append(m.clientOpts, openrouter.WithXTitle(title))
+		return nil
 	}
 }
 
@@ -70,11 +73,11 @@ func (m *openrouterModel) lastCapturedHeaders() http.Header {
 	return m.headerCapture.LastHeaders()
 }
 
-// NewOpenRouterModel creates a new model that routes requests through
+// newOpenRouterModel creates a new model that routes requests through
 // OpenRouter using the github.com/revrost/go-openrouter SDK. info carries
 // embedded model metadata used to gate request parameters; the zero value is
 // treated permissively.
-func NewOpenRouterModel(logger *slog.Logger, metrics *Metrics, apiKey string, model string, registry map[string]SubParserConfig, info ModelInfo, opts ...OpenRouterOption) Model {
+func newOpenRouterModel(logger *slog.Logger, metrics *Metrics, apiKey string, model string, registry map[string]SubParserConfig, info ModelInfo, opts ...openRouterOption) (Model, error) {
 	m := &openrouterModel{
 		logger:            logger.With(slog.String("provider", "openrouter")),
 		metrics:           metrics,
@@ -84,14 +87,16 @@ func NewOpenRouterModel(logger *slog.Logger, metrics *Metrics, apiKey string, mo
 		subParserRegistry: registry,
 	}
 	for _, opt := range opts {
-		opt(m)
+		if err := opt(m); err != nil {
+			return nil, err
+		}
 	}
 	transport := newHeaderCapturingTransport(http.DefaultTransport)
 	m.headerCapture = transport
 	httpClient := &http.Client{Transport: transport}
 	clientOpts := append([]openrouter.Option{withOpenRouterHTTPClient(httpClient)}, m.clientOpts...)
 	m.client = openrouter.NewClient(apiKey, clientOpts...)
-	return m
+	return m, nil
 }
 
 // withOpenRouterHTTPClient installs a custom http.Client on the OpenRouter
@@ -111,7 +116,10 @@ func (m *openrouterModel) GenerateContent(ctx context.Context, options ...Genera
 }
 
 func (m *openrouterModel) newSession(options ...GenerateOption) (*Session, error) {
-	opts := resolveGenerateContentOptions(m.subParserRegistry, options...)
+	opts, err := resolveGenerateContentOptions(m.subParserRegistry, options...)
+	if err != nil {
+		return nil, err
+	}
 
 	if len(opts.Tools) > 0 && !m.info.allowsToolCall() {
 		return nil, fmt.Errorf("model %s does not support tool calling", m.statsModel)

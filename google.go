@@ -78,11 +78,10 @@ type googleModel struct {
 	headerCapture     *headerCapturingTransport
 }
 
-// NewGoogleModel creates a new Google Gemini model. info carries embedded
+// newGoogleModel creates a new Google Gemini model. info carries embedded
 // model metadata used to gate request parameters; the zero value is treated
 // permissively.
-func NewGoogleModel(logger *slog.Logger, metrics *Metrics, apiKey string, model string, registry map[string]SubParserConfig, info ModelInfo) (Model, error) {
-	ctx := context.Background()
+func newGoogleModel(ctx context.Context, logger *slog.Logger, metrics *Metrics, apiKey string, model string, registry map[string]SubParserConfig, info ModelInfo) (Model, error) {
 	transport := newHeaderCapturingTransport(http.DefaultTransport)
 	httpClient := &http.Client{Transport: transport}
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
@@ -114,7 +113,10 @@ func (m *googleModel) GenerateContent(ctx context.Context, options ...GenerateOp
 }
 
 func (m *googleModel) newSession(options ...GenerateOption) (*Session, error) {
-	opts := resolveGenerateContentOptions(m.subParserRegistry, options...)
+	opts, err := resolveGenerateContentOptions(m.subParserRegistry, options...)
+	if err != nil {
+		return nil, err
+	}
 
 	// Gate request parameters against the model's known capabilities.
 	if len(opts.Tools) > 0 && !m.info.allowsToolCall() {

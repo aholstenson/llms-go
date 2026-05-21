@@ -60,9 +60,12 @@ func (weatherTool) ToString(out WeatherOutput) string {
 func main() {
 	ctx := context.Background()
 
-	manager := llms.NewManager()
+	manager, err := llms.NewManager()
+	if err != nil {
+		log.Fatalf("could not create manager: %v", err)
+	}
 
-	model, err := manager.GetModel(modelName())
+	model, err := manager.GetModel(ctx, modelName())
 	if err != nil {
 		log.Fatalf("could not load model: %v", err)
 	}

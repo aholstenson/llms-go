@@ -3,6 +3,7 @@ package llms
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"strings"
 	"time"
@@ -116,10 +117,9 @@ type generateContentOptions struct {
 	ToolCallTimeout   time.Duration
 	ParentExecution   ExecutionContext
 	// Retry options
-	MaxRetries     int
-	RetryAfterCap  time.Duration
-	RetryBackoff   BackoffPolicy
-	maxRetriesUser bool
+	MaxRetries    int
+	RetryAfterCap time.Duration
+	RetryBackoff  BackoffPolicy
 	// Structured output options
 	ResponseSchema                   *ResponseSchema
 	StructuredStreamingFunc          StructuredStreamingFunc
@@ -141,31 +141,34 @@ const DefaultRetryAfterCap = 60 * time.Second
 // timeout is configured via WithToolCallTimeout.
 const DefaultToolCallTimeout = 5 * time.Minute
 
-type GenerateOption func(*generateContentOptions)
+type GenerateOption func(*generateContentOptions) error
+
+// defaultGenerateContentOptions returns a generateContentOptions populated
+// with library defaults. Options applied on top of this overwrite the
+// defaults; an explicit zero from an option therefore means zero, not
+// "use the default."
+func defaultGenerateContentOptions() *generateContentOptions {
+	return &generateContentOptions{
+		ToolCallTimeout: DefaultToolCallTimeout,
+		MaxRetries:      DefaultMaxRetries,
+		RetryAfterCap:   DefaultRetryAfterCap,
+		RetryBackoff:    defaultBackoffPolicy(),
+	}
+}
 
 // resolveGenerateContentOptions applies GenerateOptions and resolves any
 // deferred schema builder using the model's sub-parser registry.
-func resolveGenerateContentOptions(registry map[string]SubParserConfig, opts ...GenerateOption) *generateContentOptions {
-	o := &generateContentOptions{}
+func resolveGenerateContentOptions(registry map[string]SubParserConfig, opts ...GenerateOption) (*generateContentOptions, error) {
+	o := defaultGenerateContentOptions()
 	for _, opt := range opts {
-		opt(o)
-	}
-	if o.ToolCallTimeout == 0 {
-		o.ToolCallTimeout = DefaultToolCallTimeout
-	}
-	if !o.maxRetriesUser {
-		o.MaxRetries = DefaultMaxRetries
-	}
-	if o.RetryAfterCap == 0 {
-		o.RetryAfterCap = DefaultRetryAfterCap
-	}
-	if o.RetryBackoff == nil {
-		o.RetryBackoff = defaultBackoffPolicy()
+		if err := opt(o); err != nil {
+			return nil, err
+		}
 	}
 	if o.StructuredStreamingSchemaBuilder != nil && o.StructuredStreamingSchema == nil {
 		o.StructuredStreamingSchema = o.StructuredStreamingSchemaBuilder(registry)
 	}
-	return o
+	return o, nil
 }
 
 // Model represents an LLM API that can be used to generate content.
@@ -178,46 +181,55 @@ type Model interface {
 // thinking budget configured via WithMaxThinkingTokens is added on top by
 // providers that count thinking against the output limit.
 func WithMaxOutputTokens(maxOutputTokens int) GenerateOption {
-	return func(opts *generateContentOptions) {
+	return func(opts *generateContentOptions) error {
 		opts.MaxOutputTokens = maxOutputTokens
+		return nil
 	}
 }
 
 // WithMaxThinkingTokens sets the maximum number of tokens to use for thinking.
 func WithMaxThinkingTokens(maxThinkingTokens int) GenerateOption {
-	return func(opts *generateContentOptions) {
+	return func(opts *generateContentOptions) error {
 		opts.MaxThinkingTokens = maxThinkingTokens
+		return nil
 	}
 }
 
 // WithTemperature sets the temperature of the LLM. A higher temperature will
 // result in more creative and varied responses.
 func WithTemperature(temperature float64) GenerateOption {
-	return func(opts *generateContentOptions) {
+	return func(opts *generateContentOptions) error {
 		opts.Temperature = temperature
+		return nil
 	}
 }
 
 // WithTools sets the tools that the LLM can use.
 func WithTools(tools ...ToolDef) GenerateOption {
-	return func(opts *generateContentOptions) {
+	return func(opts *generateContentOptions) error {
 		opts.Tools = tools
+		return nil
 	}
 }
 
 // WithMaxSteps sets the maximum number of steps, such as tool calls, to make.
 func WithMaxSteps(maxSteps int) GenerateOption {
-	return func(opts *generateContentOptions) {
+	return func(opts *generateContentOptions) error {
 		opts.MaxSteps = maxSteps
+		return nil
 	}
 }
 
 // WithToolCallTimeout sets the maximum duration a single tool call may run
-// before its context is cancelled. If not set, DefaultToolCallTimeout is used.
-// A negative duration disables the timeout entirely.
+// before its context is cancelled. Pass 0 to disable the timeout. If the
+// option is not set at all, DefaultToolCallTimeout (5 minutes) applies.
 func WithToolCallTimeout(timeout time.Duration) GenerateOption {
-	return func(opts *generateContentOptions) {
+	return func(opts *generateContentOptions) error {
+		if timeout < 0 {
+			return fmt.Errorf("llms.WithToolCallTimeout: timeout must be >= 0, got %s", timeout)
+		}
 		opts.ToolCallTimeout = timeout
+		return nil
 	}
 }
 
@@ -231,14 +243,15 @@ func WithToolCallTimeout(timeout time.Duration) GenerateOption {
 // WithMaxSteps budget and does not consume the parent's remaining steps. Only
 // token and tool-call accounting accrues to the parent.
 func WithParentExecution(parent ExecutionContext) GenerateOption {
-	return func(opts *generateContentOptions) {
+	return func(opts *generateContentOptions) error {
 		opts.ParentExecution = parent
+		return nil
 	}
 }
 
 // WithMaxRetries sets the maximum number of retry attempts after the initial
 // request. The total number of attempts is n+1. Default is DefaultMaxRetries
-// (2). Passing 0 disables retries; n < 0 panics.
+// (2). Passing 0 disables retries; n < 0 returns an error.
 //
 // For Anthropic and OpenAI this is forwarded to the SDK, which runs its own
 // retry loop (with its own backoff policy — see WithRetryBackoff). For
@@ -249,22 +262,26 @@ func WithParentExecution(parent ExecutionContext) GenerateOption {
 // provider — once a stream has begun emitting events, mid-stream failures
 // surface to the caller with ErrStreamingPartialOutput.
 func WithMaxRetries(n int) GenerateOption {
-	if n < 0 {
-		panic("llms.WithMaxRetries: n must be >= 0")
-	}
-	return func(opts *generateContentOptions) {
+	return func(opts *generateContentOptions) error {
+		if n < 0 {
+			return fmt.Errorf("llms.WithMaxRetries: n must be >= 0, got %d", n)
+		}
 		opts.MaxRetries = n
-		opts.maxRetriesUser = true
+		return nil
 	}
 }
 
 // WithRetryAfterCap clamps server-supplied Retry-After hints to the given
-// upper bound. Default is DefaultRetryAfterCap (60s). The cap is applied to
-// both the internal sleep duration and to the value surfaced on
-// UnavailableError.RetryAfter.
+// upper bound. Default is DefaultRetryAfterCap (60s). Pass 0 to disable the
+// cap entirely. The cap is applied to both the internal sleep duration and
+// to the value surfaced on UnavailableError.RetryAfter.
 func WithRetryAfterCap(d time.Duration) GenerateOption {
-	return func(opts *generateContentOptions) {
+	return func(opts *generateContentOptions) error {
+		if d < 0 {
+			return fmt.Errorf("llms.WithRetryAfterCap: duration must be >= 0, got %s", d)
+		}
 		opts.RetryAfterCap = d
+		return nil
 	}
 }
 
@@ -280,37 +297,42 @@ func WithRetryAfterCap(d time.Duration) GenerateOption {
 // Anthropic/OpenAI clients yourself, or set MaxRetries to 0 there and own
 // retries via an outer loop.
 func WithRetryBackoff(p BackoffPolicy) GenerateOption {
-	return func(opts *generateContentOptions) {
+	return func(opts *generateContentOptions) error {
 		opts.RetryBackoff = p
+		return nil
 	}
 }
 
 // WithSystemPrompt sets the system prompt for the LLM.
 func WithSystemPrompt(systemPrompt string) GenerateOption {
-	return func(opts *generateContentOptions) {
+	return func(opts *generateContentOptions) error {
 		opts.SystemPrompt = systemPrompt
+		return nil
 	}
 }
 
 // WithMessages sets the messages that the LLM will use to generate content.
 func WithMessages(messages ...*Message) GenerateOption {
-	return func(opts *generateContentOptions) {
+	return func(opts *generateContentOptions) error {
 		opts.Messages = messages
+		return nil
 	}
 }
 
 // WithStreamingFunc enables streaming of the LLM's response. The given function
 // will be called with each chunk of the response.
 func WithStreamingFunc(streaming StreamingFunc) GenerateOption {
-	return func(opts *generateContentOptions) {
+	return func(opts *generateContentOptions) error {
 		opts.StreamingFunc = streaming
+		return nil
 	}
 }
 
 // WithWebSearch enables web search tool calls.
 func WithWebSearch(webSearch bool) GenerateOption {
-	return func(opts *generateContentOptions) {
+	return func(opts *generateContentOptions) error {
 		opts.WebSearch = webSearch
+		return nil
 	}
 }
 
@@ -319,7 +341,7 @@ func WithWebSearch(webSearch bool) GenerateOption {
 func WithResponseSchema[T any]() GenerateOption {
 	schema := jsonSchemaReflector.Reflect(new(T))
 	name := deriveSchemaName[T]()
-	return func(opts *generateContentOptions) {
+	return func(opts *generateContentOptions) error {
 		opts.ResponseSchema = &ResponseSchema{
 			Name:   name,
 			Schema: schema,
@@ -331,6 +353,7 @@ func WithResponseSchema[T any]() GenerateOption {
 				return StructuredResult[T]{Data: result, Raw: string(data)}, nil
 			},
 		}
+		return nil
 	}
 }
 
@@ -355,7 +378,7 @@ func WithResponseSchema[T any]() GenerateOption {
 func WithStructuredStreaming[T any](handler StructuredStreamingFunc, streamOpts ...StructuredStreamingOption) GenerateOption {
 	schema := jsonSchemaReflector.Reflect(new(T))
 	name := deriveSchemaName[T]()
-	return func(opts *generateContentOptions) {
+	return func(opts *generateContentOptions) error {
 		opts.ResponseSchema = &ResponseSchema{
 			Name:   name,
 			Schema: schema,
@@ -372,6 +395,7 @@ func WithStructuredStreaming[T any](handler StructuredStreamingFunc, streamOpts 
 		opts.StructuredStreamingSchemaBuilder = func(registry map[string]SubParserConfig) *jsonstream.Schema {
 			return ConvertToJsonstreamSchemaFromType[T](registry, streamOpts...)
 		}
+		return nil
 	}
 }
 
@@ -380,7 +404,7 @@ func WithStructuredStreaming[T any](handler StructuredStreamingFunc, streamOpts 
 func WithStructuredStreamingCustom[T any](jsSchema *jsonstream.Schema, handler StructuredStreamingFunc) GenerateOption {
 	schema := jsonSchemaReflector.Reflect(new(T))
 	name := deriveSchemaName[T]()
-	return func(opts *generateContentOptions) {
+	return func(opts *generateContentOptions) error {
 		opts.ResponseSchema = &ResponseSchema{
 			Name:   name,
 			Schema: schema,
@@ -395,6 +419,7 @@ func WithStructuredStreamingCustom[T any](jsSchema *jsonstream.Schema, handler S
 		opts.StructuredStreamingFunc = handler
 		opts.StructuredStreamingSchema = jsSchema
 		opts.StructuredStreamingSchemaAuto = false
+		return nil
 	}
 }
 

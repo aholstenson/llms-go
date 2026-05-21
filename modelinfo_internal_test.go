@@ -160,7 +160,7 @@ func testMetrics(t *testing.T) *Metrics {
 // tool calling fails fast, before any network call.
 func TestToolCallGateBlocksBeforeAPI(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	m := NewOpenAIModel(logger, testMetrics(t), "test-key", "no-tools-model", nil,
+	m := newOpenAIModel(logger, testMetrics(t), "test-key", "no-tools-model", nil,
 		knownInfo(Capabilities{ToolCall: false}, "text"))
 
 	_, err := m.GenerateContent(context.Background(),
@@ -176,7 +176,7 @@ func TestToolCallGateBlocksBeforeAPI(t *testing.T) {
 // rejects image input before any network call.
 func TestImageModalityGateBlocksBeforeAPI(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	m := NewOpenAIModel(logger, testMetrics(t), "test-key", "text-only-model", nil,
+	m := newOpenAIModel(logger, testMetrics(t), "test-key", "text-only-model", nil,
 		knownInfo(Capabilities{ToolCall: true}, "text"))
 
 	_, err := m.GenerateContent(context.Background(),

@@ -23,21 +23,27 @@ type Manager struct {
 }
 
 // ManagerOption configures a Manager during construction.
-type ManagerOption func(*Manager)
+type ManagerOption func(*Manager) error
 
 // WithManagerLogger sets the logger used by the Manager and the models it
 // creates. Defaults to slog.Default() if not provided.
 func WithManagerLogger(logger *slog.Logger) ManagerOption {
-	return func(m *Manager) { m.logger = logger }
+	return func(m *Manager) error {
+		m.logger = logger
+		return nil
+	}
 }
 
 // WithManagerMetrics sets the metrics used by the Manager and the models it
 // creates. Defaults to NewNoopMetrics() if not provided.
 func WithManagerMetrics(metrics *Metrics) ManagerOption {
-	return func(m *Manager) { m.metrics = metrics }
+	return func(m *Manager) error {
+		m.metrics = metrics
+		return nil
+	}
 }
 
-func NewManager(opts ...ManagerOption) *Manager {
+func NewManager(opts ...ManagerOption) (*Manager, error) {
 	m := &Manager{
 		logger:     slog.Default(),
 		metrics:    NewNoopMetrics(),
@@ -47,9 +53,11 @@ func NewManager(opts ...ManagerOption) *Manager {
 		subParsers: make(map[string]SubParserConfig),
 	}
 	for _, opt := range opts {
-		opt(m)
+		if err := opt(m); err != nil {
+			return nil, err
+		}
 	}
-	return m
+	return m, nil
 }
 
 func (m *Manager) RegisterAlias(alias, target string) {
@@ -130,7 +138,7 @@ func (m *Manager) resolveModelNameLocked(name string) (string, error) {
 	}
 }
 
-func (m *Manager) GetModel(name string) (Model, error) {
+func (m *Manager) GetModel(ctx context.Context, name string) (Model, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -166,21 +174,25 @@ func (m *Manager) GetModel(name string) (Model, error) {
 			return nil, errors.New("ANTHROPIC_API_KEY is not set")
 		}
 
-		model = NewAnthropicModel(m.logger, m.metrics, apiKey, modelName, registry, info)
+		model = newAnthropicModel(m.logger, m.metrics, apiKey, modelName, registry, info)
 	case "openai":
 		apiKey := os.Getenv("OPENAI_API_KEY")
 		if apiKey == "" {
 			return nil, errors.New("OPENAI_API_KEY is not set")
 		}
 
-		model = NewOpenAIModel(m.logger, m.metrics, apiKey, modelName, registry, info)
+		model = newOpenAIModel(m.logger, m.metrics, apiKey, modelName, registry, info)
 	case "openrouter":
 		apiKey := os.Getenv("OPENROUTER_API_KEY")
 		if apiKey == "" {
 			return nil, errors.New("OPENROUTER_API_KEY is not set")
 		}
 
-		model = NewOpenRouterModel(m.logger, m.metrics, apiKey, modelName, registry, info)
+		var err error
+		model, err = newOpenRouterModel(m.logger, m.metrics, apiKey, modelName, registry, info)
+		if err != nil {
+			return nil, err
+		}
 	case "google":
 		apiKey := os.Getenv("GEMINI_API_KEY")
 		if apiKey == "" {
@@ -191,7 +203,7 @@ func (m *Manager) GetModel(name string) (Model, error) {
 		}
 
 		var err error
-		model, err = NewGoogleModel(m.logger, m.metrics, apiKey, modelName, registry, info)
+		model, err = newGoogleModel(ctx, m.logger, m.metrics, apiKey, modelName, registry, info)
 		if err != nil {
 			return nil, err
 		}

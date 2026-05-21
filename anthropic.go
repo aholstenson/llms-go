@@ -41,11 +41,11 @@ type anthropicModel struct {
 	subParserRegistry map[string]SubParserConfig
 }
 
-// NewAnthropicModel creates a new Anthropic model using the official Anthropic Go SDK.
+// newAnthropicModel creates a new Anthropic model using the official Anthropic Go SDK.
 // info carries embedded model metadata used to gate request parameters; the
 // zero value is treated permissively. Optional SDK request options can be
 // passed for customization (e.g., option.WithBaseURL for testing).
-func NewAnthropicModel(logger *slog.Logger, metrics *Metrics, apiKey string, model string, registry map[string]SubParserConfig, info ModelInfo, opts ...option.RequestOption) Model {
+func newAnthropicModel(logger *slog.Logger, metrics *Metrics, apiKey string, model string, registry map[string]SubParserConfig, info ModelInfo, opts ...option.RequestOption) Model {
 	// Prepend the API key option so it can be overridden by caller options
 	allOpts := append([]option.RequestOption{option.WithAPIKey(apiKey)}, opts...)
 	client := anthropic.NewClient(allOpts...)
@@ -117,7 +117,10 @@ func (m *anthropicModel) GenerateContent(ctx context.Context, options ...Generat
 }
 
 func (m *anthropicModel) newSession(options ...GenerateOption) (*Session, error) {
-	opts := resolveGenerateContentOptions(m.subParserRegistry, options...)
+	opts, err := resolveGenerateContentOptions(m.subParserRegistry, options...)
+	if err != nil {
+		return nil, err
+	}
 
 	// Gate request parameters against the model's known capabilities.
 	if len(opts.Tools) > 0 && !m.info.allowsToolCall() {

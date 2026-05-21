@@ -43,7 +43,7 @@ read from environment variables: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`,
 ```go
 manager := llms.NewManager()
 
-model, err := manager.GetModel("anthropic/claude-sonnet-4-5")
+model, err := manager.GetModel(ctx, "anthropic/claude-sonnet-4-5")
 if err != nil {
     log.Fatal(err)
 }
@@ -67,7 +67,7 @@ deploy time without code changes:
 
 ```go
 manager.RegisterAlias("fast", "anthropic/claude-haiku-4-5")
-model, _ := manager.GetModel("fast") // or set LLM_MODEL_FAST=openai/gpt-4o
+model, _ := manager.GetModel(ctx, "fast") // or set LLM_MODEL_FAST=openai/gpt-4o
 ```
 
 ### Driving the loop with `Session`
