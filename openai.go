@@ -14,10 +14,10 @@ import (
 
 	"github.com/aholstenson/llms-go/jsonstream"
 	"github.com/invopop/jsonschema"
-	"github.com/openai/openai-go"
-	"github.com/openai/openai-go/option"
-	"github.com/openai/openai-go/responses"
-	"github.com/openai/openai-go/shared"
+	"github.com/openai/openai-go/v2"
+	"github.com/openai/openai-go/v2/option"
+	"github.com/openai/openai-go/v2/responses"
+	"github.com/openai/openai-go/v2/shared"
 )
 
 // openaiResponseFromError pulls the *http.Response out of an OpenAI SDK
