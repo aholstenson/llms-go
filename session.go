@@ -209,7 +209,7 @@ func (s *Session) StepPlan(ctx context.Context) (PlanInfo, bool, error) {
 	}
 
 	s.stopReason = out.StopReason
-	s.tracker.AddTokens(out.Usage.InputTokens, out.Usage.OutputTokens, out.Usage.CachedReadTokens)
+	s.tracker.AddTokens(out.Usage.InputTokens, out.Usage.OutputTokens, out.Usage.CachedReadTokens, out.Usage.CachedWriteTokens)
 	if am := assistantMessage(out); am != nil {
 		s.messages = append(s.messages, am)
 	}
@@ -455,9 +455,10 @@ func (s *Session) loopResult() *LoopResult {
 		FinalText:  s.turn.FinalText(),
 		Messages:   s.Messages(),
 		Usage: TurnUsage{
-			InputTokens:      s.tracker.InputTokens(),
-			OutputTokens:     s.tracker.OutputTokens(),
-			CachedReadTokens: s.tracker.CachedTokens(),
+			InputTokens:       s.tracker.InputTokens(),
+			OutputTokens:      s.tracker.OutputTokens(),
+			CachedReadTokens:  s.tracker.CachedTokens(),
+			CachedWriteTokens: s.tracker.CachedWriteTokens(),
 		},
 	}
 }

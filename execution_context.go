@@ -36,8 +36,14 @@ type ExecutionContext interface {
 	// prompt tokens served from the cache, disjoint from InputTokens.
 	CachedTokens() int64
 
+	// CachedWriteTokens returns cumulative cache-write tokens across all steps —
+	// prompt tokens written to the cache when creating a new entry, disjoint
+	// from InputTokens. Non-zero only for providers with explicit caching
+	// (Anthropic, and Anthropic models via OpenRouter).
+	CachedWriteTokens() int64
+
 	// TotalTokens returns all tokens processed across all steps: uncached
-	// input + cache-read + output.
+	// input + cache-read + cache-write + output.
 	TotalTokens() int64
 }
 
@@ -56,9 +62,10 @@ type executionTracker struct {
 	totalToolCalls int
 
 	// Token tracking (cumulative across all steps)
-	inputTokens  int64
-	outputTokens int64
-	cachedTokens int64
+	inputTokens       int64
+	outputTokens      int64
+	cachedTokens      int64
+	cachedWriteTokens int64
 
 	// parent, when set, receives token and tool-call rollups so a sub-agent's
 	// spend accrues to its caller's budget.
@@ -135,12 +142,19 @@ func (t *executionTracker) CachedTokens() int64 {
 	return t.cachedTokens
 }
 
+func (t *executionTracker) CachedWriteTokens() int64 {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.cachedWriteTokens
+}
+
 func (t *executionTracker) TotalTokens() int64 {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
-	// inputTokens is uncached input and cachedTokens is disjoint from it, so a
-	// true total of processed tokens must add both alongside output.
-	return t.inputTokens + t.cachedTokens + t.outputTokens
+	// inputTokens is uncached input; cachedTokens and cachedWriteTokens are
+	// disjoint from it, so a true total of processed tokens must add all three
+	// alongside output.
+	return t.inputTokens + t.cachedTokens + t.cachedWriteTokens + t.outputTokens
 }
 
 // Write methods (used only by the session loop)
@@ -162,15 +176,16 @@ func (t *executionTracker) RecordToolCall(toolName string) {
 	}
 }
 
-func (t *executionTracker) AddTokens(input, output, cached int64) {
+func (t *executionTracker) AddTokens(input, output, cached, cachedWrite int64) {
 	t.mu.Lock()
 	t.inputTokens += input
 	t.outputTokens += output
 	t.cachedTokens += cached
+	t.cachedWriteTokens += cachedWrite
 	parent := t.parent
 	t.mu.Unlock()
 	if parent != nil {
-		parent.AddTokens(input, output, cached)
+		parent.AddTokens(input, output, cached, cachedWrite)
 	}
 }
 

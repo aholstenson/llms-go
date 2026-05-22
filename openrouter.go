@@ -515,23 +515,28 @@ func (t *openrouterTurn) nextNonStreaming(ctx context.Context, start time.Time, 
 	var usage TurnUsage
 	if response.Usage != nil {
 		// OpenRouter mirrors OpenAI: PromptTokens is the total prompt size and
-		// *includes* the cached tokens, so subtract for the disjoint, uncached
-		// input the rest of the stack expects (see uncachedInputTokens).
+		// *includes* both the cache-read and cache-write tokens, so subtract
+		// both for the disjoint, uncached input the rest of the stack expects
+		// (see uncachedInputTokens). Anthropic models routed via OpenRouter are
+		// the source of cache-write tokens.
 		cachedTokens := int64(response.Usage.PromptTokenDetails.CachedTokens)
-		inputTokens := uncachedInputTokens(int64(response.Usage.PromptTokens), cachedTokens)
+		cachedWriteTokens := int64(response.Usage.PromptTokenDetails.CacheWriteTokens)
+		inputTokens := uncachedInputTokens(int64(response.Usage.PromptTokens), cachedTokens+cachedWriteTokens)
 		outputTokens := int64(response.Usage.CompletionTokens)
 
 		usage = TurnUsage{
-			InputTokens:      inputTokens,
-			OutputTokens:     outputTokens,
-			CachedReadTokens: cachedTokens,
+			InputTokens:       inputTokens,
+			OutputTokens:      outputTokens,
+			CachedReadTokens:  cachedTokens,
+			CachedWriteTokens: cachedWriteTokens,
 		}
 		collector.Counter("input_tokens").Add(int(inputTokens))
 		collector.Counter("output_tokens").Add(int(outputTokens))
 		collector.Counter("cached_read_tokens").Add(int(cachedTokens))
+		collector.Counter("cached_write_tokens").Add(int(cachedWriteTokens))
 		m.metrics.RecordCall(ctx,
 			GenAISystemOpenRouter, GenAIOperationChat, GenAIModel(m.model),
-			inputTokens, outputTokens, cachedTokens, 0,
+			inputTokens, outputTokens, cachedTokens, cachedWriteTokens,
 		)
 	}
 
@@ -777,23 +782,27 @@ func (t *openrouterTurn) nextStreaming(ctx context.Context, start time.Time, col
 
 	var u TurnUsage
 	if usage != nil {
-		// See the non-streaming path: PromptTokens includes the cached tokens,
-		// so subtract for the disjoint, uncached input (see uncachedInputTokens).
+		// See the non-streaming path: PromptTokens includes both cache-read and
+		// cache-write tokens, so subtract both for the disjoint, uncached input
+		// (see uncachedInputTokens).
 		cachedTokens := int64(usage.PromptTokenDetails.CachedTokens)
-		inputTokens := uncachedInputTokens(int64(usage.PromptTokens), cachedTokens)
+		cachedWriteTokens := int64(usage.PromptTokenDetails.CacheWriteTokens)
+		inputTokens := uncachedInputTokens(int64(usage.PromptTokens), cachedTokens+cachedWriteTokens)
 		outputTokens := int64(usage.CompletionTokens)
 
 		u = TurnUsage{
-			InputTokens:      inputTokens,
-			OutputTokens:     outputTokens,
-			CachedReadTokens: cachedTokens,
+			InputTokens:       inputTokens,
+			OutputTokens:      outputTokens,
+			CachedReadTokens:  cachedTokens,
+			CachedWriteTokens: cachedWriteTokens,
 		}
 		collector.Counter("input_tokens").Add(int(inputTokens))
 		collector.Counter("output_tokens").Add(int(outputTokens))
 		collector.Counter("cached_read_tokens").Add(int(cachedTokens))
+		collector.Counter("cached_write_tokens").Add(int(cachedWriteTokens))
 		m.metrics.RecordCall(ctx,
 			GenAISystemOpenRouter, GenAIOperationChat, GenAIModel(m.model),
-			inputTokens, outputTokens, cachedTokens, 0,
+			inputTokens, outputTokens, cachedTokens, cachedWriteTokens,
 		)
 	}
 

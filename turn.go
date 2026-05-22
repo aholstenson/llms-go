@@ -116,11 +116,13 @@ type TurnUsage struct {
 }
 
 // uncachedInputTokens returns the number of fresh input tokens, i.e. prompt
-// tokens not served from the cache. Providers whose API reports a prompt total
-// with the cached tokens nested inside (Google, OpenAI, OpenRouter) call this
-// to derive the disjoint InputTokens that TurnUsage, pricing, and metrics
-// expect. Anthropic's API already reports a disjoint input_tokens and does not
-// use this helper.
+// tokens not accounted to the cache. Providers whose API reports a prompt total
+// with the cached tokens nested inside (Google, OpenAI, OpenRouter) call this to
+// derive the disjoint InputTokens that TurnUsage, pricing, and metrics expect.
+// cached must be the sum of all cache-accounted prompt tokens for the turn —
+// cache reads plus cache writes (OpenRouter is the only such provider that
+// reports writes). Anthropic's API already reports a disjoint input_tokens and
+// does not use this helper.
 //
 // The result is clamped at zero to defend against a provider ever reporting a
 // cached count larger than the prompt total.

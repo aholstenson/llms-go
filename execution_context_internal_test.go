@@ -78,18 +78,20 @@ var _ = Describe("executionTracker", func() {
 		})
 
 		It("should accumulate token counts", func() {
-			tracker.AddTokens(100, 50, 10)
+			tracker.AddTokens(100, 50, 10, 5)
 			Expect(tracker.InputTokens()).To(Equal(int64(100)))
 			Expect(tracker.OutputTokens()).To(Equal(int64(50)))
 			Expect(tracker.CachedTokens()).To(Equal(int64(10)))
-			// TotalTokens is uncached input + cache-read + output.
-			Expect(tracker.TotalTokens()).To(Equal(int64(160)))
+			Expect(tracker.CachedWriteTokens()).To(Equal(int64(5)))
+			// TotalTokens is uncached input + cache-read + cache-write + output.
+			Expect(tracker.TotalTokens()).To(Equal(int64(165)))
 
-			tracker.AddTokens(200, 75, 20)
+			tracker.AddTokens(200, 75, 20, 10)
 			Expect(tracker.InputTokens()).To(Equal(int64(300)))
 			Expect(tracker.OutputTokens()).To(Equal(int64(125)))
 			Expect(tracker.CachedTokens()).To(Equal(int64(30)))
-			Expect(tracker.TotalTokens()).To(Equal(int64(455)))
+			Expect(tracker.CachedWriteTokens()).To(Equal(int64(15)))
+			Expect(tracker.TotalTokens()).To(Equal(int64(470)))
 		})
 	})
 
@@ -119,7 +121,7 @@ var _ = Describe("executionTracker", func() {
 				wg.Add(1)
 				go func() {
 					defer wg.Done()
-					tracker.AddTokens(10, 5, 2)
+					tracker.AddTokens(10, 5, 2, 1)
 				}()
 			}
 
@@ -140,6 +142,7 @@ var _ = Describe("executionTracker", func() {
 			Expect(tracker.InputTokens()).To(Equal(int64(iterations * 10)))
 			Expect(tracker.OutputTokens()).To(Equal(int64(iterations * 5)))
 			Expect(tracker.CachedTokens()).To(Equal(int64(iterations * 2)))
+			Expect(tracker.CachedWriteTokens()).To(Equal(int64(iterations * 1)))
 		})
 	})
 })
@@ -169,7 +172,7 @@ var _ = Describe("ExecutionContext context helpers", func() {
 	It("should allow reading through interface", func() {
 		tracker.IncrementStep()
 		tracker.RecordToolCall("test")
-		tracker.AddTokens(100, 50, 10)
+		tracker.AddTokens(100, 50, 10, 5)
 
 		ctx = withExecutionContext(ctx, tracker)
 		retrieved := GetExecutionContext(ctx)
@@ -177,5 +180,6 @@ var _ = Describe("ExecutionContext context helpers", func() {
 		Expect(retrieved.CurrentStep()).To(Equal(1))
 		Expect(retrieved.ToolCallCount("test")).To(Equal(1))
 		Expect(retrieved.InputTokens()).To(Equal(int64(100)))
+		Expect(retrieved.CachedWriteTokens()).To(Equal(int64(5)))
 	})
 })
