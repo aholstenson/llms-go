@@ -24,16 +24,20 @@ type ExecutionContext interface {
 	// TotalToolCalls returns the total number of tool calls across all tools.
 	TotalToolCalls() int
 
-	// InputTokens returns cumulative input tokens across all steps.
+	// InputTokens returns cumulative uncached input tokens across all steps.
+	// Cached prompt tokens are reported separately by CachedTokens and are not
+	// included here (the buckets are disjoint; see TurnUsage).
 	InputTokens() int64
 
 	// OutputTokens returns cumulative output tokens across all steps.
 	OutputTokens() int64
 
-	// CachedTokens returns cumulative cached tokens across all steps.
+	// CachedTokens returns cumulative cache-read tokens across all steps —
+	// prompt tokens served from the cache, disjoint from InputTokens.
 	CachedTokens() int64
 
-	// TotalTokens returns the sum of input and output tokens.
+	// TotalTokens returns all tokens processed across all steps: uncached
+	// input + cache-read + output.
 	TotalTokens() int64
 }
 
@@ -134,7 +138,9 @@ func (t *executionTracker) CachedTokens() int64 {
 func (t *executionTracker) TotalTokens() int64 {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
-	return t.inputTokens + t.outputTokens
+	// inputTokens is uncached input and cachedTokens is disjoint from it, so a
+	// true total of processed tokens must add both alongside output.
+	return t.inputTokens + t.cachedTokens + t.outputTokens
 }
 
 // Write methods (used only by the session loop)

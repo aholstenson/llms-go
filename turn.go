@@ -82,12 +82,53 @@ func NewVisibleToolError(format string, args ...any) *VisibleToolError {
 var ErrToolNotFound = &VisibleToolError{Message: "requested tool not found"}
 
 // TurnUsage carries per-turn token accounting in neutral form.
+//
+// The prompt-token buckets are disjoint: every prompt token is counted in
+// exactly one of InputTokens, CachedReadTokens, or CachedWriteTokens. So the
+// total number of prompt tokens processed for a turn is:
+//
+//	InputTokens + CachedReadTokens + CachedWriteTokens
+//
+// This mirrors Anthropic's native usage accounting. Providers whose APIs
+// instead report a single prompt total with the cached tokens nested inside it
+// (Google, OpenAI, OpenRouter) are normalized to this disjoint form before
+// TurnUsage is populated, so InputTokens is always *uncached* input regardless
+// of provider. Keeping the buckets disjoint is what makes cost correct: cached
+// tokens are billed once at the (cheaper) cache rate, never double-counted at
+// the full input rate as well.
 type TurnUsage struct {
-	InputTokens       int64
-	OutputTokens      int64
-	CachedReadTokens  int64
+	// InputTokens is the count of fresh (uncached) prompt tokens — prompt
+	// tokens that were neither read from nor written to the cache.
+	InputTokens int64
+	// OutputTokens is the count of generated output tokens.
+	OutputTokens int64
+	// CachedReadTokens is the count of prompt tokens served from the cache,
+	// billed at the cache-read rate. Disjoint from InputTokens.
+	CachedReadTokens int64
+	// CachedWriteTokens is the count of prompt tokens written to the cache when
+	// creating a new entry, billed at the cache-write rate. Reported only by
+	// providers with explicit caching (Anthropic); zero for providers whose
+	// caching is implicit. Disjoint from InputTokens.
 	CachedWriteTokens int64
-	ThinkingTokens    int64
+	// ThinkingTokens is the count of reasoning/thinking tokens when the provider
+	// reports them separately.
+	ThinkingTokens int64
+}
+
+// uncachedInputTokens returns the number of fresh input tokens, i.e. prompt
+// tokens not served from the cache. Providers whose API reports a prompt total
+// with the cached tokens nested inside (Google, OpenAI, OpenRouter) call this
+// to derive the disjoint InputTokens that TurnUsage, pricing, and metrics
+// expect. Anthropic's API already reports a disjoint input_tokens and does not
+// use this helper.
+//
+// The result is clamped at zero to defend against a provider ever reporting a
+// cached count larger than the prompt total.
+func uncachedInputTokens(promptTotal, cached int64) int64 {
+	if fresh := promptTotal - cached; fresh > 0 {
+		return fresh
+	}
+	return 0
 }
 
 // ThinkingBlock is one neutral extended-thinking/reasoning block produced by

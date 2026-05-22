@@ -655,19 +655,22 @@ func (t *openaiTurn) Next(ctx context.Context) (TurnOutput, error) {
 	t.outputItems = outputItems
 
 	usage := finalResponse.Usage
-	promptTokens := usage.InputTokens
+	// OpenAI's InputTokens is the total prompt size and *includes* the cached
+	// tokens reported in InputTokensDetails, so subtract to get the disjoint,
+	// uncached input the rest of the stack expects (see uncachedInputTokens).
 	cachedTokens := usage.InputTokensDetails.CachedTokens
+	inputTokens := uncachedInputTokens(usage.InputTokens, cachedTokens)
 	outputTokens := usage.OutputTokens
 	reasoningTokens := usage.OutputTokensDetails.ReasoningTokens
 
-	collector.Counter("input_tokens").Add(int(promptTokens))
+	collector.Counter("input_tokens").Add(int(inputTokens))
 	collector.Counter("output_tokens").Add(int(outputTokens))
 	collector.Counter("cached_read_tokens").Add(int(cachedTokens))
 
 	m.metrics.RecordCall(
 		ctx,
 		GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model),
-		promptTokens, outputTokens, cachedTokens, 0,
+		inputTokens, outputTokens, cachedTokens, 0,
 	)
 
 	textContent := textBuilder.String()
@@ -688,7 +691,7 @@ func (t *openaiTurn) Next(ctx context.Context) (TurnOutput, error) {
 		ToolCalls:  toolCalls,
 		StopReason: openaiStopReason(finalResponse, len(toolCalls) > 0, hasRefusal),
 		Usage: TurnUsage{
-			InputTokens:      promptTokens,
+			InputTokens:      inputTokens,
 			OutputTokens:     outputTokens,
 			CachedReadTokens: cachedTokens,
 			ThinkingTokens:   reasoningTokens,

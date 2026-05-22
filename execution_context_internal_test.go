@@ -82,13 +82,14 @@ var _ = Describe("executionTracker", func() {
 			Expect(tracker.InputTokens()).To(Equal(int64(100)))
 			Expect(tracker.OutputTokens()).To(Equal(int64(50)))
 			Expect(tracker.CachedTokens()).To(Equal(int64(10)))
-			Expect(tracker.TotalTokens()).To(Equal(int64(150)))
+			// TotalTokens is uncached input + cache-read + output.
+			Expect(tracker.TotalTokens()).To(Equal(int64(160)))
 
 			tracker.AddTokens(200, 75, 20)
 			Expect(tracker.InputTokens()).To(Equal(int64(300)))
 			Expect(tracker.OutputTokens()).To(Equal(int64(125)))
 			Expect(tracker.CachedTokens()).To(Equal(int64(30)))
-			Expect(tracker.TotalTokens()).To(Equal(int64(425)))
+			Expect(tracker.TotalTokens()).To(Equal(int64(455)))
 		})
 	})
 

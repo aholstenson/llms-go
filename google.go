@@ -677,26 +677,33 @@ func (t *googleTurn) Next(ctx context.Context) (TurnOutput, error) {
 
 	var usage TurnUsage
 	if response.UsageMetadata != nil {
-		collector.Counter("input_tokens").Add(int(response.UsageMetadata.PromptTokenCount))
-		collector.Counter("output_tokens").Add(int(response.UsageMetadata.CandidatesTokenCount))
-		collector.Counter("cached_read_tokens").Add(int(response.UsageMetadata.CachedContentTokenCount))
+		// Gemini's PromptTokenCount is the total prompt size and *includes*
+		// CachedContentTokenCount, so subtract to get the disjoint, uncached
+		// input the rest of the stack expects (see uncachedInputTokens).
+		cachedTokens := int64(response.UsageMetadata.CachedContentTokenCount)
+		inputTokens := uncachedInputTokens(int64(response.UsageMetadata.PromptTokenCount), cachedTokens)
+		outputTokens := int64(response.UsageMetadata.CandidatesTokenCount)
+
+		collector.Counter("input_tokens").Add(int(inputTokens))
+		collector.Counter("output_tokens").Add(int(outputTokens))
+		collector.Counter("cached_read_tokens").Add(int(cachedTokens))
 		if response.UsageMetadata.ThoughtsTokenCount > 0 {
 			collector.Counter("thinking_tokens").Add(int(response.UsageMetadata.ThoughtsTokenCount))
 		}
 
 		usage = TurnUsage{
-			InputTokens:      int64(response.UsageMetadata.PromptTokenCount),
-			OutputTokens:     int64(response.UsageMetadata.CandidatesTokenCount),
-			CachedReadTokens: int64(response.UsageMetadata.CachedContentTokenCount),
+			InputTokens:      inputTokens,
+			OutputTokens:     outputTokens,
+			CachedReadTokens: cachedTokens,
 			ThinkingTokens:   int64(response.UsageMetadata.ThoughtsTokenCount),
 		}
 
 		m.metrics.RecordCall(
 			ctx,
 			GenAISystemGoogle, GenAIOperationChat, GenAIModel(m.model),
-			int64(response.UsageMetadata.PromptTokenCount),
-			int64(response.UsageMetadata.CandidatesTokenCount),
-			int64(response.UsageMetadata.CachedContentTokenCount),
+			inputTokens,
+			outputTokens,
+			cachedTokens,
 			0,
 		)
 	}

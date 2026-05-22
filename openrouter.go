@@ -514,17 +514,24 @@ func (t *openrouterTurn) nextNonStreaming(ctx context.Context, start time.Time, 
 
 	var usage TurnUsage
 	if response.Usage != nil {
+		// OpenRouter mirrors OpenAI: PromptTokens is the total prompt size and
+		// *includes* the cached tokens, so subtract for the disjoint, uncached
+		// input the rest of the stack expects (see uncachedInputTokens).
+		cachedTokens := int64(response.Usage.PromptTokenDetails.CachedTokens)
+		inputTokens := uncachedInputTokens(int64(response.Usage.PromptTokens), cachedTokens)
+		outputTokens := int64(response.Usage.CompletionTokens)
+
 		usage = TurnUsage{
-			InputTokens:      int64(response.Usage.PromptTokens),
-			OutputTokens:     int64(response.Usage.CompletionTokens),
-			CachedReadTokens: int64(response.Usage.PromptTokenDetails.CachedTokens),
+			InputTokens:      inputTokens,
+			OutputTokens:     outputTokens,
+			CachedReadTokens: cachedTokens,
 		}
-		collector.Counter("input_tokens").Add(response.Usage.PromptTokens)
-		collector.Counter("output_tokens").Add(response.Usage.CompletionTokens)
-		collector.Counter("cached_read_tokens").Add(response.Usage.PromptTokenDetails.CachedTokens)
+		collector.Counter("input_tokens").Add(int(inputTokens))
+		collector.Counter("output_tokens").Add(int(outputTokens))
+		collector.Counter("cached_read_tokens").Add(int(cachedTokens))
 		m.metrics.RecordCall(ctx,
 			GenAISystemOpenRouter, GenAIOperationChat, GenAIModel(m.model),
-			usage.InputTokens, usage.OutputTokens, usage.CachedReadTokens, 0,
+			inputTokens, outputTokens, cachedTokens, 0,
 		)
 	}
 
@@ -770,17 +777,23 @@ func (t *openrouterTurn) nextStreaming(ctx context.Context, start time.Time, col
 
 	var u TurnUsage
 	if usage != nil {
+		// See the non-streaming path: PromptTokens includes the cached tokens,
+		// so subtract for the disjoint, uncached input (see uncachedInputTokens).
+		cachedTokens := int64(usage.PromptTokenDetails.CachedTokens)
+		inputTokens := uncachedInputTokens(int64(usage.PromptTokens), cachedTokens)
+		outputTokens := int64(usage.CompletionTokens)
+
 		u = TurnUsage{
-			InputTokens:      int64(usage.PromptTokens),
-			OutputTokens:     int64(usage.CompletionTokens),
-			CachedReadTokens: int64(usage.PromptTokenDetails.CachedTokens),
+			InputTokens:      inputTokens,
+			OutputTokens:     outputTokens,
+			CachedReadTokens: cachedTokens,
 		}
-		collector.Counter("input_tokens").Add(usage.PromptTokens)
-		collector.Counter("output_tokens").Add(usage.CompletionTokens)
-		collector.Counter("cached_read_tokens").Add(usage.PromptTokenDetails.CachedTokens)
+		collector.Counter("input_tokens").Add(int(inputTokens))
+		collector.Counter("output_tokens").Add(int(outputTokens))
+		collector.Counter("cached_read_tokens").Add(int(cachedTokens))
 		m.metrics.RecordCall(ctx,
 			GenAISystemOpenRouter, GenAIOperationChat, GenAIModel(m.model),
-			u.InputTokens, u.OutputTokens, u.CachedReadTokens, 0,
+			inputTokens, outputTokens, cachedTokens, 0,
 		)
 	}
 
