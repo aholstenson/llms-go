@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/aholstenson/llms-go/compare/v0.2.0...v0.3.0) (2026-05-22)
+
+
+### Features
+
+* Add WithReasoningEffort as the main way of controlling thinking ([9442bd8](https://github.com/aholstenson/llms-go/commit/9442bd87734496444960bfd939124b6747b6cfa6))
+
 ## [0.2.0](https://github.com/aholstenson/llms-go/compare/v0.1.0...v0.2.0) (2026-05-22)
 
 
