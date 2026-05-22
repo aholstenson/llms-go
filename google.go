@@ -155,24 +155,56 @@ func (m *googleModel) newSession(ctx context.Context, options ...GenerateOption)
 
 	maxOutput := m.info.resolveMaxOutputTokens(opts.MaxOutputTokens, 0)
 
-	if opts.MaxThinkingTokens != 0 && m.info.allowsReasoning() {
-		thinkingBudget := int32(opts.MaxThinkingTokens) //nolint:gosec
+	// Resolve reasoning. Gemini 2.5 uses a thinking budget; Gemini 3+ uses a
+	// thinking level. Only the budget style accepts WithMaxThinkingTokens.
+	style := m.info.Caps.ReasoningStyle
+	if style == "" {
+		style = reasoningStyleBudget
+	}
+	switch route := resolveReasoningRoute(opts, m.info, style == reasoningStyleBudget, m.logger); route.Kind {
+	case reasoningKindBudget:
+		thinkingBudget := int32(route.Budget) //nolint:gosec
 		config.ThinkingConfig = &genai.ThinkingConfig{
 			ThinkingBudget:  &thinkingBudget,
 			IncludeThoughts: true,
 		}
-
 		// Gemini counts thinking tokens against the max output tokens, so add
 		// the budget before clamping below.
 		if maxOutput > 0 {
-			maxOutput += opts.MaxThinkingTokens
+			maxOutput += route.Budget
 		}
-	} else {
-		// Some Gemini models enable thinking by default, which silently
-		// includes thinking tokens in the max output tokens.
-		zero := int32(0)
-		config.ThinkingConfig = &genai.ThinkingConfig{
-			ThinkingBudget: &zero,
+	case reasoningKindEffort:
+		if style == reasoningStyleLevel {
+			config.ThinkingConfig = &genai.ThinkingConfig{
+				ThinkingLevel:   googleThinkingLevel(route.Effort),
+				IncludeThoughts: true,
+			}
+		} else {
+			budget := effortToBudget(route.Effort, m.info)
+			thinkingBudget := int32(budget) //nolint:gosec
+			config.ThinkingConfig = &genai.ThinkingConfig{
+				ThinkingBudget:  &thinkingBudget,
+				IncludeThoughts: true,
+			}
+			if maxOutput > 0 {
+				maxOutput += budget
+			}
+		}
+	case reasoningKindMandatory:
+		// Model always reasons; omit the thinking config and let it decide.
+	case reasoningKindDisable, reasoningKindSkip:
+		// Disable reasoning explicitly. Some Gemini models think by default and
+		// silently count thinking against max output tokens, so always send the
+		// disable form: budget 0 (2.5) or the minimal level (3+).
+		if style == reasoningStyleLevel {
+			config.ThinkingConfig = &genai.ThinkingConfig{
+				ThinkingLevel: genai.ThinkingLevelMinimal,
+			}
+		} else {
+			zero := int32(0)
+			config.ThinkingConfig = &genai.ThinkingConfig{
+				ThinkingBudget: &zero,
+			}
 		}
 	}
 
@@ -758,6 +790,22 @@ func (t *googleTurn) Next(ctx context.Context) (TurnOutput, error) {
 		StopReason: googleStopReason(finishReason, len(functionCalls) > 0),
 		Usage:      usage,
 	}, nil
+}
+
+// googleThinkingLevel maps a portable Effort to the Gemini thinking-level enum.
+// EffortNone never reaches here (it resolves to the off path); unrecognized
+// values fall back to medium.
+func googleThinkingLevel(e Effort) genai.ThinkingLevel {
+	switch e {
+	case EffortLow:
+		return genai.ThinkingLevelLow
+	case EffortMedium:
+		return genai.ThinkingLevelMedium
+	case EffortHigh:
+		return genai.ThinkingLevelHigh
+	default:
+		return genai.ThinkingLevelMedium
+	}
 }
 
 func googleStopReason(reason genai.FinishReason, hasToolCalls bool) StopReason {

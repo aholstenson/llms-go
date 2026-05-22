@@ -153,20 +153,40 @@ func (m *openrouterModel) newSession(ctx context.Context, options ...GenerateOpt
 		params.Temperature = float32(opts.Temperature)
 	}
 
-	if v := m.info.resolveMaxOutputTokens(opts.MaxOutputTokens, 0); v > 0 {
-		if clamped, didClamp := m.info.clampMaxOutputTokens(v); didClamp {
-			m.logger.Warn("Clamping max tokens to model output limit",
-				slog.Int("requested", v), slog.Int("limit", clamped))
-			v = clamped
+	maxOutput := m.info.resolveMaxOutputTokens(opts.MaxOutputTokens, 0)
+
+	// Resolve reasoning. OpenRouter accepts either an effort or a max-tokens
+	// budget (never both), and disables reasoning via enabled:false. A
+	// WithMaxThinkingTokens budget takes precedence over effort.
+	switch route := resolveReasoningRoute(opts, m.info, true, m.logger); route.Kind {
+	case reasoningKindBudget:
+		budget := route.Budget
+		params.Reasoning = &openrouter.ChatCompletionReasoning{MaxTokens: &budget}
+
+		// Reasoning tokens count against max_tokens (which must stay strictly
+		// higher than the reasoning budget), so add the budget before clamping
+		// to leave room for the visible response.
+		if maxOutput > 0 {
+			maxOutput += budget
 		}
-		params.MaxTokens = v
+	case reasoningKindEffort:
+		effort := string(route.Effort)
+		params.Reasoning = &openrouter.ChatCompletionReasoning{Effort: &effort}
+	case reasoningKindDisable:
+		disabled := false
+		params.Reasoning = &openrouter.ChatCompletionReasoning{Enabled: &disabled}
+	case reasoningKindMandatory, reasoningKindSkip:
+		// Mandatory-reasoning models reject enabled:false; non-reasoning or
+		// unknown models get no reasoning param.
 	}
 
-	if opts.MaxThinkingTokens > 0 && m.info.allowsReasoning() {
-		budget := opts.MaxThinkingTokens
-		params.Reasoning = &openrouter.ChatCompletionReasoning{
-			MaxTokens: &budget,
+	if maxOutput > 0 {
+		if clamped, didClamp := m.info.clampMaxOutputTokens(maxOutput); didClamp {
+			m.logger.Warn("Clamping max tokens to model output limit",
+				slog.Int("requested", maxOutput), slog.Int("limit", clamped))
+			maxOutput = clamped
 		}
+		params.MaxTokens = maxOutput
 	}
 
 	if len(tools) > 0 {

@@ -171,14 +171,42 @@ func (m *anthropicModel) newSession(ctx context.Context, options ...GenerateOpti
 	// they're added before clamping against the model's output limit.
 	maxOutput := m.info.resolveMaxOutputTokens(opts.MaxOutputTokens, 4096)
 
-	if opts.MaxThinkingTokens > 0 && m.info.allowsReasoning() {
-		params.Thinking = anthropic.BetaThinkingConfigParamOfEnabled(int64(opts.MaxThinkingTokens))
-		maxOutput += opts.MaxThinkingTokens
-
-		// Thinking mode requires a temperature of 1.0
+	// Resolve reasoning. The effective style picks the SDK shape: legacy budget
+	// (pre-4.5) uses thinking budget_tokens; effort (4.5) uses output_config
+	// effort; adaptive (4.6/4.7) adds the adaptive thinking config. Only the
+	// budget style accepts an explicit WithMaxThinkingTokens budget.
+	style := m.info.Caps.ReasoningStyle
+	if style == "" {
+		style = reasoningStyleBudget
+	}
+	switch route := resolveReasoningRoute(opts, m.info, style == reasoningStyleBudget, m.logger); route.Kind {
+	case reasoningKindBudget:
+		params.Thinking = anthropic.BetaThinkingConfigParamOfEnabled(int64(route.Budget))
+		maxOutput += route.Budget
+		// Budget-style thinking requires temperature 1.0.
 		if m.info.allowsTemperature() {
 			params.Temperature = anthropic.Float(1.0)
 		}
+	case reasoningKindEffort:
+		if style == reasoningStyleBudget {
+			budget := effortToBudget(route.Effort, m.info)
+			params.Thinking = anthropic.BetaThinkingConfigParamOfEnabled(int64(budget))
+			maxOutput += budget
+			if m.info.allowsTemperature() {
+				params.Temperature = anthropic.Float(1.0)
+			}
+		} else {
+			params.OutputConfig.Effort = anthropicOutputEffort(route.Effort)
+			if style == reasoningStyleAdaptive {
+				params.Thinking = anthropic.BetaThinkingConfigParamUnion{
+					OfAdaptive: &anthropic.BetaThinkingConfigAdaptiveParam{},
+				}
+			}
+		}
+	case reasoningKindMandatory, reasoningKindDisable, reasoningKindSkip:
+		// Anthropic disables extended thinking by omitting the thinking param;
+		// mandatory-reasoning models (Opus 4.7) keep their built-in adaptive
+		// reasoning. Nothing to send in any case.
 	}
 
 	if clamped, didClamp := m.info.clampMaxOutputTokens(maxOutput); didClamp {
@@ -900,6 +928,24 @@ func clearAnthropicCacheControl(msgs []anthropic.BetaMessageParam) {
 				block.OfToolResult.CacheControl = anthropic.BetaCacheControlEphemeralParam{}
 			}
 		}
+	}
+}
+
+// anthropicOutputEffort maps a portable Effort to the Anthropic output-config
+// effort enum. EffortNone never reaches here (it resolves to the off path);
+// unrecognized values fall back to medium.
+func anthropicOutputEffort(e Effort) anthropic.BetaOutputConfigEffort {
+	switch e {
+	case EffortLow:
+		return anthropic.BetaOutputConfigEffortLow
+	case EffortMedium:
+		return anthropic.BetaOutputConfigEffortMedium
+	case EffortHigh:
+		return anthropic.BetaOutputConfigEffortHigh
+	case "max":
+		return anthropic.BetaOutputConfigEffortMax
+	default:
+		return anthropic.BetaOutputConfigEffortMedium
 	}
 }
 

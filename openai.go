@@ -117,13 +117,34 @@ func (m *openaiModel) newSession(ctx context.Context, options ...GenerateOption)
 		params.Temperature = openai.Float(opts.Temperature)
 	}
 
-	if v := m.info.resolveMaxOutputTokens(opts.MaxOutputTokens, 0); v > 0 {
-		if clamped, didClamp := m.info.clampMaxOutputTokens(v); didClamp {
+	maxOutput := m.info.resolveMaxOutputTokens(opts.MaxOutputTokens, 0)
+
+	// Resolve reasoning. OpenAI has no token budget — effort drives — and the
+	// default is off. A WithMaxThinkingTokens value cannot control reasoning
+	// (warned in resolveReasoningRoute) but still reserves output headroom,
+	// since OpenAI counts reasoning tokens against max_output_tokens.
+	switch route := resolveReasoningRoute(opts, m.info, false, m.logger); route.Kind {
+	case reasoningKindEffort:
+		params.Reasoning = shared.ReasoningParam{Effort: openaiReasoningEffort(route.Effort)}
+	case reasoningKindDisable:
+		// gpt-5-family reasoning models accept effort "none" to disable.
+		params.Reasoning = shared.ReasoningParam{Effort: shared.ReasoningEffort("none")}
+	case reasoningKindMandatory, reasoningKindSkip, reasoningKindBudget:
+		// o-series always reasons (rejects "none"); non-reasoning/unknown
+		// models get no reasoning param; budget is not applicable to OpenAI.
+	}
+
+	if opts.MaxThinkingTokens > 0 && maxOutput > 0 {
+		maxOutput += opts.MaxThinkingTokens
+	}
+
+	if maxOutput > 0 {
+		if clamped, didClamp := m.info.clampMaxOutputTokens(maxOutput); didClamp {
 			m.logger.Warn("Clamping max tokens to model output limit",
-				slog.Int("requested", v), slog.Int("limit", clamped))
-			v = clamped
+				slog.Int("requested", maxOutput), slog.Int("limit", clamped))
+			maxOutput = clamped
 		}
-		params.MaxOutputTokens = openai.Int(int64(v))
+		params.MaxOutputTokens = openai.Int(int64(maxOutput))
 	}
 
 	if len(tools) > 0 {
@@ -697,6 +718,22 @@ func (t *openaiTurn) Next(ctx context.Context) (TurnOutput, error) {
 			ThinkingTokens:   reasoningTokens,
 		},
 	}, nil
+}
+
+// openaiReasoningEffort maps a portable Effort to the OpenAI reasoning-effort
+// enum. EffortNone never reaches here (it resolves to the off path, which emits
+// the raw "none" string); unrecognized values fall back to medium.
+func openaiReasoningEffort(e Effort) shared.ReasoningEffort {
+	switch e {
+	case EffortLow:
+		return shared.ReasoningEffortLow
+	case EffortMedium:
+		return shared.ReasoningEffortMedium
+	case EffortHigh:
+		return shared.ReasoningEffortHigh
+	default:
+		return shared.ReasoningEffortMedium
+	}
 }
 
 func openaiStopReason(r *responses.Response, hasToolCalls, hasRefusal bool) StopReason {

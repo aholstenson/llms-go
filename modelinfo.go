@@ -43,6 +43,22 @@ type Capabilities struct {
 	Reasoning   bool `json:"r"`
 	ToolCall    bool `json:"tc"`
 	Attachment  bool `json:"a"`
+	// ReasoningStyle is the mechanism this model uses to control reasoning:
+	// "budget" (token budget), "effort" (effort tier), "adaptive" (model
+	// chooses its own budget; effort tier optional) or "level" (Gemini
+	// thinking level). Empty for non-reasoning models; providers fall back to
+	// their natural default when unset.
+	ReasoningStyle string `json:"rs,omitempty"`
+	// MaxEffort is the highest effort tier this model accepts ("low"/"medium"/
+	// "high"/"max"), used to clamp WithReasoningEffort. Empty means no known
+	// ceiling. The public Effort enum tops out at "high", so this only clamps
+	// models whose ceiling is below that; it also records higher ceilings
+	// ("max") for tiers that may be exposed later.
+	MaxEffort string `json:"me,omitempty"`
+	// ReasoningMandatory marks models that always reason and cannot be turned
+	// off (OpenAI o-series, Anthropic Opus 4.7 adaptive, etc.). Providers omit
+	// any disable form for these and warn on an explicit EffortNone.
+	ReasoningMandatory bool `json:"rm,omitempty"`
 }
 
 // isUnknown reports whether this is the zero ModelInfo, i.e. the model was

@@ -118,7 +118,8 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "budget"
     },
     "m": [
       "text",
@@ -222,7 +223,8 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort"
     },
     "m": [
       "text",
@@ -248,7 +250,8 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort"
     },
     "m": [
       "text",
@@ -274,7 +277,8 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "budget"
     },
     "m": [
       "text",
@@ -300,7 +304,8 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "budget"
     },
     "m": [
       "text",
@@ -326,7 +331,8 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "budget"
     },
     "m": [
       "text",
@@ -352,7 +358,8 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "budget"
     },
     "m": [
       "text",
@@ -378,7 +385,8 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort"
     },
     "m": [
       "text",
@@ -404,7 +412,8 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort"
     },
     "m": [
       "text",
@@ -430,7 +439,8 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "adaptive"
     },
     "m": [
       "text",
@@ -456,7 +466,10 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "adaptive",
+      "me": "max",
+      "rm": true
     },
     "m": [
       "text",
@@ -482,7 +495,8 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "budget"
     },
     "m": [
       "text",
@@ -508,7 +522,8 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "budget"
     },
     "m": [
       "text",
@@ -534,7 +549,8 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort"
     },
     "m": [
       "text",
@@ -560,7 +576,8 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort"
     },
     "m": [
       "text",
@@ -586,7 +603,8 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "adaptive"
     },
     "m": [
       "text",
@@ -742,7 +760,8 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "budget"
     },
     "m": [
       "text",
@@ -769,7 +788,8 @@
       "t": true,
       "r": true,
       "tc": false,
-      "a": true
+      "a": true,
+      "rs": "budget"
     },
     "m": [
       "text",
@@ -793,7 +813,8 @@
       "t": true,
       "r": true,
       "tc": false,
-      "a": true
+      "a": true,
+      "rs": "budget"
     },
     "m": [
       "text",
@@ -817,7 +838,8 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "budget"
     },
     "m": [
       "text",
@@ -844,7 +866,8 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "budget"
     },
     "m": [
       "text",
@@ -871,7 +894,8 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "budget"
     },
     "m": [
       "text",
@@ -898,7 +922,8 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "budget"
     },
     "m": [
       "text",
@@ -925,7 +950,8 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "budget"
     },
     "m": [
       "text",
@@ -952,7 +978,8 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "budget"
     },
     "m": [
       "text",
@@ -1001,7 +1028,8 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "budget"
     },
     "m": [
       "text",
@@ -1028,7 +1056,8 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "budget"
     },
     "m": [
       "text",
@@ -1055,7 +1084,8 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "budget"
     },
     "m": [
       "text",
@@ -1104,7 +1134,8 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "level"
     },
     "m": [
       "text",
@@ -1131,7 +1162,8 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "level"
     },
     "m": [
       "text",
@@ -1157,7 +1189,8 @@
       "t": true,
       "r": true,
       "tc": false,
-      "a": true
+      "a": true,
+      "rs": "level"
     },
     "m": [
       "text",
@@ -1182,7 +1215,8 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "level"
     },
     "m": [
       "text",
@@ -1209,7 +1243,8 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "level"
     },
     "m": [
       "text",
@@ -1236,7 +1271,8 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "level"
     },
     "m": [
       "text",
@@ -1263,7 +1299,8 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "level"
     },
     "m": [
       "text",
@@ -1290,7 +1327,8 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "level"
     },
     "m": [
       "text",
@@ -1339,7 +1377,8 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "budget"
     },
     "m": [
       "text",
@@ -1366,7 +1405,8 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "budget"
     },
     "m": [
       "text",
@@ -1392,7 +1432,8 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "budget"
     },
     "m": [
       "text",
@@ -1417,7 +1458,8 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "budget"
     },
     "m": [
       "text",
@@ -1554,7 +1596,8 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "budget"
     },
     "m": [
       "text",
@@ -1576,7 +1619,8 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "budget"
     },
     "m": [
       "text",
@@ -1881,7 +1925,9 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -1904,7 +1950,9 @@
       "t": true,
       "r": true,
       "tc": false,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -1928,7 +1976,9 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -1952,7 +2002,9 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -1976,7 +2028,9 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -1999,7 +2053,9 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -2023,7 +2079,9 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -2047,7 +2105,9 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -2071,7 +2131,9 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -2095,7 +2157,9 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -2119,7 +2183,9 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -2143,7 +2209,9 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -2167,7 +2235,9 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -2191,7 +2261,9 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -2215,7 +2287,9 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -2263,7 +2337,9 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -2288,7 +2364,9 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -2313,7 +2391,9 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -2338,7 +2418,9 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -2362,7 +2444,9 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -2385,7 +2469,9 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -2409,7 +2495,9 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -2433,7 +2521,9 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -2515,7 +2605,10 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high",
+      "rm": true
     },
     "m": [
       "text",
@@ -2540,7 +2633,10 @@
       "t": false,
       "r": true,
       "tc": false,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high",
+      "rm": true
     },
     "m": [
       "text"
@@ -2563,7 +2659,10 @@
       "t": true,
       "r": true,
       "tc": false,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high",
+      "rm": true
     },
     "m": [
       "text"
@@ -2585,7 +2684,10 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high",
+      "rm": true
     },
     "m": [
       "text",
@@ -2609,7 +2711,10 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high",
+      "rm": true
     },
     "m": [
       "text",
@@ -2634,7 +2739,10 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high",
+      "rm": true
     },
     "m": [
       "text",
@@ -2658,7 +2766,10 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high",
+      "rm": true
     },
     "m": [
       "text"
@@ -2680,7 +2791,10 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high",
+      "rm": true
     },
     "m": [
       "text",
@@ -2704,7 +2818,10 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high",
+      "rm": true
     },
     "m": [
       "text",
@@ -2728,7 +2845,10 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high",
+      "rm": true
     },
     "m": [
       "text",
@@ -2839,7 +2959,9 @@
       "t": true,
       "r": true,
       "tc": false,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -2859,7 +2981,9 @@
       "t": true,
       "r": true,
       "tc": false,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -2880,7 +3004,9 @@
       "t": true,
       "r": true,
       "tc": false,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -2945,7 +3071,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -2967,7 +3095,9 @@
       "t": true,
       "r": true,
       "tc": false,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -2988,7 +3118,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -3176,7 +3308,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -3202,7 +3336,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "image",
@@ -3228,7 +3364,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "image",
@@ -3254,7 +3392,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "pdf",
@@ -3280,7 +3420,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "adaptive",
+      "me": "high"
     },
     "m": [
       "text",
@@ -3306,7 +3448,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "adaptive",
+      "me": "high"
     },
     "m": [
       "text",
@@ -3331,7 +3475,10 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "adaptive",
+      "me": "max",
+      "rm": true
     },
     "m": [
       "text",
@@ -3357,7 +3504,10 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "adaptive",
+      "me": "max",
+      "rm": true
     },
     "m": [
       "text",
@@ -3382,7 +3532,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "image",
@@ -3408,7 +3560,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -3434,7 +3588,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "adaptive",
+      "me": "high"
     },
     "m": [
       "text",
@@ -3544,7 +3700,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -3565,7 +3723,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -3586,7 +3746,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -3628,7 +3790,9 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -3670,7 +3834,9 @@
       "t": true,
       "r": true,
       "tc": false,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -3714,7 +3880,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -3737,7 +3905,9 @@
       "t": true,
       "r": true,
       "tc": false,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "image",
@@ -3760,7 +3930,9 @@
       "t": true,
       "r": true,
       "tc": false,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "image",
@@ -3781,7 +3953,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "image",
@@ -3804,7 +3978,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "image",
@@ -3827,7 +4003,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -3850,7 +4028,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -4006,7 +4186,9 @@
       "t": true,
       "r": true,
       "tc": false,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -4073,7 +4255,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -4095,7 +4279,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -4118,7 +4304,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -4140,7 +4328,9 @@
       "t": true,
       "r": true,
       "tc": false,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -4162,7 +4352,9 @@
       "t": true,
       "r": true,
       "tc": false,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -4185,7 +4377,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -4208,7 +4402,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -4230,7 +4426,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -4253,7 +4451,9 @@
       "t": true,
       "r": true,
       "tc": false,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -4276,7 +4476,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -4297,7 +4499,9 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -4319,7 +4523,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -4417,7 +4623,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "pdf",
@@ -4470,7 +4678,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -4498,7 +4708,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -4526,7 +4738,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -4554,7 +4768,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "pdf",
@@ -4581,7 +4797,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -4609,7 +4827,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "level",
+      "me": "high"
     },
     "m": [
       "text",
@@ -4637,7 +4857,9 @@
       "t": true,
       "r": true,
       "tc": false,
-      "a": true
+      "a": true,
+      "rs": "level",
+      "me": "high"
     },
     "m": [
       "image",
@@ -4659,7 +4881,9 @@
       "t": true,
       "r": true,
       "tc": false,
-      "a": true
+      "a": true,
+      "rs": "level",
+      "me": "high"
     },
     "m": [
       "image",
@@ -4684,7 +4908,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "level",
+      "me": "high"
     },
     "m": [
       "text",
@@ -4711,7 +4937,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "level",
+      "me": "high"
     },
     "m": [
       "text",
@@ -4738,7 +4966,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "level",
+      "me": "high"
     },
     "m": [
       "audio",
@@ -4766,7 +4996,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "level",
+      "me": "high"
     },
     "m": [
       "text",
@@ -4905,7 +5137,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "image",
@@ -4929,7 +5163,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "image",
@@ -4953,7 +5189,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "image",
@@ -4977,7 +5215,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "image",
@@ -5110,7 +5350,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -5176,7 +5418,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -5304,7 +5548,9 @@
       "t": true,
       "r": true,
       "tc": false,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -5748,7 +5994,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -5771,7 +6019,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -5815,7 +6065,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -5836,7 +6088,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -5857,7 +6111,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -5878,7 +6134,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -6207,7 +6465,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -6324,7 +6584,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -6510,7 +6772,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -6533,7 +6797,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -6557,7 +6823,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -6730,7 +6998,9 @@
       "t": true,
       "r": true,
       "tc": false,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -6752,7 +7022,9 @@
       "t": true,
       "r": true,
       "tc": false,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -6774,7 +7046,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -6796,7 +7070,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -6817,7 +7093,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -6839,7 +7117,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -6863,7 +7143,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -6885,7 +7167,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -6907,7 +7191,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "image",
@@ -6931,7 +7217,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -6953,7 +7241,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -7465,7 +7755,9 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -7515,7 +7807,9 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -7539,7 +7833,9 @@
       "t": true,
       "r": true,
       "tc": false,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "image",
@@ -7564,7 +7860,9 @@
       "t": true,
       "r": true,
       "tc": false,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "pdf",
@@ -7588,7 +7886,9 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -7613,7 +7913,9 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -7637,7 +7939,9 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "image",
@@ -7662,7 +7966,9 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "image",
@@ -7712,7 +8018,9 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -7736,7 +8044,9 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -7760,7 +8070,9 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "image",
@@ -7784,7 +8096,9 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "pdf",
@@ -7834,7 +8148,9 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -7857,7 +8173,9 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "image",
@@ -7906,7 +8224,9 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -7931,7 +8251,9 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -7955,7 +8277,9 @@
       "t": false,
       "r": true,
       "tc": false,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "image",
@@ -7979,7 +8303,9 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "pdf",
@@ -8004,7 +8330,9 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "pdf",
@@ -8028,7 +8356,9 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -8053,7 +8383,9 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "pdf",
@@ -8077,7 +8409,9 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "pdf",
@@ -8169,7 +8503,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -8191,7 +8527,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -8213,7 +8551,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -8235,7 +8575,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -8258,7 +8600,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -8280,7 +8624,10 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high",
+      "rm": true
     },
     "m": [
       "text",
@@ -8304,7 +8651,10 @@
       "t": false,
       "r": true,
       "tc": false,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high",
+      "rm": true
     },
     "m": [
       "text",
@@ -8329,7 +8679,10 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high",
+      "rm": true
     },
     "m": [
       "image",
@@ -8354,7 +8707,10 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high",
+      "rm": true
     },
     "m": [
       "image",
@@ -8378,7 +8734,10 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high",
+      "rm": true
     },
     "m": [
       "text",
@@ -8402,7 +8761,10 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high",
+      "rm": true
     },
     "m": [
       "text",
@@ -8425,7 +8787,10 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high",
+      "rm": true
     },
     "m": [
       "text",
@@ -8450,7 +8815,10 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high",
+      "rm": true
     },
     "m": [
       "image",
@@ -8475,7 +8843,10 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high",
+      "rm": true
     },
     "m": [
       "pdf",
@@ -8499,7 +8870,10 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high",
+      "rm": true
     },
     "m": [
       "image",
@@ -8523,7 +8897,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -8568,7 +8944,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -8630,7 +9008,9 @@
       "t": true,
       "r": true,
       "tc": false,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -8674,7 +9054,9 @@
       "t": true,
       "r": true,
       "tc": false,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -8717,7 +9099,9 @@
       "t": true,
       "r": true,
       "tc": false,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -8739,7 +9123,9 @@
       "t": true,
       "r": true,
       "tc": false,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -8761,7 +9147,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -8781,7 +9169,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -8801,7 +9191,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -8937,7 +9329,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -8982,7 +9376,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -9004,7 +9400,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -9048,7 +9446,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -9070,7 +9470,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -9115,7 +9517,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -9137,7 +9541,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -9160,7 +9566,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -9342,7 +9750,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -9407,7 +9817,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -9453,7 +9865,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -9499,7 +9913,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -9566,7 +9982,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "image",
@@ -9588,7 +10006,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -9611,7 +10031,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -9635,7 +10057,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -9659,7 +10083,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -9683,7 +10109,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -9707,7 +10135,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -9731,7 +10161,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -9755,7 +10187,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -9778,7 +10212,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -9802,7 +10238,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -9826,7 +10264,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -9850,7 +10290,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -9872,7 +10314,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -9919,7 +10363,9 @@
       "t": true,
       "r": true,
       "tc": false,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -10091,7 +10537,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -10113,7 +10561,9 @@
       "t": true,
       "r": true,
       "tc": false,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -10133,7 +10583,9 @@
       "t": true,
       "r": true,
       "tc": false,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -10156,7 +10608,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -10285,7 +10739,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -10328,7 +10784,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -10353,7 +10811,9 @@
       "t": true,
       "r": true,
       "tc": false,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -10378,7 +10838,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -10401,7 +10863,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -10423,7 +10887,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -10448,7 +10914,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -10470,7 +10938,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -10495,7 +10965,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -10539,7 +11011,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -10562,7 +11036,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -10584,7 +11060,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -10607,7 +11085,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -10631,7 +11111,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -10654,7 +11136,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "image",
@@ -10678,7 +11162,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -10701,7 +11187,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -10723,7 +11211,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -10745,7 +11235,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -10767,7 +11259,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": false
+      "a": false,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text"
@@ -10789,7 +11283,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "image",
@@ -10814,7 +11310,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -10839,7 +11337,9 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -10864,7 +11364,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -10889,7 +11391,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -10916,7 +11420,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "audio",
@@ -10942,7 +11448,9 @@
       "t": true,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "text",
@@ -10965,7 +11473,9 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "pdf",
@@ -10990,7 +11500,9 @@
       "t": false,
       "r": true,
       "tc": true,
-      "a": true
+      "a": true,
+      "rs": "effort",
+      "me": "high"
     },
     "m": [
       "pdf",

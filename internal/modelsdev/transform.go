@@ -25,7 +25,7 @@ func Transform(raw RawData) map[string]llms.ModelInfo {
 
 		for id, model := range entry.Models {
 			key := provider + "/" + id
-			out[key] = llms.ModelInfo{
+			mi := llms.ModelInfo{
 				Cost: llms.Cost{
 					Input:      model.Cost.Input,
 					Output:     model.Cost.Output,
@@ -47,6 +47,11 @@ func Transform(raw RawData) map[string]llms.ModelInfo {
 				Knowledge:  model.Knowledge,
 				Released:   model.ReleaseDate,
 			}
+			// Merge the hand-maintained reasoning metadata models.dev lacks
+			// (reasoning style, effort ceiling, mandatory reasoning, and the
+			// temperature gate for sampling-rejecting models).
+			ApplyReasoningMetadata(key, &mi)
+			out[key] = mi
 		}
 	}
 

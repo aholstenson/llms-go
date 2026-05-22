@@ -116,6 +116,64 @@ func TestTransformOmitsEmptyCacheInJSON(t *testing.T) {
 	}
 }
 
+func TestTransformReasoningMetadata(t *testing.T) {
+	reasoning := func(temp bool) modelsdev.RawModel {
+		return modelsdev.RawModel{Reasoning: true, ToolCall: true, Temperature: temp}
+	}
+	raw := modelsdev.RawData{
+		"anthropic": {ID: "anthropic", Models: map[string]modelsdev.RawModel{
+			"claude-opus-4-7":   reasoning(true), // adaptive, max, mandatory, rejects sampling
+			"claude-sonnet-4-6": reasoning(true), // adaptive
+			"claude-sonnet-4-5": reasoning(true), // effort
+			"claude-opus-4-1":   reasoning(true), // pre-4.5: budget default
+			"claude-3-5-haiku":  {ToolCall: true, Temperature: true},
+		}},
+		"openai": {ID: "openai", Models: map[string]modelsdev.RawModel{
+			"gpt-5": reasoning(false), // effort default + high ceiling
+			"o3":    reasoning(false), // mandatory
+		}},
+		"google": {ID: "google", Models: map[string]modelsdev.RawModel{
+			"gemini-3-pro-preview": reasoning(true), // level
+			"gemini-2.5-pro":       reasoning(true), // budget
+		}},
+	}
+
+	out := modelsdev.Transform(raw)
+
+	check := func(key, style, maxEffort string, mandatory, temperature bool) {
+		t.Helper()
+		c := out[key].Caps
+		if c.ReasoningStyle != style {
+			t.Errorf("%s: ReasoningStyle = %q, want %q", key, c.ReasoningStyle, style)
+		}
+		if c.MaxEffort != maxEffort {
+			t.Errorf("%s: MaxEffort = %q, want %q", key, c.MaxEffort, maxEffort)
+		}
+		if c.ReasoningMandatory != mandatory {
+			t.Errorf("%s: ReasoningMandatory = %v, want %v", key, c.ReasoningMandatory, mandatory)
+		}
+		if c.Temperature != temperature {
+			t.Errorf("%s: Temperature = %v, want %v", key, c.Temperature, temperature)
+		}
+	}
+
+	// Opus 4.7: adaptive, max ceiling, mandatory. Temperature is passed through
+	// from models.dev untouched (here the fixture reports it true).
+	check("anthropic/claude-opus-4-7", "adaptive", "max", true, true)
+	check("anthropic/claude-sonnet-4-6", "adaptive", "", false, true)
+	check("anthropic/claude-sonnet-4-5", "effort", "", false, true)
+	// Pre-4.5 Claude keeps the anthropic budget default and stays disableable.
+	check("anthropic/claude-opus-4-1", "budget", "", false, true)
+	// Non-reasoning model gets no reasoning metadata.
+	check("anthropic/claude-3-5-haiku", "", "", false, true)
+	// OpenAI default style + ceiling; o-series is mandatory.
+	check("openai/gpt-5", "effort", "high", false, false)
+	check("openai/o3", "effort", "high", true, false)
+	// Gemini 3+ uses thinking level; 2.5 keeps the budget default.
+	check("google/gemini-3-pro-preview", "level", "", false, true)
+	check("google/gemini-2.5-pro", "budget", "", false, true)
+}
+
 func keys(m map[string]llms.ModelInfo) []string {
 	out := make([]string, 0, len(m))
 	for k := range m {
