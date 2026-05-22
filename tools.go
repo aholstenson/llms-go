@@ -146,6 +146,26 @@ func doToolCall(ctx context.Context, logger *slog.Logger, streamingFunc Streamin
 		defer cancel()
 	}
 
+	eventID := newPublicID()
+	started := false
+	var out any
+
+	// Defer delivery of results so we always emit a result/error event.
+	defer func() {
+		if streamingFunc == nil || !started {
+			return
+		}
+		var event StreamingEvent
+		if err != nil {
+			event = StreamingEventToolError{ID: eventID, ToolID: tool.Name(), Error: err}
+		} else {
+			event = StreamingEventToolResult{ID: eventID, ToolID: tool.Name(), Result: out}
+		}
+		if nerr := streamingFunc(context.WithoutCancel(ctx), event); nerr != nil {
+			logger.Error("Tool notify failed", slog.String("tool", tool.Name()), slog.String("toolCallID", id), slog.Any("error", nerr))
+		}
+	}()
+
 	defer func() {
 		if r := recover(); r != nil {
 			logger.Error("Tool call panicked", slog.String("tool", tool.Name()), slog.String("toolCallID", id), slog.Int("inputLength", len(arguments)), slog.Any("panic", r))
@@ -158,7 +178,6 @@ func doToolCall(ctx context.Context, logger *slog.Logger, streamingFunc Streamin
 		tracker.RecordToolCall(tool.Name())
 	}
 
-	eventID := newPublicID()
 	logger.Debug("Executing tool", slog.String("tool", tool.Name()), slog.String("toolCallID", id), slog.String("input", arguments))
 
 	// Parse into typed struct from the tool
@@ -169,15 +188,16 @@ func doToolCall(ctx context.Context, logger *slog.Logger, streamingFunc Streamin
 		return "", fmt.Errorf("%w: %w", NewVisibleToolError("invalid arguments"), err)
 	}
 
+	// From here on the ToolUse event has been sent (or attempted), so the
+	// deferred emitter owns sending the matching terminal event.
 	if streamingFunc != nil {
-		err := streamingFunc(ctx, StreamingEventToolUse{ID: eventID, ToolID: tool.Name(), Arguments: args})
-		if err != nil {
-			logger.Error("Tool notify failed", slog.String("tool", tool.Name()), slog.String("toolCallID", id), slog.Int("inputLength", len(arguments)), slog.Any("error", err))
+		started = true
+		if nerr := streamingFunc(ctx, StreamingEventToolUse{ID: eventID, ToolID: tool.Name(), Arguments: args}); nerr != nil {
+			logger.Error("Tool notify failed", slog.String("tool", tool.Name()), slog.String("toolCallID", id), slog.Int("inputLength", len(arguments)), slog.Any("error", nerr))
 		}
 	}
 
 	// Execute the tool
-	var out any
 	out, err = tool.Execute(ctx, args)
 	if err != nil {
 		logger.Error("Tool call failed", slog.String("tool", tool.Name()), slog.String("toolCallID", id), slog.Int("inputLength", len(arguments)), slog.Any("error", err))
@@ -187,12 +207,6 @@ func doToolCall(ctx context.Context, logger *slog.Logger, streamingFunc Streamin
 	result = tool.ToString(out)
 
 	logger.Debug("Tool call succeeded", slog.String("tool", tool.Name()), slog.String("toolCallID", id), slog.String("result", result))
-	if streamingFunc != nil {
-		err := streamingFunc(ctx, StreamingEventToolResult{ID: eventID, ToolID: tool.Name(), Result: out})
-		if err != nil {
-			logger.Error("Tool notify failed", slog.String("tool", tool.Name()), slog.Int("inputLength", len(arguments)), slog.Any("error", err))
-		}
-	}
 
 	return result, nil
 }

@@ -395,5 +395,81 @@ var _ = Describe("Session", func() {
 				"start", "chunk:done", "end-final",
 			}))
 		})
+
+		It("emits ToolError in place of ToolResult when a tool returns an error", func() {
+			var (
+				mu     sync.Mutex
+				events []string
+				gotErr error
+			)
+			record := func(_ context.Context, e StreamingEvent) error {
+				mu.Lock()
+				defer mu.Unlock()
+				switch ev := e.(type) {
+				case StreamingEventToolUse:
+					events = append(events, "tooluse")
+				case StreamingEventToolResult:
+					events = append(events, "toolresult")
+				case StreamingEventToolError:
+					events = append(events, "toolerror")
+					gotErr = ev.Error
+				}
+				return nil
+			}
+
+			boom := NewToolDef[*sessArgs, string](sessTool{name: "echo", fn: func(_ context.Context, _ sessArgs) (string, error) {
+				return "", errors.New("boom")
+			}})
+			turn := &fakeTurn{script: []TurnOutput{
+				{ToolCalls: []ToolCall{{ID: "1", Name: "echo", Arguments: `{"v":"v"}`}}, StopReason: StopReasonToolUse},
+				{Text: "done", StopReason: StopReasonEndTurn},
+			}}
+
+			s, _ := newTestSession(turn, []ToolDef{boom}, WithStreamingFunc(record))
+			_, err := runSession(context.Background(), s)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(events).To(Equal([]string{"tooluse", "toolerror"}))
+			Expect(gotErr).To(MatchError(ContainSubstring("boom")))
+		})
+
+		It("emits ToolError when a tool panics", func() {
+			var (
+				mu     sync.Mutex
+				events []string
+				gotErr error
+			)
+			record := func(_ context.Context, e StreamingEvent) error {
+				mu.Lock()
+				defer mu.Unlock()
+				switch ev := e.(type) {
+				case StreamingEventToolUse:
+					events = append(events, "tooluse")
+				case StreamingEventToolResult:
+					events = append(events, "toolresult")
+				case StreamingEventToolError:
+					events = append(events, "toolerror")
+					gotErr = ev.Error
+				}
+				return nil
+			}
+
+			boom := NewToolDef[*sessArgs, string](sessTool{name: "echo", fn: func(_ context.Context, _ sessArgs) (string, error) {
+				panic("kaboom")
+			}})
+			turn := &fakeTurn{script: []TurnOutput{
+				{ToolCalls: []ToolCall{{ID: "1", Name: "echo", Arguments: `{"v":"v"}`}}, StopReason: StopReasonToolUse},
+				{Text: "done", StopReason: StopReasonEndTurn},
+			}}
+
+			s, _ := newTestSession(turn, []ToolDef{boom}, WithStreamingFunc(record))
+			_, err := runSession(context.Background(), s)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(events).To(Equal([]string{"tooluse", "toolerror"}))
+			var visible *VisibleToolError
+			Expect(errors.As(gotErr, &visible)).To(BeTrue())
+			Expect(gotErr).To(MatchError(ContainSubstring("kaboom")))
+		})
 	})
 })

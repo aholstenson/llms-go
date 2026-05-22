@@ -67,6 +67,23 @@ type StreamingEventToolResult struct {
 
 func (StreamingEventToolResult) isEvent() {}
 
+// StreamingEventToolError is the terminal event for a tool call that failed,
+// emitted in place of StreamingEventToolResult. It always follows the matching
+// StreamingEventToolUse (paired by ID), so consumers tracking the tool-call
+// lifecycle can move the call out of a running state on failure. Error carries
+// the failure (including tool panics, surfaced as a VisibleToolError).
+//
+// Because Go type switches are not exhaustiveness-checked, a consumer that does
+// not handle this event will leave a failed call pinned to its running state;
+// handle it alongside StreamingEventToolResult.
+type StreamingEventToolError struct {
+	ID     string
+	ToolID string
+	Error  error
+}
+
+func (StreamingEventToolError) isEvent() {}
+
 type StreamingEventCitation struct {
 	Title string
 	URL   string
