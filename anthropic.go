@@ -795,14 +795,9 @@ func (t *anthropicTurn) Next(ctx context.Context) (TurnOutput, error) {
 	var err error
 	var streamingEmitted bool
 
-	if t.opts.StreamingFunc != nil || t.opts.StructuredStreamingFunc != nil {
-		response, err = m.handleStreaming(ctx, t.params, t.opts.StreamingFunc, t.opts.StructuredStreamingFunc, t.jsParser, &t.structuredContentBuilder, &streamingEmitted, option.WithMaxRetries(t.opts.MaxRetries))
-	} else {
-		response, err = m.client.Beta.Messages.New(ctx, t.params,
-			option.WithHeader("anthropic-beta", "structured-outputs-2025-11-13"),
-			option.WithMaxRetries(t.opts.MaxRetries),
-		)
-	}
+	// Anthropic's API rejects non-streaming requests for any generation that
+	// may exceed 10 minutes so we run in streaming mode for all requests.
+	response, err = m.handleStreaming(ctx, t.params, t.opts.StreamingFunc, t.opts.StructuredStreamingFunc, t.jsParser, &t.structuredContentBuilder, &streamingEmitted, option.WithMaxRetries(t.opts.MaxRetries))
 
 	anthropicError := &anthropic.Error{}
 	if errors.As(err, &anthropicError) {
