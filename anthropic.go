@@ -642,19 +642,13 @@ func (m *anthropicModel) convertTools(tools []ToolDef) ([]anthropic.BetaToolUnio
 	result := make([]anthropic.BetaToolUnionParam, 0, len(tools))
 	toolMap := make(map[string]ToolDef, len(tools))
 
-	for i, tool := range tools {
+	for _, tool := range tools {
 		if _, exists := toolMap[tool.Name()]; exists {
 			continue
 		}
 
 		// Create JSON schema for tool parameters
 		schema := jsonSchemaReflector.Reflect(tool.Schema())
-
-		// Cache the available tools
-		var cacheControl anthropic.BetaCacheControlEphemeralParam
-		if i == len(tools)-1 {
-			cacheControl = anthropic.NewBetaCacheControlEphemeralParam()
-		}
 
 		// Create Anthropic tool definition
 		toolParam := anthropic.BetaToolParam{
@@ -664,11 +658,14 @@ func (m *anthropicModel) convertTools(tools []ToolDef) ([]anthropic.BetaToolUnio
 				Properties: schema.Properties,
 				Type:       constant.Object(schema.Type),
 			},
-			CacheControl: cacheControl,
 		}
 
 		result = append(result, anthropic.BetaToolUnionParam{OfTool: &toolParam})
 		toolMap[tool.Name()] = tool
+	}
+
+	if len(result) > 0 {
+		result[len(result)-1].OfTool.CacheControl = anthropic.NewBetaCacheControlEphemeralParam()
 	}
 
 	return result, toolMap

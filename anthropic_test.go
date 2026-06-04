@@ -93,6 +93,44 @@ var _ = Describe("anthropicTurn cache-control budget", func() {
 	})
 })
 
+var _ = Describe("anthropicModel.convertTools cache-control", func() {
+	It("caches the last deduped tool when duplicates appear at the tail", func() {
+		m := &anthropicModel{}
+
+		tools, _ := m.convertTools([]ToolDef{
+			NewToolDef[*sessArgs, string](sessTool{name: "a"}),
+			NewToolDef[*sessArgs, string](sessTool{name: "b"}),
+			NewToolDef[*sessArgs, string](sessTool{name: "a"}),
+		})
+
+		Expect(tools).To(HaveLen(2))
+		Expect(tools[0].OfTool.Name).To(Equal("a"))
+		Expect(tools[1].OfTool.Name).To(Equal("b"))
+		Expect(string(tools[0].OfTool.CacheControl.Type)).To(Equal(""))
+		Expect(string(tools[1].OfTool.CacheControl.Type)).To(Equal("ephemeral"))
+	})
+
+	It("caches the last tool when there are no duplicates", func() {
+		m := &anthropicModel{}
+
+		tools, _ := m.convertTools([]ToolDef{
+			NewToolDef[*sessArgs, string](sessTool{name: "a"}),
+			NewToolDef[*sessArgs, string](sessTool{name: "b"}),
+		})
+
+		Expect(tools).To(HaveLen(2))
+		Expect(string(tools[0].OfTool.CacheControl.Type)).To(Equal(""))
+		Expect(string(tools[1].OfTool.CacheControl.Type)).To(Equal("ephemeral"))
+	})
+
+	It("returns nil for empty input", func() {
+		m := &anthropicModel{}
+		tools, toolMap := m.convertTools(nil)
+		Expect(tools).To(BeNil())
+		Expect(toolMap).To(BeEmpty())
+	})
+})
+
 var _ = Describe("anthropicTurn.Observe cache-control", func() {
 	It("clears prior tool_result cache-control and caches only the last new block", func() {
 		turn := &anthropicTurn{
