@@ -879,11 +879,18 @@ func (t *anthropicTurn) Next(ctx context.Context) (TurnOutput, error) {
 
 	toolCalls := make([]ToolCall, 0, len(toolUseBlocks))
 	for _, b := range toolUseBlocks {
-		inputBytes, _ := json.Marshal(b.Input)
+		arguments := b.JSON.Input.Raw()
+		if arguments == "" {
+			inputBytes, err := json.Marshal(b.Input)
+			if err != nil {
+				return TurnOutput{}, fmt.Errorf("marshal tool use input for %s: %w", b.Name, err)
+			}
+			arguments = string(inputBytes)
+		}
 		toolCalls = append(toolCalls, ToolCall{
 			ID:        b.ID,
 			Name:      b.Name,
-			Arguments: string(inputBytes),
+			Arguments: arguments,
 		})
 	}
 
