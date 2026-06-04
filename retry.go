@@ -129,7 +129,8 @@ type retryClassifier func(err error) (retryable bool, statusCode int, retryAfter
 
 // retryLoop runs fn up to opts.MaxRetries+1 times, sleeping between
 // attempts according to opts.RetryBackoff. classify decides whether an
-// error is retryable.
+// error is retryable. provider and model are stamped onto any
+// *UnavailableError returned on final failure.
 //
 // Returns the function's value on success, or on final failure a
 // *UnavailableError if the final attempt was retryable, or the raw error
@@ -137,6 +138,7 @@ type retryClassifier func(err error) (retryable bool, statusCode int, retryAfter
 func retryLoop[T any](
 	ctx context.Context,
 	opts *generateContentOptions,
+	provider, model string,
 	classify retryClassifier,
 	fn func(ctx context.Context) (T, error),
 ) (T, error) {
@@ -174,11 +176,16 @@ func retryLoop[T any](
 			}
 			lastRetryAfter = ra
 			lastHasRetryAfter = true
+		} else {
+			lastRetryAfter = 0
+			lastHasRetryAfter = false
 		}
 
 		if !retryable || attempt == maxAttempts-1 {
 			if retryable {
 				return zero, &UnavailableError{
+					Provider:      provider,
+					Model:         model,
 					StatusCode:    lastStatus,
 					RetryAfter:    lastRetryAfter,
 					HasRetryAfter: lastHasRetryAfter,

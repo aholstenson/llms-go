@@ -685,7 +685,7 @@ func (t *googleTurn) Next(ctx context.Context) (TurnOutput, error) {
 			ra, hasRA := extractRetryAfter("google", err, m.lastCapturedHeaders())
 			return true, status, ra, hasRA
 		}
-		response, err = retryLoop(ctx, t.opts, classify, func(ctx context.Context) (*genai.GenerateContentResponse, error) {
+		response, err = retryLoop(ctx, t.opts, string(GenAISystemGoogle), m.model, classify, func(ctx context.Context) (*genai.GenerateContentResponse, error) {
 			return m.client.Models.GenerateContent(ctx, m.model, t.messages, t.config)
 		})
 	}
@@ -721,8 +721,6 @@ func (t *googleTurn) Next(ctx context.Context) (TurnOutput, error) {
 		if errors.As(err, &ue) {
 			ue.PartialOutput = streamingEmitted
 			ue.PartialUsage = partialUsage
-			ue.Provider = string(GenAISystemGoogle)
-			ue.Model = m.model
 			m.metrics.RecordCallDuration(ctx, GenAISystemGoogle, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeUnavailable)
 			if streamingEmitted {
 				return TurnOutput{}, errors.Join(ue, ErrStreamingPartialOutput)

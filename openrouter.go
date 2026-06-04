@@ -483,7 +483,7 @@ func (t *openrouterTurn) nextNonStreaming(ctx context.Context, start time.Time, 
 		return true, status, ra, hasRA
 	}
 
-	response, err := retryLoop(ctx, t.opts, classify, func(ctx context.Context) (openrouter.ChatCompletionResponse, error) {
+	response, err := retryLoop(ctx, t.opts, string(GenAISystemOpenRouter), m.model, classify, func(ctx context.Context) (openrouter.ChatCompletionResponse, error) {
 		return m.client.CreateChatCompletion(ctx, t.params)
 	})
 	if err != nil {
@@ -861,8 +861,6 @@ func (t *openrouterTurn) reportError(ctx context.Context, err error, start time.
 	if errors.As(err, &ue) {
 		ue.PartialOutput = partialEmitted
 		ue.PartialUsage = partialUsage
-		ue.Provider = string(GenAISystemOpenRouter)
-		ue.Model = m.model
 		m.metrics.RecordCallDuration(ctx, GenAISystemOpenRouter, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeUnavailable)
 		if partialEmitted {
 			return TurnOutput{}, errors.Join(ue, ErrStreamingPartialOutput)

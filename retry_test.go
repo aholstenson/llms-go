@@ -52,7 +52,7 @@ var _ = Describe("retryLoop", func() {
 
 	It("returns the value on first success", func() {
 		var calls int32
-		v, err := retryLoop(context.Background(), defaultOpts(),
+		v, err := retryLoop(context.Background(), defaultOpts(), "", "",
 			func(error) (bool, int, time.Duration, bool) { return false, 0, 0, false },
 			func(ctx context.Context) (int, error) {
 				atomic.AddInt32(&calls, 1)
@@ -68,7 +68,7 @@ var _ = Describe("retryLoop", func() {
 		classify := func(error) (bool, int, time.Duration, bool) {
 			return true, 429, 100 * time.Millisecond, true
 		}
-		_, err := retryLoop(context.Background(), defaultOpts(), classify,
+		_, err := retryLoop(context.Background(), defaultOpts(), "", "", classify,
 			func(ctx context.Context) (int, error) {
 				atomic.AddInt32(&calls, 1)
 				return 0, errors.New("boom")
@@ -91,7 +91,7 @@ var _ = Describe("retryLoop", func() {
 		classify := func(error) (bool, int, time.Duration, bool) {
 			return true, 503, 0, false
 		}
-		_, err := retryLoop(context.Background(), opts, classify,
+		_, err := retryLoop(context.Background(), opts, "", "", classify,
 			func(ctx context.Context) (int, error) {
 				atomic.AddInt32(&calls, 1)
 				return 0, errors.New("boom")
@@ -109,7 +109,7 @@ var _ = Describe("retryLoop", func() {
 			return false, 400, 0, false
 		}
 		expected := errors.New("nope")
-		_, err := retryLoop(context.Background(), defaultOpts(), classify,
+		_, err := retryLoop(context.Background(), defaultOpts(), "", "", classify,
 			func(ctx context.Context) (int, error) {
 				atomic.AddInt32(&calls, 1)
 				return 0, expected
@@ -125,7 +125,7 @@ var _ = Describe("retryLoop", func() {
 		classify := func(error) (bool, int, time.Duration, bool) {
 			return true, 429, 10 * time.Second, true
 		}
-		_, err := retryLoop(context.Background(), opts, classify,
+		_, err := retryLoop(context.Background(), opts, "", "", classify,
 			func(ctx context.Context) (int, error) { return 0, errors.New("boom") })
 		var ue *UnavailableError
 		Expect(errors.As(err, &ue)).To(BeTrue())
@@ -137,7 +137,7 @@ var _ = Describe("retryLoop", func() {
 		classify := func(error) (bool, int, time.Duration, bool) {
 			return true, 429, 0, false
 		}
-		v, err := retryLoop(context.Background(), defaultOpts(), classify,
+		v, err := retryLoop(context.Background(), defaultOpts(), "", "", classify,
 			func(ctx context.Context) (int, error) {
 				n := atomic.AddInt32(&calls, 1)
 				if n < 3 {
