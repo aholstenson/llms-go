@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.4.0](https://github.com/aholstenson/llms-go/compare/v0.3.0...v0.4.0) (2026-06-04)
+
+
+### Features
+
+* Account for partial usage when models error ([d8e4631](https://github.com/aholstenson/llms-go/commit/d8e4631a115bdd7768d4105e5504a3296c72e435))
+* Improve error messages from models ([9fd0d86](https://github.com/aholstenson/llms-go/commit/9fd0d860918f820cfee67bdb80da098357e24d68))
+
+
+### Bug Fixes
+
+* Always use streaming mode for Anthropic to avoid refusals due to request size ([3d2a70c](https://github.com/aholstenson/llms-go/commit/3d2a70cfa35dc64f36a70e66c8a46430d001e128))
+* **anthropic:** Fix edge case with tool result caching ([292f5d3](https://github.com/aholstenson/llms-go/commit/292f5d39eb20ccd5beff872a28362e26030cb45d))
+* Don't leak stale Retry-After into UnavailableError ([47d7cc7](https://github.com/aholstenson/llms-go/commit/47d7cc70ee2e5e2d8534bb3cbf5226e3c966ec3b))
+* **google:** Don't leak messages in error logs ([5953299](https://github.com/aholstenson/llms-go/commit/5953299cdf5e38e8078c01755ac35c1cda0f9820))
+* **jsonstream:** Always flush sub-parser at end of streaming string ([e0bb494](https://github.com/aholstenson/llms-go/commit/e0bb4946d51b9de96906eedb3bd2c771d34f6fdb))
+* **jsonstream:** Propagate errors from sub-parsers ([fa1abfa](https://github.com/aholstenson/llms-go/commit/fa1abfa684cae5a63629e559dcff5b1499ae31be))
+
 ## [0.3.0](https://github.com/aholstenson/llms-go/compare/v0.2.0...v0.3.0) (2026-05-22)
 
 
