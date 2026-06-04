@@ -512,7 +512,6 @@ func (p *Parser) processString(frame *stateFrame) (int, error) {
 		if ch == '"' {
 			// End of string
 			if streaming {
-				// Emit final chunk if any
 				if chunkBuilder.Len() > 0 || p.pendingChunk != "" {
 					chunk := p.pendingChunk + chunkBuilder.String()
 					p.pendingChunk = ""
@@ -524,15 +523,17 @@ func (p *Parser) processString(frame *stateFrame) (int, error) {
 						if ferr != nil {
 							return consumed, newParseError(p.currentPath(), p.offset+consumed, "sub-parser feed failed", ferr)
 						}
-						flushEvents, flerr := frame.subParser.Flush()
-						for _, ev := range flushEvents {
-							p.emitSubParserEvent(ev)
-						}
-						if flerr != nil {
-							return consumed, newParseError(p.currentPath(), p.offset+consumed, "sub-parser flush failed", flerr)
-						}
 					} else {
 						p.emitEvent(EventStringChunk{path: p.currentPath(), Chunk: chunk})
+					}
+				}
+				if frame.subParser != nil {
+					flushEvents, flerr := frame.subParser.Flush()
+					for _, ev := range flushEvents {
+						p.emitSubParserEvent(ev)
+					}
+					if flerr != nil {
+						return consumed, newParseError(p.currentPath(), p.offset+consumed, "sub-parser flush failed", flerr)
 					}
 				}
 			}
@@ -922,7 +923,6 @@ func (p *Parser) popFrame(value any) {
 		return
 	}
 
-	frame := p.stack[len(p.stack)-1]
 	p.stack = p.stack[:len(p.stack)-1]
 
 	if len(p.stack) == 0 {
@@ -946,9 +946,6 @@ func (p *Parser) popFrame(value any) {
 			Value: value,
 		})
 	}
-
-	// Reset the value frame's path component reference since it's been popped
-	_ = frame
 }
 
 func (p *Parser) emitEvent(event Event) {

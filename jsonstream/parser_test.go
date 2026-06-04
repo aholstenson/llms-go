@@ -2330,6 +2330,82 @@ var _ = Describe("Parser", func() {
 			combined := strings.Join(subParser.chunks, "")
 			Expect(combined).To(Equal("الأمن"))
 		})
+
+		It("should preserve order when escapes precede partial UTF-8 fed byte-by-byte", func() {
+			// Mixes JSON escapes (which populate p.pendingChunk) with multi-byte UTF-8
+			// characters. When fed byte-by-byte, the parser hits the incomplete-UTF-8
+			// break path inside processString with pendingChunk holding the escape
+			// payload. The sub-parser must still observe the chunks in order and
+			// receive the full string with no fragmentation across logical characters.
+			//   "a\nأ\tبéc" -> a, newline, ا (alef-hamza-above 0xD8 0xA3),
+			//   tab, ب (0xD8 0xA8), unicode-escaped é, c.
+			json := `{"text": "a\nأ\tبéc"}`
+
+			for i := 0; i < len(json); i++ {
+				_, err := p.Feed(json[i : i+1])
+				Expect(err).NotTo(HaveOccurred())
+			}
+			_, err := p.Flush()
+			Expect(err).NotTo(HaveOccurred())
+
+			for _, chunk := range subParser.chunks {
+				Expect(utf8.ValidString(chunk)).To(BeTrue(), "chunk should be valid UTF-8: %q", chunk)
+			}
+
+			combined := strings.Join(subParser.chunks, "")
+			Expect(combined).To(Equal("a\nأ\tبéc"))
+		})
+
+		It("should always call sub-parser Flush at end of string", func() {
+			// The closing quote arrives in a separate Feed from any string
+			// content, so chunkBuilder is empty and pendingChunk is empty when
+			// we hit '"'. Sub-parser Flush must still be called once per string
+			// or stateful sub-parsers lose their final emission.
+			_, err := p.Feed(`{"text": "hello`)
+			Expect(err).NotTo(HaveOccurred())
+			events, err := p.Feed(`"}`)
+			Expect(err).NotTo(HaveOccurred())
+
+			// mockSubParser.Flush() returns a sentinel mockTextEvent{Text: "flush"};
+			// the parser wraps each sub-parser event as EventParsedStringChunk.
+			var sawFlush bool
+			for _, e := range events {
+				ev, ok := e.(jsonstream.EventParsedStringChunk)
+				if !ok {
+					continue
+				}
+				if te, ok := ev.Chunk.(*mockTextEvent); ok && te.Text == "flush" {
+					sawFlush = true
+				}
+			}
+			Expect(sawFlush).To(BeTrue(), "sub-parser Flush should be invoked at end of string")
+		})
+
+		It("should preserve order when partial UTF-8 immediately follows an escape", func() {
+			// Targets the specific case: an escape transitions to stateString with
+			// pendingChunk populated; the very next byte is a multi-byte UTF-8 leader
+			// that is incomplete in the current Feed buffer. processString breaks
+			// without flushing pendingChunk, and the next Feed completes the rune.
+			// The sub-parser should receive "\nأ" as a single contiguous payload.
+			chunks := []string{
+				`{"text": "`,
+				`\`, `n`, // produces pendingChunk = "\n"
+				"\xD8", // first byte of أ (incomplete)
+				"\xA3", // completes أ
+				`"}`,
+			}
+			for _, c := range chunks {
+				_, err := p.Feed(c)
+				Expect(err).NotTo(HaveOccurred())
+			}
+			_, err := p.Flush()
+			Expect(err).NotTo(HaveOccurred())
+
+			for _, chunk := range subParser.chunks {
+				Expect(utf8.ValidString(chunk)).To(BeTrue(), "chunk should be valid UTF-8: %q", chunk)
+			}
+			Expect(strings.Join(subParser.chunks, "")).To(Equal("\nأ"))
+		})
 	})
 
 	Context("when parsing unicode escapes in object keys", func() {
