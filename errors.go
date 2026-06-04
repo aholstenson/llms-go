@@ -45,6 +45,10 @@ var ErrStructuredStreamParse = errors.New("structured stream parse failed")
 //     no counter) this is an upper bound: MaxRetries+1.
 //   - PartialOutput: true when at least one content event was dispatched
 //     to StreamingFunc before the stream errored.
+//   - PartialUsage: usage accumulated up to the point of a mid-stream
+//     failure, if the provider reported any. Nil when no usage was seen
+//     before the stream errored. Surface this to cost accounting so the
+//     tokens already generated (and billed) are not silently dropped.
 type UnavailableError struct {
 	Provider      string
 	Model         string
@@ -53,6 +57,7 @@ type UnavailableError struct {
 	HasRetryAfter bool
 	Attempts      int
 	PartialOutput bool
+	PartialUsage  *TurnUsage
 	Cause         error
 }
 

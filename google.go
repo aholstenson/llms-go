@@ -263,7 +263,11 @@ func (m *googleModel) handleStreaming(
 
 	for resp, err := range m.client.Models.GenerateContentStream(ctx, m.model, messages, config) {
 		if err != nil {
-			return nil, err
+			// Preserve whatever usage / partial content we accumulated before
+			// the stream errored so the caller can surface it (see
+			// UnavailableError.PartialUsage). lastResponse may still be nil
+			// if the stream errored before yielding any chunk.
+			return lastResponse, err
 		}
 
 		if len(resp.Candidates) > 0 && resp.Candidates[0].Content != nil {
@@ -390,6 +394,33 @@ func (m *googleModel) handleStreaming(
 	}
 
 	return lastResponse, nil
+}
+
+// extractUsage converts a genai response's usage metadata into TurnUsage,
+// returning nil if no usage was reported. Shared between the success path
+// and the mid-stream-error path (where the partial response still carries
+// the tokens billed before the failure).
+func (m *googleModel) extractUsage(resp *genai.GenerateContentResponse) *TurnUsage {
+	if resp == nil || resp.UsageMetadata == nil {
+		return nil
+	}
+
+	um := resp.UsageMetadata
+	if um.PromptTokenCount == 0 && um.CandidatesTokenCount == 0 &&
+		um.CachedContentTokenCount == 0 && um.ThoughtsTokenCount == 0 {
+		return nil
+	}
+
+	// Gemini's PromptTokenCount is the total prompt size and *includes*
+	// CachedContentTokenCount, so subtract to get the disjoint, uncached
+	// input the rest of the stack expects (see uncachedInputTokens).
+	cachedTokens := int64(um.CachedContentTokenCount)
+	return &TurnUsage{
+		InputTokens:      uncachedInputTokens(int64(um.PromptTokenCount), cachedTokens),
+		OutputTokens:     int64(um.CandidatesTokenCount),
+		CachedReadTokens: cachedTokens,
+		ThinkingTokens:   int64(um.ThoughtsTokenCount),
+	}
 }
 
 func (m *googleModel) extractText(resp *genai.GenerateContentResponse) string {
@@ -664,9 +695,32 @@ func (t *googleTurn) Next(ctx context.Context) (TurnOutput, error) {
 			metrics.RecordFailure(m.statsModel, collector)
 		}
 
+		// On a mid-stream failure the streaming loop may have accumulated
+		// usage before erroring; record it so cost accounting is not lost.
+		partialUsage := m.extractUsage(response)
+		if partialUsage != nil {
+			collector.Counter("input_tokens").Add(int(partialUsage.InputTokens))
+			collector.Counter("output_tokens").Add(int(partialUsage.OutputTokens))
+			collector.Counter("cached_read_tokens").Add(int(partialUsage.CachedReadTokens))
+
+			if partialUsage.ThinkingTokens > 0 {
+				collector.Counter("thinking_tokens").Add(int(partialUsage.ThinkingTokens))
+			}
+
+			m.metrics.RecordCall(
+				ctx,
+				GenAISystemGoogle, GenAIOperationChat, GenAIModel(m.model),
+				partialUsage.InputTokens,
+				partialUsage.OutputTokens,
+				partialUsage.CachedReadTokens,
+				0,
+			)
+		}
+
 		var ue *UnavailableError
 		if errors.As(err, &ue) {
 			ue.PartialOutput = streamingEmitted
+			ue.PartialUsage = partialUsage
 			ue.Provider = string(GenAISystemGoogle)
 			ue.Model = m.model
 			m.metrics.RecordCallDuration(ctx, GenAISystemGoogle, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeUnavailable)
@@ -692,6 +746,7 @@ func (t *googleTurn) Next(ctx context.Context) (TurnOutput, error) {
 					HasRetryAfter: hasRA,
 					Attempts:      1,
 					PartialOutput: streamingEmitted,
+					PartialUsage:  partialUsage,
 					Cause:         err,
 				}
 				m.metrics.RecordCallDuration(ctx, GenAISystemGoogle, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeUnavailable)
@@ -712,34 +767,22 @@ func (t *googleTurn) Next(ctx context.Context) (TurnOutput, error) {
 	}
 
 	var usage TurnUsage
-	if response.UsageMetadata != nil {
-		// Gemini's PromptTokenCount is the total prompt size and *includes*
-		// CachedContentTokenCount, so subtract to get the disjoint, uncached
-		// input the rest of the stack expects (see uncachedInputTokens).
-		cachedTokens := int64(response.UsageMetadata.CachedContentTokenCount)
-		inputTokens := uncachedInputTokens(int64(response.UsageMetadata.PromptTokenCount), cachedTokens)
-		outputTokens := int64(response.UsageMetadata.CandidatesTokenCount)
-
-		collector.Counter("input_tokens").Add(int(inputTokens))
-		collector.Counter("output_tokens").Add(int(outputTokens))
-		collector.Counter("cached_read_tokens").Add(int(cachedTokens))
-		if response.UsageMetadata.ThoughtsTokenCount > 0 {
-			collector.Counter("thinking_tokens").Add(int(response.UsageMetadata.ThoughtsTokenCount))
+	if u := m.extractUsage(response); u != nil {
+		collector.Counter("input_tokens").Add(int(u.InputTokens))
+		collector.Counter("output_tokens").Add(int(u.OutputTokens))
+		collector.Counter("cached_read_tokens").Add(int(u.CachedReadTokens))
+		if u.ThinkingTokens > 0 {
+			collector.Counter("thinking_tokens").Add(int(u.ThinkingTokens))
 		}
 
-		usage = TurnUsage{
-			InputTokens:      inputTokens,
-			OutputTokens:     outputTokens,
-			CachedReadTokens: cachedTokens,
-			ThinkingTokens:   int64(response.UsageMetadata.ThoughtsTokenCount),
-		}
+		usage = *u
 
 		m.metrics.RecordCall(
 			ctx,
 			GenAISystemGoogle, GenAIOperationChat, GenAIModel(m.model),
-			inputTokens,
-			outputTokens,
-			cachedTokens,
+			u.InputTokens,
+			u.OutputTokens,
+			u.CachedReadTokens,
 			0,
 		)
 	}

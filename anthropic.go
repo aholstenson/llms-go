@@ -471,7 +471,10 @@ func (m *anthropicModel) handleStreaming(
 	}
 
 	if stream.Err() != nil {
-		return nil, fmt.Errorf("streaming error from Anthropic: %w", stream.Err())
+		// Return the accumulated message so the caller can recover any
+		// usage emitted before the stream errored (Anthropic reports input
+		// usage on message_start, very early in the stream).
+		return &message, fmt.Errorf("streaming error from Anthropic: %w", stream.Err())
 	}
 	if structuredStreamErr != nil {
 		if streamingEmitted != nil && *streamingEmitted {
@@ -484,6 +487,27 @@ func (m *anthropicModel) handleStreaming(
 	}
 
 	return &message, nil
+}
+
+// extractUsage converts the accumulated BetaMessage usage into TurnUsage.
+// Returns nil when no tokens have been reported yet — handleStreaming can
+// surface an empty zero-value message if it errors before message_start.
+func (m *anthropicModel) extractUsage(msg *anthropic.BetaMessage) *TurnUsage {
+	if msg == nil {
+		return nil
+	}
+
+	if msg.Usage.InputTokens == 0 && msg.Usage.OutputTokens == 0 &&
+		msg.Usage.CacheReadInputTokens == 0 && msg.Usage.CacheCreationInputTokens == 0 {
+		return nil
+	}
+
+	return &TurnUsage{
+		InputTokens:       msg.Usage.InputTokens,
+		OutputTokens:      msg.Usage.OutputTokens,
+		CachedReadTokens:  msg.Usage.CacheReadInputTokens,
+		CachedWriteTokens: msg.Usage.CacheCreationInputTokens,
+	}
 }
 
 func (m *anthropicModel) convertMessages(systemPrompt string, messages []*Message) ([]anthropic.BetaMessageParam, string, error) {
@@ -802,6 +826,23 @@ func (t *anthropicTurn) Next(ctx context.Context) (TurnOutput, error) {
 			metrics.RecordFailure(m.statsModel, collector)
 		}
 
+		// On a mid-stream failure the SDK may already have surfaced
+		// message_start usage; preserve it so cost accounting is not lost.
+		partialUsage := m.extractUsage(response)
+		if partialUsage != nil {
+			collector.Counter("input_tokens").Add(int(partialUsage.InputTokens))
+			collector.Counter("output_tokens").Add(int(partialUsage.OutputTokens))
+			collector.Counter("cached_read_tokens").Add(int(partialUsage.CachedReadTokens))
+			collector.Counter("cached_write_tokens").Add(int(partialUsage.CachedWriteTokens))
+			m.metrics.RecordCall(ctx,
+				GenAISystemAnthropic, GenAIOperationChat, GenAIModel(m.model),
+				partialUsage.InputTokens,
+				partialUsage.OutputTokens,
+				partialUsage.CachedReadTokens,
+				partialUsage.CachedWriteTokens,
+			)
+		}
+
 		if isUnavailableStatusCode(anthropicError.StatusCode) {
 			m.metrics.RecordCallDuration(ctx, GenAISystemAnthropic, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeUnavailable)
 			ra, hasRA := extractRetryAfter("anthropic", err, nil)
@@ -816,6 +857,7 @@ func (t *anthropicTurn) Next(ctx context.Context) (TurnOutput, error) {
 				HasRetryAfter: hasRA,
 				Attempts:      t.opts.MaxRetries + 1,
 				PartialOutput: streamingEmitted,
+				PartialUsage:  partialUsage,
 				Cause:         err,
 			}
 			if streamingEmitted {
@@ -830,6 +872,23 @@ func (t *anthropicTurn) Next(ctx context.Context) (TurnOutput, error) {
 		if metrics := GetMetrics(ctx); metrics != nil {
 			metrics.RecordFailure(m.statsModel, collector)
 		}
+
+		// Non-SDK errors (e.g. structured stream parse failure) can still
+		// land after message_start surfaced usage; preserve it.
+		if partialUsage := m.extractUsage(response); partialUsage != nil {
+			collector.Counter("input_tokens").Add(int(partialUsage.InputTokens))
+			collector.Counter("output_tokens").Add(int(partialUsage.OutputTokens))
+			collector.Counter("cached_read_tokens").Add(int(partialUsage.CachedReadTokens))
+			collector.Counter("cached_write_tokens").Add(int(partialUsage.CachedWriteTokens))
+			m.metrics.RecordCall(ctx,
+				GenAISystemAnthropic, GenAIOperationChat, GenAIModel(m.model),
+				partialUsage.InputTokens,
+				partialUsage.OutputTokens,
+				partialUsage.CachedReadTokens,
+				partialUsage.CachedWriteTokens,
+			)
+		}
+
 		m.metrics.RecordCallDuration(ctx, GenAISystemAnthropic, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeInternal)
 		return TurnOutput{}, fmt.Errorf("error from Anthropic (model %s): %w", m.model, err)
 	}

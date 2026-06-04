@@ -190,6 +190,29 @@ func (m *openaiModel) newSession(ctx context.Context, options ...GenerateOption)
 	return newSession(turn, newTracker(opts), toolMap, opts, m.logger), nil
 }
 
+// extractUsage converts an OpenAI Response's usage block into TurnUsage.
+// Returns nil when no tokens have been reported (e.g. the stream errored
+// before a Completed/Failed/Incomplete event surfaced a final response).
+func (m *openaiModel) extractUsage(resp *responses.Response) *TurnUsage {
+	if resp == nil {
+		return nil
+	}
+
+	u := resp.Usage
+	if u.InputTokens == 0 && u.OutputTokens == 0 &&
+		u.InputTokensDetails.CachedTokens == 0 && u.OutputTokensDetails.ReasoningTokens == 0 {
+		return nil
+	}
+
+	cachedTokens := u.InputTokensDetails.CachedTokens
+	return &TurnUsage{
+		InputTokens:      uncachedInputTokens(u.InputTokens, cachedTokens),
+		OutputTokens:     u.OutputTokens,
+		CachedReadTokens: cachedTokens,
+		ThinkingTokens:   u.OutputTokensDetails.ReasoningTokens,
+	}
+}
+
 func (m *openaiModel) convertMessages(messages []*Message) (responses.ResponseInputParam, error) {
 	result := make(responses.ResponseInputParam, 0, len(messages))
 
@@ -567,6 +590,24 @@ func (t *openaiTurn) Next(ctx context.Context) (TurnOutput, error) {
 		if metrics := GetMetrics(ctx); metrics != nil {
 			metrics.RecordFailure(m.statsModel, collector)
 		}
+
+		// If a ResponseIncomplete/Failed event landed before the transport
+		// errored, finalResponse already carries usage — preserve it so
+		// cost accounting is not lost.
+		partialUsage := m.extractUsage(finalResponse)
+		if partialUsage != nil {
+			collector.Counter("input_tokens").Add(int(partialUsage.InputTokens))
+			collector.Counter("output_tokens").Add(int(partialUsage.OutputTokens))
+			collector.Counter("cached_read_tokens").Add(int(partialUsage.CachedReadTokens))
+			m.metrics.RecordCall(ctx,
+				GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model),
+				partialUsage.InputTokens,
+				partialUsage.OutputTokens,
+				partialUsage.CachedReadTokens,
+				0,
+			)
+		}
+
 		openaiError := &openai.Error{}
 		if errors.As(stream.Err(), &openaiError) && isUnavailableStatusCode(openaiError.StatusCode) {
 			m.metrics.RecordCallDuration(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeUnavailable)
@@ -582,6 +623,7 @@ func (t *openaiTurn) Next(ctx context.Context) (TurnOutput, error) {
 				HasRetryAfter: hasRA,
 				Attempts:      t.opts.MaxRetries + 1,
 				PartialOutput: streamingEmitted,
+				PartialUsage:  partialUsage,
 				Cause:         stream.Err(),
 			}
 			if streamingEmitted {
@@ -605,6 +647,23 @@ func (t *openaiTurn) Next(ctx context.Context) (TurnOutput, error) {
 		if metrics := GetMetrics(ctx); metrics != nil {
 			metrics.RecordFailure(m.statsModel, collector)
 		}
+
+		// A ResponseStatusFailed event carries final usage (the model
+		// generated tokens before the server-side failure), so preserve it.
+		partialUsage := m.extractUsage(finalResponse)
+		if partialUsage != nil {
+			collector.Counter("input_tokens").Add(int(partialUsage.InputTokens))
+			collector.Counter("output_tokens").Add(int(partialUsage.OutputTokens))
+			collector.Counter("cached_read_tokens").Add(int(partialUsage.CachedReadTokens))
+			m.metrics.RecordCall(ctx,
+				GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model),
+				partialUsage.InputTokens,
+				partialUsage.OutputTokens,
+				partialUsage.CachedReadTokens,
+				0,
+			)
+		}
+
 		respErr := finalResponse.Error
 		err := fmt.Errorf("OpenAI response failed (model %s): %s: %s", m.model, respErr.Code, respErr.Message)
 		if respErr.Code == "rate_limit_exceeded" {
@@ -615,6 +674,7 @@ func (t *openaiTurn) Next(ctx context.Context) (TurnOutput, error) {
 				StatusCode:    0,
 				Attempts:      t.opts.MaxRetries + 1,
 				PartialOutput: streamingEmitted,
+				PartialUsage:  partialUsage,
 				Cause:         err,
 			}
 			if streamingEmitted {

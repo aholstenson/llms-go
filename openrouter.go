@@ -487,7 +487,7 @@ func (t *openrouterTurn) nextNonStreaming(ctx context.Context, start time.Time, 
 		return m.client.CreateChatCompletion(ctx, t.params)
 	})
 	if err != nil {
-		return t.reportError(ctx, err, start, collector, false, false)
+		return t.reportError(ctx, err, start, collector, false, false, nil)
 	}
 
 	if len(response.Choices) == 0 {
@@ -533,30 +533,15 @@ func (t *openrouterTurn) nextNonStreaming(ctx context.Context, start time.Time, 
 	thinking := extractOpenRouterThinking(&message)
 
 	var usage TurnUsage
-	if response.Usage != nil {
-		// OpenRouter mirrors OpenAI: PromptTokens is the total prompt size and
-		// *includes* both the cache-read and cache-write tokens, so subtract
-		// both for the disjoint, uncached input the rest of the stack expects
-		// (see uncachedInputTokens). Anthropic models routed via OpenRouter are
-		// the source of cache-write tokens.
-		cachedTokens := int64(response.Usage.PromptTokenDetails.CachedTokens)
-		cachedWriteTokens := int64(response.Usage.PromptTokenDetails.CacheWriteTokens)
-		inputTokens := uncachedInputTokens(int64(response.Usage.PromptTokens), cachedTokens+cachedWriteTokens)
-		outputTokens := int64(response.Usage.CompletionTokens)
-
-		usage = TurnUsage{
-			InputTokens:       inputTokens,
-			OutputTokens:      outputTokens,
-			CachedReadTokens:  cachedTokens,
-			CachedWriteTokens: cachedWriteTokens,
-		}
-		collector.Counter("input_tokens").Add(int(inputTokens))
-		collector.Counter("output_tokens").Add(int(outputTokens))
-		collector.Counter("cached_read_tokens").Add(int(cachedTokens))
-		collector.Counter("cached_write_tokens").Add(int(cachedWriteTokens))
+	if u := m.extractUsage(response.Usage); u != nil {
+		usage = *u
+		collector.Counter("input_tokens").Add(int(u.InputTokens))
+		collector.Counter("output_tokens").Add(int(u.OutputTokens))
+		collector.Counter("cached_read_tokens").Add(int(u.CachedReadTokens))
+		collector.Counter("cached_write_tokens").Add(int(u.CachedWriteTokens))
 		m.metrics.RecordCall(ctx,
 			GenAISystemOpenRouter, GenAIOperationChat, GenAIModel(m.model),
-			inputTokens, outputTokens, cachedTokens, cachedWriteTokens,
+			u.InputTokens, u.OutputTokens, u.CachedReadTokens, u.CachedWriteTokens,
 		)
 	}
 
@@ -589,7 +574,7 @@ func (t *openrouterTurn) nextStreaming(ctx context.Context, start time.Time, col
 
 	stream, err := m.client.CreateChatCompletionStream(ctx, params)
 	if err != nil {
-		return t.reportError(ctx, err, start, collector, true, false)
+		return t.reportError(ctx, err, start, collector, true, false, nil)
 	}
 	defer stream.Close()
 
@@ -752,7 +737,7 @@ func (t *openrouterTurn) nextStreaming(ctx context.Context, start time.Time, col
 		return TurnOutput{}, fmt.Errorf("stream handling failed for OpenRouter (model %s)", m.model)
 	}
 	if err != nil {
-		return t.reportError(ctx, err, start, collector, true, streamingEmitted)
+		return t.reportError(ctx, err, start, collector, true, streamingEmitted, m.extractUsage(usage))
 	}
 
 	// Rebuild assistant message + neutral tool calls in deterministic order.
@@ -846,10 +831,27 @@ func (t *openrouterTurn) nextStreaming(ctx context.Context, start time.Time, col
 	}, nil
 }
 
-func (t *openrouterTurn) reportError(ctx context.Context, err error, start time.Time, collector Collector, streaming bool, partialEmitted bool) (TurnOutput, error) {
+func (t *openrouterTurn) reportError(ctx context.Context, err error, start time.Time, collector Collector, streaming bool, partialEmitted bool, partialUsage *TurnUsage) (TurnOutput, error) {
 	m := t.m
 	if metrics := GetMetrics(ctx); metrics != nil {
 		metrics.RecordFailure(m.statsModel, collector)
+	}
+
+	// On a mid-stream failure the chunked stream may already have surfaced
+	// a usage block (IncludeUsage is set on every streaming request);
+	// preserve it so cost accounting is not lost.
+	if partialUsage != nil {
+		collector.Counter("input_tokens").Add(int(partialUsage.InputTokens))
+		collector.Counter("output_tokens").Add(int(partialUsage.OutputTokens))
+		collector.Counter("cached_read_tokens").Add(int(partialUsage.CachedReadTokens))
+		collector.Counter("cached_write_tokens").Add(int(partialUsage.CachedWriteTokens))
+		m.metrics.RecordCall(ctx,
+			GenAISystemOpenRouter, GenAIOperationChat, GenAIModel(m.model),
+			partialUsage.InputTokens,
+			partialUsage.OutputTokens,
+			partialUsage.CachedReadTokens,
+			partialUsage.CachedWriteTokens,
+		)
 	}
 
 	// retryLoop already wrapped non-streaming retryable errors in
@@ -858,6 +860,7 @@ func (t *openrouterTurn) reportError(ctx context.Context, err error, start time.
 	var ue *UnavailableError
 	if errors.As(err, &ue) {
 		ue.PartialOutput = partialEmitted
+		ue.PartialUsage = partialUsage
 		ue.Provider = string(GenAISystemOpenRouter)
 		ue.Model = m.model
 		m.metrics.RecordCallDuration(ctx, GenAISystemOpenRouter, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeUnavailable)
@@ -881,6 +884,7 @@ func (t *openrouterTurn) reportError(ctx context.Context, err error, start time.
 			HasRetryAfter: hasRA,
 			Attempts:      1,
 			PartialOutput: partialEmitted,
+			PartialUsage:  partialUsage,
 			Cause:         err,
 		}
 		if partialEmitted {
@@ -890,6 +894,28 @@ func (t *openrouterTurn) reportError(ctx context.Context, err error, start time.
 	}
 	m.metrics.RecordCallDuration(ctx, GenAISystemOpenRouter, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeInternal)
 	return TurnOutput{}, fmt.Errorf("error from OpenRouter (model %s): %w", m.model, err)
+}
+
+// extractUsage converts an openrouter.Usage to TurnUsage, or returns nil
+// when no tokens have been reported.
+func (m *openrouterModel) extractUsage(u *openrouter.Usage) *TurnUsage {
+	if u == nil {
+		return nil
+	}
+	// PromptTokens includes both cache-read and cache-write tokens; subtract
+	// both for the disjoint, uncached input (see uncachedInputTokens).
+	cachedTokens := int64(u.PromptTokenDetails.CachedTokens)
+	cachedWriteTokens := int64(u.PromptTokenDetails.CacheWriteTokens)
+	if u.PromptTokens == 0 && u.CompletionTokens == 0 &&
+		cachedTokens == 0 && cachedWriteTokens == 0 {
+		return nil
+	}
+	return &TurnUsage{
+		InputTokens:       uncachedInputTokens(int64(u.PromptTokens), cachedTokens+cachedWriteTokens),
+		OutputTokens:      int64(u.CompletionTokens),
+		CachedReadTokens:  cachedTokens,
+		CachedWriteTokens: cachedWriteTokens,
+	}
 }
 
 func extractOpenRouterThinking(msg *openrouter.ChatCompletionMessage) []ThinkingBlock {

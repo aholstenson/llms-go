@@ -54,4 +54,21 @@ var _ = Describe("Streaming partial output sentinel", func() {
 		Expect(errors.As(wrapped, &recovered)).To(BeTrue())
 		Expect(recovered.PartialOutput).To(BeTrue())
 	})
+
+	It("PartialUsage survives an errors.As recovery", func() {
+		ue := &UnavailableError{
+			PartialOutput: true,
+			PartialUsage: &TurnUsage{
+				InputTokens:  12,
+				OutputTokens: 7,
+			},
+		}
+		joined := errors.Join(ue, ErrStreamingPartialOutput)
+
+		var recovered *UnavailableError
+		Expect(errors.As(joined, &recovered)).To(BeTrue())
+		Expect(recovered.PartialUsage).NotTo(BeNil())
+		Expect(recovered.PartialUsage.InputTokens).To(Equal(int64(12)))
+		Expect(recovered.PartialUsage.OutputTokens).To(Equal(int64(7)))
+	})
 })
