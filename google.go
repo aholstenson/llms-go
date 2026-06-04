@@ -704,7 +704,7 @@ func (t *googleTurn) Next(ctx context.Context) (TurnOutput, error) {
 
 		var apiErr genai.APIError
 		if errors.As(err, &apiErr) {
-			m.logger.Error("Google API error", slog.Any("error", err), slog.Any("messages", t.messages))
+			m.logger.Error("Google API error", slog.Any("error", err))
 		}
 
 		m.metrics.RecordCallDuration(ctx, GenAISystemGoogle, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeInternal)
