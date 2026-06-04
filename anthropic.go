@@ -812,6 +812,8 @@ func (t *anthropicTurn) Next(ctx context.Context) (TurnOutput, error) {
 				ra = t.opts.RetryAfterCap
 			}
 			ue := &UnavailableError{
+				Provider:      string(GenAISystemAnthropic),
+				Model:         m.model,
 				StatusCode:    anthropicError.StatusCode,
 				RetryAfter:    ra,
 				HasRetryAfter: hasRA,
@@ -826,13 +828,13 @@ func (t *anthropicTurn) Next(ctx context.Context) (TurnOutput, error) {
 		}
 
 		m.metrics.RecordCallDuration(ctx, GenAISystemAnthropic, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeInternal)
-		return TurnOutput{}, fmt.Errorf("error from Anthropic: %w", err)
+		return TurnOutput{}, fmt.Errorf("error from Anthropic (model %s): %w", m.model, err)
 	} else if err != nil {
 		if metrics := GetMetrics(ctx); metrics != nil {
 			metrics.RecordFailure(m.statsModel, collector)
 		}
 		m.metrics.RecordCallDuration(ctx, GenAISystemAnthropic, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeInternal)
-		return TurnOutput{}, err
+		return TurnOutput{}, fmt.Errorf("error from Anthropic (model %s): %w", m.model, err)
 	}
 
 	var toolUseBlocks []anthropic.BetaToolUseBlock

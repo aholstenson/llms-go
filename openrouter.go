@@ -495,7 +495,7 @@ func (t *openrouterTurn) nextNonStreaming(ctx context.Context, start time.Time, 
 			metrics.RecordFailure(m.statsModel, collector)
 		}
 		m.metrics.RecordCallDuration(ctx, GenAISystemOpenRouter, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeEmptyResponse)
-		return TurnOutput{}, errors.New("no completion choices returned from OpenRouter")
+		return TurnOutput{}, fmt.Errorf("no completion choices returned from OpenRouter (model %s)", m.model)
 	}
 
 	choice := response.Choices[0]
@@ -749,7 +749,7 @@ func (t *openrouterTurn) nextStreaming(ctx context.Context, start time.Time, col
 			metrics.RecordFailure(m.statsModel, collector)
 		}
 		m.metrics.RecordCallDuration(ctx, GenAISystemOpenRouter, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeStreamProcessing)
-		return TurnOutput{}, errors.New("stream handling failed")
+		return TurnOutput{}, fmt.Errorf("stream handling failed for OpenRouter (model %s)", m.model)
 	}
 	if err != nil {
 		return t.reportError(ctx, err, start, collector, true, streamingEmitted)
@@ -858,6 +858,8 @@ func (t *openrouterTurn) reportError(ctx context.Context, err error, start time.
 	var ue *UnavailableError
 	if errors.As(err, &ue) {
 		ue.PartialOutput = partialEmitted
+		ue.Provider = string(GenAISystemOpenRouter)
+		ue.Model = m.model
 		m.metrics.RecordCallDuration(ctx, GenAISystemOpenRouter, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeUnavailable)
 		if partialEmitted {
 			return TurnOutput{}, errors.Join(ue, ErrStreamingPartialOutput)
@@ -872,6 +874,8 @@ func (t *openrouterTurn) reportError(ctx context.Context, err error, start time.
 			ra = t.opts.RetryAfterCap
 		}
 		newUE := &UnavailableError{
+			Provider:      string(GenAISystemOpenRouter),
+			Model:         m.model,
 			StatusCode:    status,
 			RetryAfter:    ra,
 			HasRetryAfter: hasRA,
@@ -885,7 +889,7 @@ func (t *openrouterTurn) reportError(ctx context.Context, err error, start time.
 		return TurnOutput{}, newUE
 	}
 	m.metrics.RecordCallDuration(ctx, GenAISystemOpenRouter, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeInternal)
-	return TurnOutput{}, fmt.Errorf("error from OpenRouter: %w", err)
+	return TurnOutput{}, fmt.Errorf("error from OpenRouter (model %s): %w", m.model, err)
 }
 
 func extractOpenRouterThinking(msg *openrouter.ChatCompletionMessage) []ThinkingBlock {

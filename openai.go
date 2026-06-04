@@ -101,12 +101,10 @@ func (m *openaiModel) newSession(ctx context.Context, options ...GenerateOption)
 	params := responses.ResponseNewParams{
 		Model: shared.ResponsesModel(m.model),
 		// Drive the loop statelessly: we re-send the full input every turn
-		// and disable server-side storage. Request encrypted reasoning so
-		// o-series reasoning items survive replay between turns.
+		// and disable server-side storage. Encrypted reasoning is requested
+		// below only when the model actually reasons — non-reasoning models
+		// reject the include with a 400.
 		Store: openai.Bool(false),
-		Include: []responses.ResponseIncludable{
-			responses.ResponseIncludableReasoningEncryptedContent,
-		},
 	}
 
 	if opts.SystemPrompt != "" {
@@ -126,12 +124,17 @@ func (m *openaiModel) newSession(ctx context.Context, options ...GenerateOption)
 	switch route := resolveReasoningRoute(opts, m.info, false, m.logger); route.Kind {
 	case reasoningKindEffort:
 		params.Reasoning = shared.ReasoningParam{Effort: openaiReasoningEffort(route.Effort)}
+		params.Include = []responses.ResponseIncludable{responses.ResponseIncludableReasoningEncryptedContent}
+	case reasoningKindMandatory:
+		// o-series always reasons (rejects "none"); send no reasoning param
+		// but still ask for encrypted content so reasoning items replay.
+		params.Include = []responses.ResponseIncludable{responses.ResponseIncludableReasoningEncryptedContent}
 	case reasoningKindDisable:
 		// gpt-5-family reasoning models accept effort "none" to disable.
 		params.Reasoning = shared.ReasoningParam{Effort: shared.ReasoningEffort("none")}
-	case reasoningKindMandatory, reasoningKindSkip, reasoningKindBudget:
-		// o-series always reasons (rejects "none"); non-reasoning/unknown
-		// models get no reasoning param; budget is not applicable to OpenAI.
+	case reasoningKindSkip, reasoningKindBudget:
+		// Non-reasoning/unknown models get no reasoning param and no
+		// encrypted-content include (would 400). Budget is not applicable.
 	}
 
 	if opts.MaxThinkingTokens > 0 && maxOutput > 0 {
@@ -558,7 +561,7 @@ func (t *openaiTurn) Next(ctx context.Context) (TurnOutput, error) {
 			metrics.RecordFailure(m.statsModel, collector)
 		}
 		m.metrics.RecordCallDuration(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeStreamProcessing)
-		return TurnOutput{}, errors.New("stream handling failed")
+		return TurnOutput{}, fmt.Errorf("stream handling failed for OpenAI (model %s)", m.model)
 	}
 	if stream.Err() != nil {
 		if metrics := GetMetrics(ctx); metrics != nil {
@@ -572,6 +575,8 @@ func (t *openaiTurn) Next(ctx context.Context) (TurnOutput, error) {
 				ra = t.opts.RetryAfterCap
 			}
 			ue := &UnavailableError{
+				Provider:      string(GenAISystemOpenAI),
+				Model:         m.model,
 				StatusCode:    openaiError.StatusCode,
 				RetryAfter:    ra,
 				HasRetryAfter: hasRA,
@@ -585,7 +590,7 @@ func (t *openaiTurn) Next(ctx context.Context) (TurnOutput, error) {
 			return TurnOutput{}, ue
 		}
 		m.metrics.RecordCallDuration(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeInternal)
-		return TurnOutput{}, fmt.Errorf("got error from OpenAI while streaming: %w", stream.Err())
+		return TurnOutput{}, fmt.Errorf("got error from OpenAI (model %s) while streaming: %w", m.model, stream.Err())
 	}
 
 	if finalResponse == nil {
@@ -593,7 +598,7 @@ func (t *openaiTurn) Next(ctx context.Context) (TurnOutput, error) {
 			metrics.RecordFailure(m.statsModel, collector)
 		}
 		m.metrics.RecordCallDuration(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeEmptyResponse)
-		return TurnOutput{}, errors.New("no completed response from OpenAI")
+		return TurnOutput{}, fmt.Errorf("no completed response from OpenAI (model %s)", m.model)
 	}
 
 	if finalResponse.Status == responses.ResponseStatusFailed {
@@ -601,10 +606,12 @@ func (t *openaiTurn) Next(ctx context.Context) (TurnOutput, error) {
 			metrics.RecordFailure(m.statsModel, collector)
 		}
 		respErr := finalResponse.Error
-		err := fmt.Errorf("OpenAI response failed: %s: %s", respErr.Code, respErr.Message)
+		err := fmt.Errorf("OpenAI response failed (model %s): %s: %s", m.model, respErr.Code, respErr.Message)
 		if respErr.Code == "rate_limit_exceeded" {
 			m.metrics.RecordCallDuration(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeUnavailable)
 			ue := &UnavailableError{
+				Provider:      string(GenAISystemOpenAI),
+				Model:         m.model,
 				StatusCode:    0,
 				Attempts:      t.opts.MaxRetries + 1,
 				PartialOutput: streamingEmitted,

@@ -29,6 +29,9 @@ var ErrStructuredStreamParse = errors.New("structured stream parse failed")
 // wrapped error chain.
 //
 // Fields:
+//   - Provider: the GenAI system (e.g. "openai", "anthropic"), or "" if
+//     not stamped.
+//   - Model: the model ID requested, or "" if not stamped.
 //   - StatusCode: HTTP status when known, 0 otherwise (e.g. OpenAI in-band
 //     rate_limit_exceeded events).
 //   - RetryAfter: the server's Retry-After hint (after RetryAfterCap is
@@ -43,6 +46,8 @@ var ErrStructuredStreamParse = errors.New("structured stream parse failed")
 //   - PartialOutput: true when at least one content event was dispatched
 //     to StreamingFunc before the stream errored.
 type UnavailableError struct {
+	Provider      string
+	Model         string
 	StatusCode    int
 	RetryAfter    time.Duration
 	HasRetryAfter bool
@@ -53,6 +58,17 @@ type UnavailableError struct {
 
 func (e *UnavailableError) Error() string {
 	b := []byte("model unavailable")
+	if e.Provider != "" || e.Model != "" {
+		b = append(b, " ("...)
+		if e.Provider != "" {
+			b = append(b, e.Provider...)
+			if e.Model != "" {
+				b = append(b, '/')
+			}
+		}
+		b = append(b, e.Model...)
+		b = append(b, ')')
+	}
 	if e.StatusCode != 0 {
 		b = append(b, fmt.Sprintf(" (status %d)", e.StatusCode)...)
 	}

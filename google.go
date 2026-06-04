@@ -386,7 +386,7 @@ func (m *googleModel) handleStreaming(
 	}
 
 	if lastResponse == nil {
-		return nil, errors.New("no response from Google")
+		return nil, fmt.Errorf("no response from Google (model %s)", m.model)
 	}
 
 	return lastResponse, nil
@@ -667,6 +667,8 @@ func (t *googleTurn) Next(ctx context.Context) (TurnOutput, error) {
 		var ue *UnavailableError
 		if errors.As(err, &ue) {
 			ue.PartialOutput = streamingEmitted
+			ue.Provider = string(GenAISystemGoogle)
+			ue.Model = m.model
 			m.metrics.RecordCallDuration(ctx, GenAISystemGoogle, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeUnavailable)
 			if streamingEmitted {
 				return TurnOutput{}, errors.Join(ue, ErrStreamingPartialOutput)
@@ -683,6 +685,8 @@ func (t *googleTurn) Next(ctx context.Context) (TurnOutput, error) {
 					ra = t.opts.RetryAfterCap
 				}
 				se := &UnavailableError{
+					Provider:      string(GenAISystemGoogle),
+					Model:         m.model,
 					StatusCode:    status,
 					RetryAfter:    ra,
 					HasRetryAfter: hasRA,
@@ -704,7 +708,7 @@ func (t *googleTurn) Next(ctx context.Context) (TurnOutput, error) {
 		}
 
 		m.metrics.RecordCallDuration(ctx, GenAISystemGoogle, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeInternal)
-		return TurnOutput{}, err
+		return TurnOutput{}, fmt.Errorf("error from Google (model %s): %w", m.model, err)
 	}
 
 	var usage TurnUsage
