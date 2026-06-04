@@ -2589,8 +2589,9 @@ var _ = Describe("Parser", func() {
 	})
 
 	Context("when using sub-parser that returns errors", func() {
-		It("should silently ignore sub-parser Feed errors", func() {
-			errSubParser := &errorSubParser{feedErr: errors.New("feed error")}
+		It("should propagate sub-parser Feed errors from Feed", func() {
+			feedErr := errors.New("feed error")
+			errSubParser := &errorSubParser{feedErr: feedErr}
 			schema := &jsonstream.Schema{
 				Root: jsonstream.FieldConfig{
 					Type: jsonstream.TypeObject,
@@ -2605,21 +2606,14 @@ var _ = Describe("Parser", func() {
 			}
 			p := jsonstream.New(schema)
 
-			events, err := p.Feed(`{"content": "test"}`)
-			Expect(err).NotTo(HaveOccurred())
-
-			// Should still get the string complete event
-			var foundComplete bool
-			for _, e := range events {
-				if _, ok := e.(jsonstream.EventStringComplete); ok {
-					foundComplete = true
-				}
-			}
-			Expect(foundComplete).To(BeTrue())
+			_, err := p.Feed(`{"content": "test"}`)
+			Expect(err).To(HaveOccurred())
+			Expect(errors.Is(err, feedErr)).To(BeTrue(), "expected wrapped feed error, got %v", err)
 		})
 
-		It("should silently ignore sub-parser Flush errors", func() {
-			errSubParser := &errorSubParser{flushErr: errors.New("flush error")}
+		It("should propagate sub-parser Feed errors mid-string when chunked", func() {
+			feedErr := errors.New("feed error")
+			errSubParser := &errorSubParser{feedErr: feedErr}
 			schema := &jsonstream.Schema{
 				Root: jsonstream.FieldConfig{
 					Type: jsonstream.TypeObject,
@@ -2634,16 +2628,60 @@ var _ = Describe("Parser", func() {
 			}
 			p := jsonstream.New(schema)
 
-			events, err := p.Feed(`{"content": "test"}`)
+			// Feed without closing quote — triggers the mid-string sub-parser flush
+			// path (processString lines ~579-590).
+			_, err := p.Feed(`{"content": "abc`)
+			Expect(err).To(HaveOccurred())
+			Expect(errors.Is(err, feedErr)).To(BeTrue(), "expected wrapped feed error, got %v", err)
+		})
+
+		It("should propagate sub-parser Flush errors from Feed at end-of-string", func() {
+			flushErr := errors.New("flush error")
+			errSubParser := &errorSubParser{flushErr: flushErr}
+			schema := &jsonstream.Schema{
+				Root: jsonstream.FieldConfig{
+					Type: jsonstream.TypeObject,
+					Children: map[string]jsonstream.FieldConfig{
+						"content": {
+							Type:      jsonstream.TypeString,
+							Streaming: true,
+							SubParser: errSubParser,
+						},
+					},
+				},
+			}
+			p := jsonstream.New(schema)
+
+			_, err := p.Feed(`{"content": "test"}`)
+			Expect(err).To(HaveOccurred())
+			Expect(errors.Is(err, flushErr)).To(BeTrue(), "expected wrapped flush error, got %v", err)
+		})
+
+		It("should propagate sub-parser Flush errors from Parser.Flush", func() {
+			flushErr := errors.New("flush error")
+			errSubParser := &errorSubParser{flushErr: flushErr}
+			schema := &jsonstream.Schema{
+				Root: jsonstream.FieldConfig{
+					Type: jsonstream.TypeObject,
+					Children: map[string]jsonstream.FieldConfig{
+						"content": {
+							Type:      jsonstream.TypeString,
+							Streaming: true,
+							SubParser: errSubParser,
+						},
+					},
+				},
+			}
+			p := jsonstream.New(schema)
+
+			// Open string but never close it, then Flush() should surface the
+			// sub-parser flush error from flushPending().
+			_, err := p.Feed(`{"content": "abc`)
 			Expect(err).NotTo(HaveOccurred())
 
-			var foundComplete bool
-			for _, e := range events {
-				if _, ok := e.(jsonstream.EventStringComplete); ok {
-					foundComplete = true
-				}
-			}
-			Expect(foundComplete).To(BeTrue())
+			_, err = p.Flush()
+			Expect(err).To(HaveOccurred())
+			Expect(errors.Is(err, flushErr)).To(BeTrue(), "expected wrapped flush error, got %v", err)
 		})
 	})
 

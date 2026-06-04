@@ -135,7 +135,9 @@ func (p *Parser) Flush() ([]Event, error) {
 	p.events = nil
 
 	// Flush any remaining buffered content
-	p.flushPending()
+	if err := p.flushPending(); err != nil {
+		return p.events, err
+	}
 
 	return p.events, nil
 }
@@ -515,13 +517,19 @@ func (p *Parser) processString(frame *stateFrame) (int, error) {
 					chunk := p.pendingChunk + chunkBuilder.String()
 					p.pendingChunk = ""
 					if frame.subParser != nil {
-						events, _ := frame.subParser.Feed(chunk)
-						flushEvents, _ := frame.subParser.Flush()
+						events, ferr := frame.subParser.Feed(chunk)
 						for _, ev := range events {
 							p.emitSubParserEvent(ev)
 						}
+						if ferr != nil {
+							return consumed, newParseError(p.currentPath(), p.offset+consumed, "sub-parser feed failed", ferr)
+						}
+						flushEvents, flerr := frame.subParser.Flush()
 						for _, ev := range flushEvents {
 							p.emitSubParserEvent(ev)
+						}
+						if flerr != nil {
+							return consumed, newParseError(p.currentPath(), p.offset+consumed, "sub-parser flush failed", flerr)
 						}
 					} else {
 						p.emitEvent(EventStringChunk{path: p.currentPath(), Chunk: chunk})
@@ -540,9 +548,12 @@ func (p *Parser) processString(frame *stateFrame) (int, error) {
 				chunk := p.pendingChunk + chunkBuilder.String()
 				p.pendingChunk = ""
 				if frame.subParser != nil {
-					events, _ := frame.subParser.Feed(chunk)
+					events, ferr := frame.subParser.Feed(chunk)
 					for _, ev := range events {
 						p.emitSubParserEvent(ev)
+					}
+					if ferr != nil {
+						return consumed, newParseError(p.currentPath(), p.offset+consumed, "sub-parser feed failed", ferr)
 					}
 				} else {
 					p.emitEvent(EventStringChunk{path: p.currentPath(), Chunk: chunk})
@@ -580,9 +591,12 @@ func (p *Parser) processString(frame *stateFrame) (int, error) {
 		chunk := p.pendingChunk + chunkBuilder.String()
 		p.pendingChunk = ""
 		if frame.subParser != nil {
-			events, _ := frame.subParser.Feed(chunk)
+			events, ferr := frame.subParser.Feed(chunk)
 			for _, ev := range events {
 				p.emitSubParserEvent(ev)
+			}
+			if ferr != nil {
+				return consumed, newParseError(p.currentPath(), p.offset+consumed, "sub-parser feed failed", ferr)
 			}
 		} else {
 			p.emitEvent(EventStringChunk{path: p.currentPath(), Chunk: chunk})
@@ -947,28 +961,43 @@ func (p *Parser) emitSubParserEvent(event any) {
 	p.emitEvent(EventParsedStringChunk{path: path, Chunk: event})
 }
 
-func (p *Parser) flushPending() {
+func (p *Parser) flushPending() error {
 	// Handle any remaining buffered content
-	if len(p.stack) > 0 {
-		frame := p.stack[len(p.stack)-1]
-		if frame.state == stateString && frame.config != nil && frame.config.Streaming {
-			if p.pendingChunk != "" {
-				if frame.subParser != nil {
-					events, _ := frame.subParser.Feed(p.pendingChunk)
-					flushEvents, _ := frame.subParser.Flush()
-					for _, ev := range events {
-						p.emitSubParserEvent(ev)
-					}
-					for _, ev := range flushEvents {
-						p.emitSubParserEvent(ev)
-					}
-				} else {
-					p.emitEvent(EventStringChunk{path: p.currentPath(), Chunk: p.pendingChunk})
-				}
-				p.pendingChunk = ""
+	if len(p.stack) == 0 {
+		return nil
+	}
+	frame := p.stack[len(p.stack)-1]
+	if frame.state != stateString || frame.config == nil || !frame.config.Streaming {
+		return nil
+	}
+	if p.pendingChunk == "" && frame.subParser == nil {
+		return nil
+	}
+	if frame.subParser != nil {
+		var feedErr error
+		if p.pendingChunk != "" {
+			var events []any
+			events, feedErr = frame.subParser.Feed(p.pendingChunk)
+			for _, ev := range events {
+				p.emitSubParserEvent(ev)
 			}
 		}
+		p.pendingChunk = ""
+		if feedErr != nil {
+			return newParseError(p.currentPath(), p.offset, "sub-parser feed failed", feedErr)
+		}
+		flushEvents, flushErr := frame.subParser.Flush()
+		for _, ev := range flushEvents {
+			p.emitSubParserEvent(ev)
+		}
+		if flushErr != nil {
+			return newParseError(p.currentPath(), p.offset, "sub-parser flush failed", flushErr)
+		}
+		return nil
 	}
+	p.emitEvent(EventStringChunk{path: p.currentPath(), Chunk: p.pendingChunk})
+	p.pendingChunk = ""
+	return nil
 }
 
 func isHexDigit(ch byte) bool {
