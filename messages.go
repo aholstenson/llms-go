@@ -86,6 +86,11 @@ type ToolResultPart struct {
 	Name  string
 	Text  string
 	Error string
+	// Attachments are optional rich-content parts (*ImagePart / *BinaryPart)
+	// produced by a tool alongside its textual result. They are delivered to
+	// the model either natively (Anthropic) or via a trailing synthetic user
+	// message (OpenAI / Google / OpenRouter).
+	Attachments []MessagePart
 }
 
 func NewToolResultPart(id, name, text, errText string) *ToolResultPart {
@@ -148,9 +153,13 @@ func partTypeName(p MessagePart) (string, error) {
 	}
 }
 
-func (m *Message) MarshalJSON() ([]byte, error) {
-	parts := make([]json.RawMessage, 0, len(m.Parts))
-	for _, p := range m.Parts {
+// marshalParts encodes a slice of MessageParts into discriminated raw JSON
+// objects, splicing a "type" field into each part. It is shared by the
+// Message codec and by ToolResultPart's attachment encoding so nested parts
+// round-trip identically to top-level ones.
+func marshalParts(parts []MessagePart) ([]json.RawMessage, error) {
+	out := make([]json.RawMessage, 0, len(parts))
+	for _, p := range parts {
 		typeName, err := partTypeName(p)
 		if err != nil {
 			return nil, err
@@ -167,28 +176,20 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		} else {
 			merged = append(merged, '}')
 		}
-		parts = append(parts, merged)
+		out = append(out, merged)
 	}
-	return json.Marshal(messageJSON{Role: m.Role, Parts: parts, Cache: m.Cache})
+	return out, nil
 }
 
-func mustJSON(v any) []byte {
-	b, _ := json.Marshal(v)
-	return b
-}
-
-func (m *Message) UnmarshalJSON(data []byte) error {
-	var raw messageJSON
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return err
-	}
-	m.Role = raw.Role
-	m.Cache = raw.Cache
-	m.Parts = make([]MessagePart, 0, len(raw.Parts))
-	for _, rp := range raw.Parts {
+// unmarshalParts decodes discriminated raw JSON objects back into MessageParts,
+// dispatching on the "type" field. Shared by the Message codec and
+// ToolResultPart's attachment decoding.
+func unmarshalParts(raw []json.RawMessage) ([]MessagePart, error) {
+	parts := make([]MessagePart, 0, len(raw))
+	for _, rp := range raw {
 		var env partEnvelope
 		if err := json.Unmarshal(rp, &env); err != nil {
-			return err
+			return nil, err
 		}
 		var part MessagePart
 		switch env.Type {
@@ -205,12 +206,113 @@ func (m *Message) UnmarshalJSON(data []byte) error {
 		case "thinking":
 			part = new(ThinkingPart)
 		default:
-			return fmt.Errorf("cannot unmarshal unknown message part type %q", env.Type)
+			return nil, fmt.Errorf("cannot unmarshal unknown message part type %q", env.Type)
 		}
 		if err := json.Unmarshal(rp, part); err != nil {
+			return nil, err
+		}
+		parts = append(parts, part)
+	}
+	return parts, nil
+}
+
+// marshalAttachments encodes tool-result attachments, rejecting any part that
+// is not an image or binary so the rich-result boundary stays narrow.
+func marshalAttachments(parts []MessagePart) ([]json.RawMessage, error) {
+	for _, p := range parts {
+		switch p.(type) {
+		case *ImagePart, *BinaryPart:
+		default:
+			return nil, fmt.Errorf("tool-result attachment must be *ImagePart or *BinaryPart, got %T", p)
+		}
+	}
+	return marshalParts(parts)
+}
+
+// unmarshalAttachments decodes tool-result attachments and enforces the same
+// image/binary restriction as marshalAttachments.
+func unmarshalAttachments(raw []json.RawMessage) ([]MessagePart, error) {
+	parts, err := unmarshalParts(raw)
+	if err != nil {
+		return nil, err
+	}
+	for _, p := range parts {
+		switch p.(type) {
+		case *ImagePart, *BinaryPart:
+		default:
+			return nil, fmt.Errorf("tool-result attachment must be image or binary, got %T", p)
+		}
+	}
+	return parts, nil
+}
+
+func (m *Message) MarshalJSON() ([]byte, error) {
+	parts, err := marshalParts(m.Parts)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(messageJSON{Role: m.Role, Parts: parts, Cache: m.Cache})
+}
+
+func mustJSON(v any) []byte {
+	b, _ := json.Marshal(v)
+	return b
+}
+
+func (m *Message) UnmarshalJSON(data []byte) error {
+	var raw messageJSON
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	m.Role = raw.Role
+	m.Cache = raw.Cache
+	parts, err := unmarshalParts(raw.Parts)
+	if err != nil {
+		return err
+	}
+	m.Parts = parts
+	return nil
+}
+
+// toolResultPartJSON is the on-disk shape of a ToolResultPart. The scalar
+// fields keep their default (capitalized) names for backward compatibility;
+// attachments are encoded as discriminated parts via the shared helpers so
+// they survive the snapshot round-trip even though they nest under a part.
+type toolResultPartJSON struct {
+	ID          string            `json:"ID"`
+	Name        string            `json:"Name"`
+	Text        string            `json:"Text"`
+	Error       string            `json:"Error"`
+	Attachments []json.RawMessage `json:"Attachments,omitempty"`
+}
+
+func (p *ToolResultPart) MarshalJSON() ([]byte, error) {
+	out := toolResultPartJSON{ID: p.ID, Name: p.Name, Text: p.Text, Error: p.Error}
+	if len(p.Attachments) > 0 {
+		atts, err := marshalAttachments(p.Attachments)
+		if err != nil {
+			return nil, err
+		}
+		out.Attachments = atts
+	}
+	return json.Marshal(out)
+}
+
+func (p *ToolResultPart) UnmarshalJSON(data []byte) error {
+	var raw toolResultPartJSON
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	p.ID = raw.ID
+	p.Name = raw.Name
+	p.Text = raw.Text
+	p.Error = raw.Error
+	if len(raw.Attachments) > 0 {
+		atts, err := unmarshalAttachments(raw.Attachments)
+		if err != nil {
 			return err
 		}
-		m.Parts = append(m.Parts, part)
+		p.Attachments = atts
 	}
 	return nil
 }

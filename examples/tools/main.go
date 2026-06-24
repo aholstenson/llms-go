@@ -53,8 +53,8 @@ func (weatherTool) Execute(ctx context.Context, in *WeatherInput) (WeatherOutput
 	return WeatherOutput{City: in.City, Temp: 18, Condition: "partly cloudy"}, nil
 }
 
-func (weatherTool) ToString(out WeatherOutput) string {
-	return fmt.Sprintf("%s: %d°C, %s", out.City, out.Temp, out.Condition)
+func (weatherTool) Render(out WeatherOutput) llms.ToolResult {
+	return llms.TextToolResult(fmt.Sprintf("%s: %d°C, %s", out.City, out.Temp, out.Condition))
 }
 
 func main() {

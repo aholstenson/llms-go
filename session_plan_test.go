@@ -377,6 +377,15 @@ var _ = Describe("Session plan/observe", func() {
 						NewTextPart("calling"),
 						NewToolCallPart("1", "echo", `{"v":"hi"}`),
 					),
+					NewMessage(RoleUser, &ToolResultPart{
+						ID:   "1",
+						Name: "echo",
+						Text: "rendered",
+						Attachments: []MessagePart{
+							NewImagePart("https://example.com/a.png"),
+							NewBinaryPart("image/png", []byte{4, 5, 6}),
+						},
+					}),
 				},
 				Step:         1,
 				Phase:        SessionPhaseAwaitingTools,
@@ -404,6 +413,15 @@ var _ = Describe("Session plan/observe", func() {
 				NewImagePart("https://example.com/i.png"),
 				NewBinaryPart("application/pdf", []byte{1, 2, 3}),
 				NewToolResultPart("t1", "echo", "x", ""),
+				&ToolResultPart{
+					ID:   "t2",
+					Name: "screenshot",
+					Text: "captured",
+					Attachments: []MessagePart{
+						NewImagePart("https://example.com/shot.png"),
+						NewBinaryPart("image/png", []byte{9, 8, 7}),
+					},
+				},
 			).WithCache(true)
 
 			for _, original := range []*Message{msg, user} {

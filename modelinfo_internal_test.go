@@ -145,7 +145,7 @@ func (echoTool) Name() string                                             { retu
 func (echoTool) Description() string                                      { return "echoes input" }
 func (echoTool) Schema() *echoInput                                       { return &echoInput{} }
 func (echoTool) Execute(_ context.Context, in *echoInput) (string, error) { return in.Text, nil }
-func (echoTool) ToString(s string) string                                 { return s }
+func (echoTool) Render(s string) ToolResult                               { return TextToolResult(s) }
 
 func testMetrics(t *testing.T) *Metrics {
 	t.Helper()

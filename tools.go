@@ -12,6 +12,58 @@ import (
 	"github.com/invopop/jsonschema"
 )
 
+// ToolResult is what a tool renders from a successful Execute. Text is what
+// the model reads as the result; Attachments optionally carry rich content
+// (*ImagePart / *BinaryPart) that is delivered to the model either natively
+// (Anthropic tool-result blocks) or as a trailing synthetic user message
+// (OpenAI / Google / OpenRouter).
+//
+// Render only concerns the success path: errors continue to flow through
+// ToolOutcome.Error / ModelError / VisibleToolError.
+type ToolResult struct {
+	// Text is what the model reads as the tool result.
+	Text string
+	// Attachments are optional rich-content parts (*ImagePart / *BinaryPart)
+	// delivered to the model alongside the textual result.
+	Attachments []MessagePart
+}
+
+// TextToolResult is a convenience constructor for the common text-only tool
+// result. (Named to avoid colliding with the TextResult Result type.)
+func TextToolResult(text string) ToolResult { return ToolResult{Text: text} }
+
+// WithImage returns a copy of the result with an image attachment appended.
+// It chains off TextToolResult (or a bare ToolResult{}) for the rich-content
+// case, e.g. TextToolResult("done").WithImage("https://...").
+func (r ToolResult) WithImage(url string) ToolResult {
+	r.Attachments = append(r.Attachments, NewImagePart(url))
+	return r
+}
+
+// WithBinary returns a copy of the result with a binary attachment appended,
+// e.g. TextToolResult("rendered chart").WithBinary("image/png", png).
+func (r ToolResult) WithBinary(mediaType string, data []byte) ToolResult {
+	r.Attachments = append(r.Attachments, NewBinaryPart(mediaType, data))
+	return r
+}
+
+// appendToolAttachment appends a labeled attachment group to parts: a text
+// part naming the tool call, followed by the attachments themselves. It is a
+// no-op when the call produced no attachments.
+//
+// Providers without native in-result attachment support (OpenAI, Google,
+// OpenRouter) deliver tool-result attachments in a trailing user message. The
+// label gives the model an explicit back-reference so each attachment is
+// attributed to its tool call rather than read as fresh user input — which
+// matters when several tool calls in one batch each return attachments.
+func appendToolAttachment(parts []MessagePart, name, id string, attachments []MessagePart) []MessagePart {
+	if len(attachments) == 0 {
+		return parts
+	}
+	parts = append(parts, NewTextPart(fmt.Sprintf("Attachment(s) from tool %q (call %s):", name, id)))
+	return append(parts, attachments...)
+}
+
 // Tool is used to describe a tool that can be used by the LLM.
 type Tool[I any, O any] interface {
 	// Name is the unique name of the tool.
@@ -27,7 +79,10 @@ type Tool[I any, O any] interface {
 	// Execute is the function that will be called when the tool is invoked.
 	Execute(ctx context.Context, input I) (O, error)
 
-	ToString(O) string
+	// Render turns a successful Execute output into the result delivered to
+	// the model. Use TextResult for the common text-only case, or set
+	// Attachments to deliver images/binary content.
+	Render(O) ToolResult
 }
 
 type ToolDef interface {
@@ -35,7 +90,7 @@ type ToolDef interface {
 	Description() string
 	Schema() any
 	Execute(ctx context.Context, in any) (any, error)
-	ToString(any) string
+	Render(any) ToolResult
 }
 
 // ConditionalTool is an optional interface that ToolDef values may implement
@@ -66,8 +121,8 @@ func (tw *toolWrapper[I, O]) Execute(ctx context.Context, in any) (any, error) {
 	return tw.tool.Execute(ctx, in.(I))
 }
 
-func (tw *toolWrapper[I, O]) ToString(out any) string {
-	return tw.tool.ToString(out.(O))
+func (tw *toolWrapper[I, O]) Render(out any) ToolResult {
+	return tw.tool.Render(out.(O))
 }
 
 // IsAvailable delegates to the wrapped Tool when it implements
@@ -139,7 +194,7 @@ func newPublicID() string {
 
 // doToolCall is a helper function to make a tool call using the given JSON-encoded
 // arguments.
-func doToolCall(ctx context.Context, logger *slog.Logger, streamingFunc StreamingFunc, timeout time.Duration, id string, tool ToolDef, arguments string) (result string, err error) {
+func doToolCall(ctx context.Context, logger *slog.Logger, streamingFunc StreamingFunc, timeout time.Duration, id string, tool ToolDef, arguments string) (result ToolResult, err error) {
 	if timeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, timeout)
@@ -185,7 +240,7 @@ func doToolCall(ctx context.Context, logger *slog.Logger, streamingFunc Streamin
 	args := reflect.New(schemaType).Interface()
 	if err := json.Unmarshal([]byte(arguments), args); err != nil {
 		logger.Error("Tool call failed, could not parse arguments", slog.String("tool", tool.Name()), slog.String("toolCallID", id), slog.Int("inputLength", len(arguments)), slog.Any("error", err))
-		return "", fmt.Errorf("%w: %w", NewVisibleToolError("invalid arguments"), err)
+		return ToolResult{}, fmt.Errorf("%w: %w", NewVisibleToolError("invalid arguments"), err)
 	}
 
 	// From here on the ToolUse event has been sent (or attempted), so the
@@ -201,12 +256,12 @@ func doToolCall(ctx context.Context, logger *slog.Logger, streamingFunc Streamin
 	out, err = tool.Execute(ctx, args)
 	if err != nil {
 		logger.Error("Tool call failed", slog.String("tool", tool.Name()), slog.String("toolCallID", id), slog.Int("inputLength", len(arguments)), slog.Any("error", err))
-		return "", fmt.Errorf("tool execution failed: %w", err)
+		return ToolResult{}, fmt.Errorf("tool execution failed: %w", err)
 	}
 
-	result = tool.ToString(out)
+	result = tool.Render(out)
 
-	logger.Debug("Tool call succeeded", slog.String("tool", tool.Name()), slog.String("toolCallID", id), slog.String("result", result))
+	logger.Debug("Tool call succeeded", slog.String("tool", tool.Name()), slog.String("toolCallID", id), slog.String("result", result.Text))
 
 	return result, nil
 }

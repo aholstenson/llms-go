@@ -226,6 +226,7 @@ func (m *openaiModel) convertMessages(messages []*Message) (responses.ResponseIn
 			// Tool-result messages map to standalone function_call_output
 			// items in the Responses input, one per result.
 			if _, isToolResult := msg.Parts[0].(*ToolResultPart); isToolResult {
+				var trailing []MessagePart
 				for _, part := range msg.Parts {
 					trp, ok := part.(*ToolResultPart)
 					if !ok {
@@ -239,6 +240,23 @@ func (m *openaiModel) convertMessages(messages []*Message) (responses.ResponseIn
 						OfFunctionCallOutput: &responses.ResponseInputItemFunctionCallOutputParam{
 							CallID: trp.ID,
 							Output: text,
+						},
+					})
+					if trp.Error == "" {
+						trailing = appendToolAttachment(trailing, trp.Name, trp.ID, trp.Attachments)
+					}
+				}
+				// The Responses tool-result item is text-only, so deliver any
+				// rich attachments as a trailing, labeled user message.
+				if len(trailing) > 0 {
+					content, err := convertUserParts(trailing)
+					if err != nil {
+						return nil, err
+					}
+					result = append(result, responses.ResponseInputItemUnionParam{
+						OfInputMessage: &responses.ResponseInputItemMessageParam{
+							Role:    "user",
+							Content: content,
 						},
 					})
 				}
@@ -428,6 +446,7 @@ func (t *openaiTurn) Observe(ctx context.Context, _ TurnOutput, outcomes []ToolO
 // ObserveToolResults appends only the tool-result items, used when the
 // assistant turn is already in native history (reconstructed turn).
 func (t *openaiTurn) ObserveToolResults(_ context.Context, _ []ToolCall, outcomes []ToolOutcome) error {
+	var trailing []MessagePart
 	for _, o := range outcomes {
 		text := o.Text
 		if o.Error != nil {
@@ -437,6 +456,23 @@ func (t *openaiTurn) ObserveToolResults(_ context.Context, _ []ToolCall, outcome
 			OfFunctionCallOutput: &responses.ResponseInputItemFunctionCallOutputParam{
 				CallID: o.ID,
 				Output: text,
+			},
+		})
+		if o.Error == nil {
+			trailing = appendToolAttachment(trailing, o.Name, o.ID, o.Attachments)
+		}
+	}
+	// The Responses tool-result item is text-only, so deliver any rich
+	// attachments as a trailing, labeled user message.
+	if len(trailing) > 0 {
+		content, err := convertUserParts(trailing)
+		if err != nil {
+			return err
+		}
+		t.inputItems = append(t.inputItems, responses.ResponseInputItemUnionParam{
+			OfInputMessage: &responses.ResponseInputItemMessageParam{
+				Role:    "user",
+				Content: content,
 			},
 		})
 	}

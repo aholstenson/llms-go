@@ -233,6 +233,45 @@ func (r rawJSONSchema) MarshalJSON() ([]byte, error) {
 	return []byte(r), nil
 }
 
+// openrouterUserParts converts neutral message parts into OpenRouter
+// multi-part content. It is shared by user-message conversion and tool-result
+// attachment fallback. Non-image binary is rejected: OpenRouter has no portable
+// carrier for it.
+func openrouterUserParts(parts []MessagePart) ([]openrouter.ChatMessagePart, error) {
+	out := make([]openrouter.ChatMessagePart, 0, len(parts))
+	for _, part := range parts {
+		switch p := part.(type) {
+		case *TextPart:
+			out = append(out, openrouter.ChatMessagePart{
+				Type: openrouter.ChatMessagePartTypeText,
+				Text: p.Text,
+			})
+		case *ImagePart:
+			out = append(out, openrouter.ChatMessagePart{
+				Type: openrouter.ChatMessagePartTypeImageURL,
+				ImageURL: &openrouter.ChatMessageImageURL{
+					URL: p.URL,
+				},
+			})
+		case *BinaryPart:
+			if strings.HasPrefix(p.MediaType, "image/") {
+				dataURL := fmt.Sprintf("data:%s;base64,%s", p.MediaType, base64.StdEncoding.EncodeToString(p.Data))
+				out = append(out, openrouter.ChatMessagePart{
+					Type: openrouter.ChatMessagePartTypeImageURL,
+					ImageURL: &openrouter.ChatMessageImageURL{
+						URL: dataURL,
+					},
+				})
+			} else {
+				return nil, fmt.Errorf("unsupported binary media type for OpenRouter: %s", p.MediaType)
+			}
+		default:
+			return nil, fmt.Errorf("unsupported part type for OpenRouter: %T", part)
+		}
+	}
+	return out, nil
+}
+
 func (m *openrouterModel) convertMessages(systemPrompt string, messages []*Message) ([]openrouter.ChatCompletionMessage, error) {
 	result := make([]openrouter.ChatCompletionMessage, 0, len(messages)+1)
 
@@ -250,6 +289,7 @@ func (m *openrouterModel) convertMessages(systemPrompt string, messages []*Messa
 			// Tool-result messages map to OpenRouter's separate tool role,
 			// one message per result.
 			if _, isToolResult := msg.Parts[0].(*ToolResultPart); isToolResult {
+				var trailing []MessagePart
 				for _, part := range msg.Parts {
 					trp, ok := part.(*ToolResultPart)
 					if !ok {
@@ -260,6 +300,21 @@ func (m *openrouterModel) convertMessages(systemPrompt string, messages []*Messa
 						text = trp.Error
 					}
 					result = append(result, openrouter.ToolMessage(trp.ID, text))
+					if trp.Error == "" {
+						trailing = appendToolAttachment(trailing, trp.Name, trp.ID, trp.Attachments)
+					}
+				}
+				// The tool message is text-only, so deliver any rich
+				// attachments as a trailing, labeled user message.
+				if len(trailing) > 0 {
+					parts, err := openrouterUserParts(trailing)
+					if err != nil {
+						return nil, err
+					}
+					result = append(result, openrouter.ChatCompletionMessage{
+						Role:    openrouter.ChatMessageRoleUser,
+						Content: openrouter.Content{Multi: parts},
+					})
 				}
 				continue
 			}
@@ -272,36 +327,9 @@ func (m *openrouterModel) convertMessages(systemPrompt string, messages []*Messa
 				}
 			}
 
-			parts := make([]openrouter.ChatMessagePart, 0, len(msg.Parts))
-			for _, part := range msg.Parts {
-				switch p := part.(type) {
-				case *TextPart:
-					parts = append(parts, openrouter.ChatMessagePart{
-						Type: openrouter.ChatMessagePartTypeText,
-						Text: p.Text,
-					})
-				case *ImagePart:
-					parts = append(parts, openrouter.ChatMessagePart{
-						Type: openrouter.ChatMessagePartTypeImageURL,
-						ImageURL: &openrouter.ChatMessageImageURL{
-							URL: p.URL,
-						},
-					})
-				case *BinaryPart:
-					if strings.HasPrefix(p.MediaType, "image/") {
-						dataURL := fmt.Sprintf("data:%s;base64,%s", p.MediaType, base64.StdEncoding.EncodeToString(p.Data))
-						parts = append(parts, openrouter.ChatMessagePart{
-							Type: openrouter.ChatMessagePartTypeImageURL,
-							ImageURL: &openrouter.ChatMessageImageURL{
-								URL: dataURL,
-							},
-						})
-					} else {
-						return nil, fmt.Errorf("unsupported binary media type for OpenRouter: %s", p.MediaType)
-					}
-				default:
-					return nil, fmt.Errorf("unsupported part type for OpenRouter: %T", part)
-				}
+			parts, err := openrouterUserParts(msg.Parts)
+			if err != nil {
+				return nil, err
 			}
 			result = append(result, openrouter.ChatCompletionMessage{
 				Role:    openrouter.ChatMessageRoleUser,
@@ -422,12 +450,28 @@ func (t *openrouterTurn) Observe(ctx context.Context, _ TurnOutput, outcomes []T
 }
 
 func (t *openrouterTurn) ObserveToolResults(_ context.Context, _ []ToolCall, outcomes []ToolOutcome) error {
+	var trailing []MessagePart
 	for _, o := range outcomes {
 		result := o.Text
 		if o.Error != nil {
 			result = o.ModelError()
 		}
 		t.params.Messages = append(t.params.Messages, openrouter.ToolMessage(o.ID, result))
+		if o.Error == nil {
+			trailing = appendToolAttachment(trailing, o.Name, o.ID, o.Attachments)
+		}
+	}
+	// The tool message is text-only, so deliver any rich attachments as a
+	// trailing, labeled user message.
+	if len(trailing) > 0 {
+		parts, err := openrouterUserParts(trailing)
+		if err != nil {
+			return err
+		}
+		t.params.Messages = append(t.params.Messages, openrouter.ChatCompletionMessage{
+			Role:    openrouter.ChatMessageRoleUser,
+			Content: openrouter.Content{Multi: parts},
+		})
 	}
 	return nil
 }

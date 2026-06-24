@@ -73,7 +73,7 @@ func (t researchTool) Execute(ctx context.Context, in *ResearchInput) (string, e
 	return "", nil
 }
 
-func (researchTool) ToString(out string) string { return out }
+func (researchTool) Render(out string) llms.ToolResult { return llms.TextToolResult(out) }
 
 // DeployInput is the deploy tool's argument schema.
 type DeployInput struct {
@@ -82,10 +82,10 @@ type DeployInput struct {
 
 type deployTool struct{}
 
-func (deployTool) Name() string               { return "deploy" }
-func (deployTool) Description() string        { return "Deploy a service to production." }
-func (deployTool) Schema() *DeployInput       { return &DeployInput{} }
-func (deployTool) ToString(out string) string { return out }
+func (deployTool) Name() string                      { return "deploy" }
+func (deployTool) Description() string               { return "Deploy a service to production." }
+func (deployTool) Schema() *DeployInput              { return &DeployInput{} }
+func (deployTool) Render(out string) llms.ToolResult { return llms.TextToolResult(out) }
 func (deployTool) Execute(_ context.Context, in *DeployInput) (string, error) {
 	fmt.Println("deploying", in.Service)
 	return "deployed " + in.Service, nil

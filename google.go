@@ -450,9 +450,49 @@ func (m *googleModel) isPartEmpty(p *genai.Part) bool {
 		!p.Thought
 }
 
+// googleTrailingPart converts a neutral part of the trailing tool-result
+// attachment message (a label *TextPart or an *ImagePart / *BinaryPart) into a
+// genai.Part. Shared by the tool-result attachment fallback in convertMessages
+// and ObserveToolResults.
+func googleTrailingPart(part MessagePart) (*genai.Part, error) {
+	switch p := part.(type) {
+	case *TextPart:
+		return &genai.Part{Text: p.Text}, nil
+	case *BinaryPart:
+		return &genai.Part{InlineData: &genai.Blob{Data: p.Data, MIMEType: p.MediaType}}, nil
+	case *ImagePart:
+		return &genai.Part{FileData: &genai.FileData{FileURI: p.URL}}, nil
+	default:
+		return nil, fmt.Errorf("unsupported trailing part type for Google: %T", part)
+	}
+}
+
+// googleTrailingContent builds the trailing user content delivering tool-result
+// attachments, or nil when there is nothing to deliver.
+func (m *googleModel) googleTrailingContent(trailing []MessagePart) (*genai.Content, error) {
+	if len(trailing) == 0 {
+		return nil, nil
+	}
+	parts := make([]*genai.Part, 0, len(trailing))
+	for _, t := range trailing {
+		p, err := googleTrailingPart(t)
+		if err != nil {
+			return nil, err
+		}
+		if !m.isPartEmpty(p) {
+			parts = append(parts, p)
+		}
+	}
+	if len(parts) == 0 {
+		return nil, nil
+	}
+	return &genai.Content{Role: genai.RoleUser, Parts: parts}, nil
+}
+
 func (m *googleModel) convertMessages(messages []*Message) ([]*genai.Content, error) {
 	result := make([]*genai.Content, 0, len(messages)+1)
 	for _, message := range messages {
+		var trailing []MessagePart
 		parts := make([]*genai.Part, 0, len(message.Parts))
 		for _, part := range message.Parts {
 			var p *genai.Part
@@ -500,6 +540,7 @@ func (m *googleModel) convertMessages(messages []*Message) ([]*genai.Content, er
 					responseMap["error"] = part.Error
 				} else {
 					responseMap["output"] = part.Text
+					trailing = appendToolAttachment(trailing, part.Name, part.ID, part.Attachments)
 				}
 				p = &genai.Part{
 					FunctionResponse: &genai.FunctionResponse{
@@ -530,6 +571,16 @@ func (m *googleModel) convertMessages(messages []*Message) ([]*genai.Content, er
 			default:
 				return nil, fmt.Errorf("unsupported message role for Google: %s", message.Role)
 			}
+		}
+
+		// A function_response part is text-only, so deliver any tool-result
+		// attachments as a trailing, labeled user message.
+		trailingMsg, err := m.googleTrailingContent(trailing)
+		if err != nil {
+			return nil, err
+		}
+		if trailingMsg != nil {
+			result = append(result, trailingMsg)
 		}
 	}
 	return result, nil
@@ -620,12 +671,14 @@ func (t *googleTurn) Observe(ctx context.Context, _ TurnOutput, outcomes []ToolO
 // the assistant message is already in native history (reconstructed turn).
 func (t *googleTurn) ObserveToolResults(_ context.Context, _ []ToolCall, outcomes []ToolOutcome) error {
 	toolResultsMsg := &genai.Content{Role: genai.RoleUser}
+	var trailing []MessagePart
 	for _, o := range outcomes {
 		responseMap := make(map[string]any)
 		if o.Error != nil {
 			responseMap["error"] = o.ModelError()
 		} else {
 			responseMap["output"] = o.Text
+			trailing = appendToolAttachment(trailing, o.Name, o.ID, o.Attachments)
 		}
 		toolResultsMsg.Parts = append(toolResultsMsg.Parts, &genai.Part{
 			FunctionResponse: &genai.FunctionResponse{
@@ -636,6 +689,16 @@ func (t *googleTurn) ObserveToolResults(_ context.Context, _ []ToolCall, outcome
 		})
 	}
 	t.messages = append(t.messages, toolResultsMsg)
+
+	// A function_response part is text-only, so deliver any tool-result
+	// attachments as a trailing, labeled user message.
+	trailingMsg, err := t.m.googleTrailingContent(trailing)
+	if err != nil {
+		return err
+	}
+	if trailingMsg != nil {
+		t.messages = append(t.messages, trailingMsg)
+	}
 	return nil
 }
 

@@ -39,6 +39,10 @@ type ToolOutcome struct {
 	Name  string
 	Text  string
 	Error error
+	// Attachments are optional rich-content parts (*ImagePart / *BinaryPart)
+	// produced by the tool's Render, delivered to the model alongside Text.
+	// Only meaningful on the success path (Error == nil).
+	Attachments []MessagePart
 }
 
 // ModelError returns the message that should be sent to the model for this

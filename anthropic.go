@@ -510,6 +510,32 @@ func (m *anthropicModel) extractUsage(msg *anthropic.BetaMessage) *TurnUsage {
 	}
 }
 
+// betaImageBlock converts a neutral *ImagePart / *BinaryPart into an
+// Anthropic image block param. It is shared by user-message conversion and
+// tool-result attachment passthrough.
+func betaImageBlock(part MessagePart) (*anthropic.BetaImageBlockParam, error) {
+	switch content := part.(type) {
+	case *ImagePart:
+		return &anthropic.BetaImageBlockParam{
+			Source: anthropic.BetaImageBlockParamSourceUnion{
+				OfURL: &anthropic.BetaURLImageSourceParam{URL: content.URL},
+			},
+		}, nil
+	case *BinaryPart:
+		data := base64.StdEncoding.EncodeToString(content.Data)
+		return &anthropic.BetaImageBlockParam{
+			Source: anthropic.BetaImageBlockParamSourceUnion{
+				OfBase64: &anthropic.BetaBase64ImageSourceParam{
+					MediaType: anthropic.BetaBase64ImageSourceMediaType(content.MediaType),
+					Data:      data,
+				},
+			},
+		}, nil
+	default:
+		return nil, fmt.Errorf("unsupported attachment type for Anthropic: %T", part)
+	}
+}
+
 func (m *anthropicModel) convertMessages(systemPrompt string, messages []*Message) ([]anthropic.BetaMessageParam, string, error) {
 	result := make([]anthropic.BetaMessageParam, 0, len(messages))
 
@@ -548,28 +574,12 @@ func (m *anthropicModel) convertMessages(systemPrompt string, messages []*Messag
 							CacheControl: cacheControl,
 						},
 					})
-				case *ImagePart:
-					contentParts = append(contentParts, anthropic.BetaContentBlockParamUnion{
-						OfImage: &anthropic.BetaImageBlockParam{
-							Source: anthropic.BetaImageBlockParamSourceUnion{
-								OfURL: &anthropic.BetaURLImageSourceParam{
-									URL: content.URL,
-								},
-							},
-						},
-					})
-				case *BinaryPart:
-					data := base64.StdEncoding.EncodeToString(content.Data)
-					contentParts = append(contentParts, anthropic.BetaContentBlockParamUnion{
-						OfImage: &anthropic.BetaImageBlockParam{
-							Source: anthropic.BetaImageBlockParamSourceUnion{
-								OfBase64: &anthropic.BetaBase64ImageSourceParam{
-									MediaType: anthropic.BetaBase64ImageSourceMediaType(content.MediaType),
-									Data:      data,
-								},
-							},
-						},
-					})
+				case *ImagePart, *BinaryPart:
+					img, err := betaImageBlock(part)
+					if err != nil {
+						return nil, "", err
+					}
+					contentParts = append(contentParts, anthropic.BetaContentBlockParamUnion{OfImage: img})
 				case *ToolResultPart:
 					// Replayed tool result. The live cache breakpoint on the
 					// latest tool_result is owned by anthropicTurn.Observe; do
@@ -578,13 +588,24 @@ func (m *anthropicModel) convertMessages(systemPrompt string, messages []*Messag
 					if content.Error != "" {
 						result = content.Error
 					}
+					resultContent := []anthropic.BetaToolResultBlockParamContentUnion{
+						{OfText: &anthropic.BetaTextBlockParam{Text: result}},
+					}
+					// Attachments only accompany a successful result.
+					if content.Error == "" {
+						for _, att := range content.Attachments {
+							img, err := betaImageBlock(att)
+							if err != nil {
+								return nil, "", err
+							}
+							resultContent = append(resultContent, anthropic.BetaToolResultBlockParamContentUnion{OfImage: img})
+						}
+					}
 					contentParts = append(contentParts, anthropic.BetaContentBlockParamUnion{
 						OfToolResult: &anthropic.BetaToolResultBlockParam{
 							ToolUseID: content.ID,
-							Content: []anthropic.BetaToolResultBlockParamContentUnion{
-								{OfText: &anthropic.BetaTextBlockParam{Text: result}},
-							},
-							IsError: anthropic.Bool(content.Error != ""),
+							Content:   resultContent,
+							IsError:   anthropic.Bool(content.Error != ""),
 						},
 					})
 				default:
@@ -763,12 +784,24 @@ func (t *anthropicTurn) ObserveToolResults(_ context.Context, _ []ToolCall, outc
 			cacheControl = anthropic.NewBetaCacheControlEphemeralParam()
 		}
 
+		resultContent := []anthropic.BetaToolResultBlockParamContentUnion{
+			{OfText: &anthropic.BetaTextBlockParam{Text: result}},
+		}
+		// Attachments only accompany a successful result.
+		if o.Error == nil {
+			for _, att := range o.Attachments {
+				img, err := betaImageBlock(att)
+				if err != nil {
+					return err
+				}
+				resultContent = append(resultContent, anthropic.BetaToolResultBlockParamContentUnion{OfImage: img})
+			}
+		}
+
 		toolResultsContent = append(toolResultsContent, anthropic.BetaContentBlockParamUnion{
 			OfToolResult: &anthropic.BetaToolResultBlockParam{
-				ToolUseID: o.ID,
-				Content: []anthropic.BetaToolResultBlockParamContentUnion{
-					{OfText: &anthropic.BetaTextBlockParam{Text: result}},
-				},
+				ToolUseID:    o.ID,
+				Content:      resultContent,
 				IsError:      anthropic.Bool(o.Error != nil),
 				CacheControl: cacheControl,
 			},

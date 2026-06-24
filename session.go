@@ -416,7 +416,8 @@ func (s *Session) RunTools(ctx context.Context, calls []ToolCall) ([]ToolOutcome
 			if err != nil {
 				outcome.Error = err
 			} else {
-				outcome.Text = result
+				outcome.Text = result.Text
+				outcome.Attachments = result.Attachments
 			}
 			ch <- indexed{i: i, outcome: outcome}
 		}(i, call, tool)
@@ -470,7 +471,7 @@ func assistantMessage(out TurnOutput) *Message {
 func toolOutcomeMessage(outcomes []ToolOutcome) *Message {
 	parts := make([]MessagePart, 0, len(outcomes))
 	for _, o := range outcomes {
-		parts = append(parts, &ToolResultPart{ID: o.ID, Name: o.Name, Text: o.Text, Error: o.ModelError()})
+		parts = append(parts, &ToolResultPart{ID: o.ID, Name: o.Name, Text: o.Text, Error: o.ModelError(), Attachments: o.Attachments})
 	}
 	return NewMessage(RoleUser, parts...)
 }

@@ -93,6 +93,61 @@ var _ = Describe("anthropicTurn cache-control budget", func() {
 	})
 })
 
+var _ = Describe("anthropicTurn tool-result attachments", func() {
+	It("appends an OfImage content block to the tool_result for an attachment", func() {
+		m := &anthropicModel{}
+		turn := &anthropicTurn{
+			m:        m,
+			response: &anthropic.BetaMessage{Role: "assistant"},
+			params:   anthropic.BetaMessageNewParams{},
+		}
+
+		Expect(turn.Observe(context.Background(), TurnOutput{}, []ToolOutcome{
+			{
+				ID:   "1",
+				Name: "shot",
+				Text: "captured",
+				Attachments: []MessagePart{
+					NewBinaryPart("image/png", []byte{1, 2, 3}),
+				},
+			},
+		})).To(Succeed())
+
+		// The last message is the tool-result user message.
+		last := turn.params.Messages[len(turn.params.Messages)-1]
+		Expect(last.Content).To(HaveLen(1))
+		tr := last.Content[0].OfToolResult
+		Expect(tr).NotTo(BeNil())
+		Expect(tr.Content).To(HaveLen(2))
+		Expect(tr.Content[0].OfText).NotTo(BeNil())
+		Expect(tr.Content[0].OfText.Text).To(Equal("captured"))
+		Expect(tr.Content[1].OfImage).NotTo(BeNil())
+		Expect(tr.Content[1].OfImage.Source.OfBase64).NotTo(BeNil())
+	})
+
+	It("carries attachments through convertMessages tool-result replay", func() {
+		m := &anthropicModel{}
+		msgs := []*Message{
+			NewMessage(RoleUser, &ToolResultPart{
+				ID:   "1",
+				Name: "shot",
+				Text: "captured",
+				Attachments: []MessagePart{
+					NewImagePart("https://example.com/a.png"),
+				},
+			}),
+		}
+		out, _, err := m.convertMessages("", msgs)
+		Expect(err).NotTo(HaveOccurred())
+		tr := out[0].Content[0].OfToolResult
+		Expect(tr).NotTo(BeNil())
+		Expect(tr.Content).To(HaveLen(2))
+		Expect(tr.Content[1].OfImage).NotTo(BeNil())
+		Expect(tr.Content[1].OfImage.Source.OfURL).NotTo(BeNil())
+		Expect(tr.Content[1].OfImage.Source.OfURL.URL).To(Equal("https://example.com/a.png"))
+	})
+})
+
 var _ = Describe("anthropicModel.convertTools cache-control", func() {
 	It("caches the last deduped tool when duplicates appear at the tail", func() {
 		m := &anthropicModel{}

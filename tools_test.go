@@ -15,10 +15,10 @@ type condArgs struct{}
 // plainTool is a Tool[*condArgs, string] that does not opt in to ConditionalTool.
 type plainTool struct{ name string }
 
-func (t plainTool) Name() string                                       { return t.name }
-func (t plainTool) Description() string                                { return "plain" }
-func (t plainTool) Schema() *condArgs                                  { return &condArgs{} }
-func (t plainTool) ToString(s string) string                           { return s }
+func (t plainTool) Name() string                                           { return t.name }
+func (t plainTool) Description() string                                    { return "plain" }
+func (t plainTool) Schema() *condArgs                                      { return &condArgs{} }
+func (t plainTool) Render(s string) ToolResult                             { return TextToolResult(s) }
 func (t plainTool) Execute(_ context.Context, _ *condArgs) (string, error) { return t.name, nil }
 
 // condTool is a Tool[*condArgs, string] that opts in to ConditionalTool.
@@ -28,12 +28,12 @@ type condTool struct {
 	err   error
 }
 
-func (t condTool) Name() string                                       { return t.name }
-func (t condTool) Description() string                                { return "conditional" }
-func (t condTool) Schema() *condArgs                                  { return &condArgs{} }
-func (t condTool) ToString(s string) string                           { return s }
+func (t condTool) Name() string                                           { return t.name }
+func (t condTool) Description() string                                    { return "conditional" }
+func (t condTool) Schema() *condArgs                                      { return &condArgs{} }
+func (t condTool) Render(s string) ToolResult                             { return TextToolResult(s) }
 func (t condTool) Execute(_ context.Context, _ *condArgs) (string, error) { return t.name, nil }
-func (t condTool) IsAvailable(_ context.Context) (bool, error)        { return t.avail, t.err }
+func (t condTool) IsAvailable(_ context.Context) (bool, error)            { return t.avail, t.err }
 
 var _ = Describe("filterAvailableTools", func() {
 	ctx := context.Background()
@@ -94,6 +94,38 @@ var _ = Describe("filterAvailableTools", func() {
 		out, err = filterAvailableTools(ctx, empty)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(out).To(HaveLen(0))
+	})
+})
+
+var _ = Describe("ToolResult builders", func() {
+	It("TextToolResult carries text and no attachments", func() {
+		r := TextToolResult("done")
+		Expect(r.Text).To(Equal("done"))
+		Expect(r.Attachments).To(BeEmpty())
+	})
+
+	It("WithImage and WithBinary append attachments in order", func() {
+		r := TextToolResult("chart").
+			WithImage("https://example.com/a.png").
+			WithBinary("image/png", []byte{1, 2, 3})
+
+		Expect(r.Text).To(Equal("chart"))
+		Expect(r.Attachments).To(Equal([]MessagePart{
+			NewImagePart("https://example.com/a.png"),
+			NewBinaryPart("image/png", []byte{1, 2, 3}),
+		}))
+	})
+
+	It("supports an attachment-only result off a bare ToolResult", func() {
+		r := ToolResult{}.WithImage("https://example.com/b.png")
+		Expect(r.Text).To(BeEmpty())
+		Expect(r.Attachments).To(HaveLen(1))
+	})
+
+	It("does not mutate the receiver (value semantics)", func() {
+		base := TextToolResult("base")
+		base.WithImage("https://example.com/c.png")
+		Expect(base.Attachments).To(BeEmpty())
 	})
 })
 

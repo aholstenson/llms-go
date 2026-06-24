@@ -14,15 +14,15 @@ import (
 // any provider. Each Next pops the next scripted TurnOutput; emit, when set,
 // is called from Next so streaming-event ordering can be asserted.
 type fakeTurn struct {
-	mu       sync.Mutex
-	script   []TurnOutput
-	nextIdx  int
-	nextCnt  int
+	mu                    sync.Mutex
+	script                []TurnOutput
+	nextIdx               int
+	nextCnt               int
 	observed              [][]ToolOutcome
 	reconstructedObserved [][]ToolOutcome
 	injected              []*Message
-	finalTxt string
-	emit     func(ctx context.Context) error
+	finalTxt              string
+	emit                  func(ctx context.Context) error
 }
 
 func (f *fakeTurn) Next(ctx context.Context) (TurnOutput, error) {
@@ -98,14 +98,29 @@ type sessTool struct {
 func (t sessTool) Name() string        { return t.name }
 func (t sessTool) Description() string { return "echo tool" }
 func (t sessTool) Schema() *sessArgs   { return &sessArgs{} }
-func (t sessTool) ToString(s string) string {
-	return s
+func (t sessTool) Render(s string) ToolResult {
+	return TextToolResult(s)
 }
 func (t sessTool) Execute(ctx context.Context, in *sessArgs) (string, error) {
 	if t.fn != nil {
 		return t.fn(ctx, *in)
 	}
 	return in.V, nil
+}
+
+// attachTool's Render returns a rich result carrying an image attachment, used
+// to exercise attachment propagation from Render through to ToolOutcome.
+type attachTool struct{ name string }
+
+func (t attachTool) Name() string                                            { return t.name }
+func (t attachTool) Description() string                                     { return "image tool" }
+func (t attachTool) Schema() *sessArgs                                       { return &sessArgs{} }
+func (t attachTool) Execute(_ context.Context, in *sessArgs) (string, error) { return in.V, nil }
+func (t attachTool) Render(s string) ToolResult {
+	return ToolResult{
+		Text:        s,
+		Attachments: []MessagePart{NewImagePart("https://example.com/" + s + ".png")},
+	}
 }
 
 func newTestSession(turn Turn, tools []ToolDef, options ...GenerateOption) (*Session, *executionTracker) {
@@ -153,6 +168,26 @@ var _ = Describe("Session", func() {
 			Expect(tracker.CachedTokens()).To(Equal(int64(2)))
 			Expect(turn.observed).To(HaveLen(1))
 			Expect(turn.observed[0]).To(Equal([]ToolOutcome{{ID: "1", Name: "echo", Text: "hi"}}))
+		})
+
+		It("propagates Render attachments to the observed outcome", func() {
+			shot := NewToolDef[*sessArgs, string](attachTool{name: "shot"})
+			turn := &fakeTurn{script: []TurnOutput{
+				{
+					ToolCalls:  []ToolCall{{ID: "1", Name: "shot", Arguments: `{"v":"hi"}`}},
+					StopReason: StopReasonToolUse,
+				},
+				{Text: "done", StopReason: StopReasonEndTurn},
+			}}
+			s, _ := newTestSession(turn, []ToolDef{shot})
+
+			_, err := runSession(context.Background(), s)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(turn.observed).To(HaveLen(1))
+			Expect(turn.observed[0]).To(Equal([]ToolOutcome{{
+				ID: "1", Name: "shot", Text: "hi",
+				Attachments: []MessagePart{NewImagePart("https://example.com/hi.png")},
+			}}))
 		})
 	})
 
