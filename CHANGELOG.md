@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.0](https://github.com/aholstenson/llms-go/compare/v0.4.0...v0.5.0) (2026-06-24)
+
+
+### Features
+
+* Add session snapshot support ([4d06cbb](https://github.com/aholstenson/llms-go/commit/4d06cbbba50cb9ba5b4a3b54ec282826eecc689f))
+* Support for returning images and binary data for tool calls ([154baac](https://github.com/aholstenson/llms-go/commit/154baac2be359621ac0a7f026958521f5af7ec60))
+
 ## [0.4.0](https://github.com/aholstenson/llms-go/compare/v0.3.0...v0.4.0) (2026-06-04)
 
 
