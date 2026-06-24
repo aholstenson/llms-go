@@ -247,6 +247,151 @@ var _ = Describe("Session plan/observe", func() {
 		})
 	})
 
+	Describe("snapshot / restore", func() {
+		It("round-trips an awaiting-tools snapshot and resumes without a model call", func() {
+			calls := []ToolCall{{ID: "1", Name: "echo", Arguments: `{"v":"hi"}`}}
+
+			a, _ := newTestSession(&fakeTurn{script: script()}, []ToolDef{echo},
+				WithMessages(NewMessage(RoleUser, NewTextPart("go"))))
+			_, done, err := a.StepPlan(context.Background())
+			Expect(err).NotTo(HaveOccurred())
+			Expect(done).To(BeFalse())
+
+			snap := a.Snapshot()
+			Expect(snap.Phase).To(Equal(SessionPhaseAwaitingTools))
+			Expect(snap.PendingCalls).To(Equal(calls))
+			Expect(snap.Step).To(Equal(1))
+			// Usage reflects the first scripted turn.
+			Expect(snap.Usage.InputTokens).To(Equal(int64(10)))
+			Expect(snap.Usage.OutputTokens).To(Equal(int64(5)))
+			Expect(snap.Usage.CachedReadTokens).To(Equal(int64(2)))
+
+			// Persist and reload as another process would.
+			raw, err := json.Marshal(snap)
+			Expect(err).NotTo(HaveOccurred())
+			var restored SessionSnapshot
+			Expect(json.Unmarshal(raw, &restored)).To(Succeed())
+
+			bTurn := &fakeTurn{script: []TurnOutput{
+				{Text: "all done", StopReason: StopReasonEndTurn},
+			}}
+			b, bt := newTestSession(bTurn, []ToolDef{echo}, WithSnapshot(&restored))
+
+			// Cumulative usage and step survive the restore.
+			Expect(bt.InputTokens()).To(Equal(int64(10)))
+			Expect(bt.OutputTokens()).To(Equal(int64(5)))
+			Expect(bt.CachedTokens()).To(Equal(int64(2)))
+
+			_, _, err = b.StepObserve(context.Background(),
+				[]ToolOutcome{{ID: "1", Name: "echo", Text: "hi"}})
+			Expect(err).NotTo(HaveOccurred())
+
+			plan, done, err := b.StepPlan(context.Background())
+			Expect(err).NotTo(HaveOccurred())
+			Expect(done).To(BeTrue())
+			// Step numbering continues from the snapshot (the "all done" turn is 2).
+			Expect(plan.Step).To(Equal(2))
+
+			// Resume used the no-model-call fold, not Observe.
+			Expect(bTurn.reconstructedObserved).To(HaveLen(1))
+			Expect(bTurn.observed).To(BeEmpty())
+
+			msgs := b.Messages()
+			Expect(msgs).To(HaveLen(4))
+			Expect(msgs[2].Parts[0]).To(Equal(&ToolResultPart{ID: "1", Name: "echo", Text: "hi"}))
+			Expect(msgs[3].Parts[0].(*TextPart).Text).To(Equal("all done"))
+		})
+
+		It("continues the step budget across a ready-phase restore instead of resetting it", func() {
+			// Empty script => every turn requests a tool, so the run only ever
+			// ends by exhausting the step budget.
+			a, _ := newTestSession(&fakeTurn{}, []ToolDef{echo}, WithMaxSteps(2))
+			_, done, err := a.StepPlan(context.Background())
+			Expect(err).NotTo(HaveOccurred())
+			Expect(done).To(BeFalse())
+			_, _, err = a.StepObserve(context.Background(),
+				[]ToolOutcome{{ID: "loop", Name: "echo", Text: "loop"}})
+			Expect(err).NotTo(HaveOccurred())
+
+			snap := a.Snapshot()
+			Expect(snap.Phase).To(Equal(SessionPhaseReady))
+			Expect(snap.Step).To(Equal(1))
+
+			b, _ := newTestSession(&fakeTurn{}, []ToolDef{echo},
+				WithSnapshot(&snap), WithMaxSteps(2))
+
+			// First restored plan is step 2, not step 1: the budget did not reset.
+			plan, done, err := b.StepPlan(context.Background())
+			Expect(err).NotTo(HaveOccurred())
+			Expect(done).To(BeFalse())
+			Expect(plan.Step).To(Equal(2))
+			_, _, err = b.StepObserve(context.Background(),
+				[]ToolOutcome{{ID: "loop", Name: "echo", Text: "loop"}})
+			Expect(err).NotTo(HaveOccurred())
+
+			// One more plan exhausts the original budget of 2.
+			_, done, err = b.StepPlan(context.Background())
+			Expect(err).NotTo(HaveOccurred())
+			Expect(done).To(BeTrue())
+
+			_, rerr := b.Result()
+			var mse *MaxStepsError
+			Expect(errors.As(rerr, &mse)).To(BeTrue())
+			Expect(mse.Result.StopReason).To(Equal(StopReasonMaxSteps))
+		})
+
+		It("rejects invalid or conflicting snapshots", func() {
+			valid := SessionSnapshot{
+				Transcript: []*Message{NewMessage(RoleUser, NewTextPart("go"))},
+				Phase:      SessionPhaseReady,
+			}
+
+			_, err := resolveGenerateContentOptions(nil,
+				WithSnapshot(&SessionSnapshot{Phase: SessionPhaseReady}))
+			Expect(err).To(MatchError(ContainSubstring("empty transcript")))
+
+			_, err = resolveGenerateContentOptions(nil, WithSnapshot(&SessionSnapshot{
+				Transcript: valid.Transcript,
+				Phase:      SessionPhaseAwaitingTools,
+			}))
+			Expect(err).To(MatchError(ContainSubstring("no pending tool calls")))
+
+			_, err = resolveGenerateContentOptions(nil, WithSnapshot(&SessionSnapshot{
+				Transcript: valid.Transcript,
+				Phase:      "bogus",
+			}))
+			Expect(err).To(MatchError(ContainSubstring("unknown snapshot phase")))
+
+			_, err = resolveGenerateContentOptions(nil,
+				WithMessages(NewMessage(RoleUser, NewTextPart("go"))),
+				WithSnapshot(&valid))
+			Expect(err).To(MatchError(ContainSubstring("mutually exclusive")))
+		})
+
+		It("survives a JSON round-trip with every part type and pending calls", func() {
+			snap := SessionSnapshot{
+				Transcript: []*Message{
+					NewMessage(RoleUser, NewTextPart("go")),
+					NewMessage(RoleAssistant,
+						&ThinkingPart{Text: "ponder", Signature: "sig"},
+						NewTextPart("calling"),
+						NewToolCallPart("1", "echo", `{"v":"hi"}`),
+					),
+				},
+				Step:         1,
+				Phase:        SessionPhaseAwaitingTools,
+				PendingCalls: []ToolCall{{ID: "1", Name: "echo", Arguments: `{"v":"hi"}`}},
+				Usage:        TurnUsage{InputTokens: 10, OutputTokens: 5, CachedReadTokens: 2},
+			}
+
+			raw, err := json.Marshal(snap)
+			Expect(err).NotTo(HaveOccurred())
+			var back SessionSnapshot
+			Expect(json.Unmarshal(raw, &back)).To(Succeed())
+			Expect(back).To(Equal(snap))
+		})
+	})
+
 	Describe("Message JSON codec", func() {
 		It("round-trips every part type including signed/redacted thinking", func() {
 			msg := NewMessage(RoleAssistant,

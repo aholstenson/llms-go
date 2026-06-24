@@ -134,6 +134,9 @@ type generateContentOptions struct {
 	WebSearch         bool
 	ToolCallTimeout   time.Duration
 	ParentExecution   ExecutionContext
+	// restoreSnapshot, when set via WithSnapshot, seeds a restored Session's
+	// transcript, step budget, phase, and cumulative usage.
+	restoreSnapshot *SessionSnapshot
 	// Retry options
 	MaxRetries    int
 	RetryAfterCap time.Duration
@@ -186,7 +189,38 @@ func resolveGenerateContentOptions(registry map[string]SubParserConfig, opts ...
 	if o.StructuredStreamingSchemaBuilder != nil && o.StructuredStreamingSchema == nil {
 		o.StructuredStreamingSchema = o.StructuredStreamingSchemaBuilder(registry)
 	}
+	if err := resolveSnapshot(o); err != nil {
+		return nil, err
+	}
 	return o, nil
+}
+
+// resolveSnapshot validates a restore snapshot and seeds the transcript from
+// it. It is the single point where WithSnapshot becomes the request's
+// Messages, so restore flows uniformly through every provider's
+// convertMessages without per-provider changes.
+func resolveSnapshot(o *generateContentOptions) error {
+	snap := o.restoreSnapshot
+	if snap == nil {
+		return nil
+	}
+	if o.Messages != nil {
+		return fmt.Errorf("WithSnapshot and WithMessages are mutually exclusive")
+	}
+	if len(snap.Transcript) == 0 {
+		return fmt.Errorf("WithSnapshot: snapshot has an empty transcript")
+	}
+	switch snap.Phase {
+	case SessionPhaseReady:
+	case SessionPhaseAwaitingTools:
+		if len(snap.PendingCalls) == 0 {
+			return fmt.Errorf("WithSnapshot: %s snapshot has no pending tool calls", snap.Phase)
+		}
+	default:
+		return fmt.Errorf("WithSnapshot: unknown snapshot phase %q", snap.Phase)
+	}
+	o.Messages = snap.Transcript
+	return nil
 }
 
 // Model represents an LLM API that can be used to generate content.
@@ -383,6 +417,29 @@ func WithSystemPrompt(systemPrompt string) GenerateOption {
 func WithMessages(messages ...*Message) GenerateOption {
 	return func(opts *generateContentOptions) error {
 		opts.Messages = messages
+		return nil
+	}
+}
+
+// WithSnapshot restores a Session from a SessionSnapshot captured earlier with
+// Session.Snapshot, reconstructing the transcript, the consumed step budget,
+// the plan/observe phase, and cumulative token usage. Use it with NewSession,
+// re-supplying tools and other options (notably the same WithMaxSteps) as for
+// the original session:
+//
+//	s, err := llms.NewSession(ctx, model,
+//		llms.WithSnapshot(&snap),
+//		llms.WithTools(tools...),
+//		llms.WithMaxSteps(8),
+//	)
+//
+// When the snapshot's phase is SessionPhaseAwaitingTools the restored session
+// is primed for StepObserve with the outcomes of snap.PendingCalls (no model
+// call); otherwise the next call is StepPlan/Step. WithSnapshot is mutually
+// exclusive with WithMessages — it supplies the transcript itself.
+func WithSnapshot(snap *SessionSnapshot) GenerateOption {
+	return func(opts *generateContentOptions) error {
+		opts.restoreSnapshot = snap
 		return nil
 	}
 }

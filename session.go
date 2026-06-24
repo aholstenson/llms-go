@@ -21,6 +21,47 @@ const (
 	phaseAwaitingObserve
 )
 
+// SessionPhase is the serializable phase of a Session at snapshot time. It is
+// the stable, public counterpart of the internal stepPhase.
+type SessionPhase string
+
+const (
+	// SessionPhaseReady means the session is between turns: the next call on a
+	// restored session is StepPlan (or Step).
+	SessionPhaseReady SessionPhase = "ready"
+	// SessionPhaseAwaitingTools means the model requested tool calls that have
+	// not yet been observed: the next call on a restored session is StepObserve
+	// with the outcomes of SessionSnapshot.PendingCalls (no model call).
+	SessionPhaseAwaitingTools SessionPhase = "awaiting_tools"
+)
+
+// SessionSnapshot is the durable, JSON-serializable state of a Session. It
+// captures everything needed to reconstruct an in-flight session in another
+// process (or after a restart): the neutral transcript, the consumed step
+// budget, the plan/observe phase plus any pending tool calls, and cumulative
+// token usage. Restore it with WithSnapshot.
+//
+// Snapshot a session at a phaseReady boundary (between turns) or at an
+// awaiting-tools boundary (after StepPlan yielded tool calls, before
+// StepObserve). A done or failed session's snapshot is not meaningfully
+// resumable.
+type SessionSnapshot struct {
+	// Transcript is the neutral accumulated message history (Session.Messages).
+	Transcript []*Message `json:"transcript"`
+	// Step is the number of model turns already consumed, so a restored
+	// session continues against the same WithMaxSteps budget instead of
+	// resetting to zero.
+	Step int `json:"step"`
+	// Phase is the session phase at snapshot time.
+	Phase SessionPhase `json:"phase"`
+	// PendingCalls carries the tool calls awaiting outcomes; set only when
+	// Phase is SessionPhaseAwaitingTools.
+	PendingCalls []ToolCall `json:"pendingCalls,omitempty"`
+	// Usage is the cumulative token usage so cost tracking survives the
+	// round-trip.
+	Usage TurnUsage `json:"usage"`
+}
+
 // StepInfo describes the result of a single Session.Step.
 type StepInfo struct {
 	// Step is the 1-indexed model turn this info describes.
@@ -95,7 +136,7 @@ func newSession(turn Turn, tracker *executionTracker, toolMap map[string]ToolDef
 	messages := make([]*Message, 0, len(opts.Messages)+4)
 	messages = append(messages, opts.Messages...)
 
-	return &Session{
+	s := &Session{
 		turn:     turn,
 		tracker:  tracker,
 		toolMap:  toolMap,
@@ -104,6 +145,22 @@ func newSession(turn Turn, tracker *executionTracker, toolMap map[string]ToolDef
 		maxSteps: maxSteps,
 		messages: messages,
 	}
+
+	// Restore from a snapshot: seed the consumed step budget and, when the
+	// snapshot was taken mid-tool, re-enter the awaiting-observe state so the
+	// next StepObserve folds outcomes back via Turn.ObserveToolResults (no
+	// model call) — the same path as ResumeForToolResults. The snapshot has
+	// already been validated in resolveGenerateContentOptions.
+	if snap := opts.restoreSnapshot; snap != nil {
+		s.step = snap.Step
+		if snap.Phase == SessionPhaseAwaitingTools {
+			s.phase = phaseAwaitingObserve
+			s.reconstructedObserve = true
+			s.pendingCalls = snap.PendingCalls
+		}
+	}
+
+	return s
 }
 
 // newTracker builds the execution tracker for a generation, rolling up to a
@@ -113,10 +170,25 @@ func newTracker(opts *generateContentOptions) *executionTracker {
 	if maxSteps <= 0 {
 		maxSteps = defaultMaxSteps
 	}
+	var t *executionTracker
 	if opts.ParentExecution != nil {
-		return newChildTracker(maxSteps, opts.ParentExecution)
+		t = newChildTracker(maxSteps, opts.ParentExecution)
+	} else {
+		t = newExecutionTracker(maxSteps)
 	}
-	return newExecutionTracker(maxSteps)
+
+	// Restore cumulative counters from a snapshot. Assign directly rather than
+	// via AddTokens so restored totals are not re-rolled into a parent tracker
+	// (which would double-count a sub-agent's prior spend).
+	if snap := opts.restoreSnapshot; snap != nil {
+		t.currentStep = snap.Step
+		t.inputTokens = snap.Usage.InputTokens
+		t.outputTokens = snap.Usage.OutputTokens
+		t.cachedTokens = snap.Usage.CachedReadTokens
+		t.cachedWriteTokens = snap.Usage.CachedWriteTokens
+	}
+
+	return t
 }
 
 // sessionModel is implemented by provider models that can construct a
@@ -468,6 +540,40 @@ func (s *Session) Messages() []*Message {
 	out := make([]*Message, len(s.messages))
 	copy(out, s.messages)
 	return out
+}
+
+// Snapshot captures the session's durable state for persistence and later
+// restore via WithSnapshot. It is safe to call between turns (phaseReady) or
+// after a StepPlan that yielded tool calls but before StepObserve
+// (awaiting-tools). Snapshotting a done or failed session is allowed but not
+// meaningfully resumable. ThinkingTokens is not tracked cumulatively and is
+// reported as zero, matching loopResult.
+func (s *Session) Snapshot() SessionSnapshot {
+	snap := SessionSnapshot{
+		Transcript: s.Messages(),
+		Step:       s.step,
+		Phase:      SessionPhaseReady,
+		Usage: TurnUsage{
+			InputTokens:       s.tracker.InputTokens(),
+			OutputTokens:      s.tracker.OutputTokens(),
+			CachedReadTokens:  s.tracker.CachedTokens(),
+			CachedWriteTokens: s.tracker.CachedWriteTokens(),
+		},
+	}
+
+	if s.phase == phaseAwaitingObserve {
+		snap.Phase = SessionPhaseAwaitingTools
+		// A live post-StepPlan await stashes the calls in planOutput; an
+		// already-restored await carries them in pendingCalls.
+		calls := s.planOutput.ToolCalls
+		if s.reconstructedObserve {
+			calls = s.pendingCalls
+		}
+		snap.PendingCalls = make([]ToolCall, len(calls))
+		copy(snap.PendingCalls, calls)
+	}
+
+	return snap
 }
 
 // StopReason returns the most recent stop reason observed by the session.

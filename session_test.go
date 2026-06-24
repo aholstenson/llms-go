@@ -117,12 +117,9 @@ func newTestSession(turn Turn, tools []ToolDef, options ...GenerateOption) (*Ses
 	for _, t := range tools {
 		toolMap[t.Name()] = t
 	}
-	tracker := newExecutionTracker(func() int {
-		if opts.MaxSteps > 0 {
-			return opts.MaxSteps
-		}
-		return defaultMaxSteps
-	}())
+	// Mirror production: newTracker applies the maxSteps fallback and seeds
+	// from a restore snapshot when WithSnapshot was supplied.
+	tracker := newTracker(opts)
 	return newSession(turn, tracker, toolMap, opts, slog.Default()), tracker
 }
 
