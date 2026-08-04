@@ -22,6 +22,8 @@ touching application code.
   OpenTelemetry GenAI metrics and local stats aggregation.
 - **Capability-aware** — embedded model metadata gates temperature,
   reasoning, and modality behavior so missing features fail gracefully.
+- **Pluggable credentials** — environment variables by default, or supply
+  your own source; credentials are resolved per request so they can rotate.
 
 ## Installation
 
@@ -36,9 +38,10 @@ import llms "github.com/aholstenson/llms-go"
 ## Quick start
 
 Models are resolved through a `Manager` using fully-qualified
-`provider/model` names (e.g. `anthropic/claude-sonnet-4-5`). API keys are
-read from environment variables: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`,
-`OPENROUTER_API_KEY`, or `GEMINI_API_KEY` (also accepts `GOOGLE_API_KEY`).
+`provider/model` names (e.g. `anthropic/claude-sonnet-4-5`). By default API
+keys are read from environment variables: `ANTHROPIC_API_KEY`,
+`OPENAI_API_KEY`, `OPENROUTER_API_KEY`, or `GEMINI_API_KEY` (also accepts
+`GOOGLE_API_KEY`). See [Credentials](#credentials) to supply them yourself.
 
 ```go
 manager := llms.NewManager()
@@ -69,6 +72,45 @@ deploy time without code changes:
 manager.RegisterAlias("fast", "anthropic/claude-haiku-4-5")
 model, _ := manager.GetModel(ctx, "fast") // or set LLM_MODEL_FAST=openai/gpt-4o
 ```
+
+### Credentials
+
+A `Manager` gets its API keys from a `CredentialSource`. The default is
+`EnvCredentials`, which reads the environment variables listed above and
+memoizes what it finds. Applications that keep keys somewhere else — a secret
+manager, a config file, a per-tenant lookup — supply their own:
+
+```go
+manager, err := llms.NewManager(
+    llms.WithManagerCredentials(llms.CredentialFunc(
+        func(ctx context.Context, provider string) (llms.Credential, error) {
+            token, err := vault.Token(ctx, provider) // your own lookup
+            if err != nil {
+                return llms.Credential{}, err
+            }
+            return llms.Credential{APIKey: token}, nil
+        },
+    )),
+)
+```
+
+The source is consulted twice: once when `GetModel` builds a model, so a
+missing credential is reported there instead of surfacing as an opaque
+transport error later, and then once per outbound HTTP request. The
+per-request call is what makes rotation work — a short-lived token can expire
+and be replaced without the model being rebuilt or the `Manager`'s model cache
+being invalidated. It also puts the source in the hot path of every request,
+so implementations should cache and refresh on expiry rather than doing real
+work on every call.
+
+`Credential.APIKey` is placed in whichever authentication header the provider
+expects. For endpoints that need more than a key — a gateway token, a tenant
+identifier — `Credential.Headers` is applied on top, and a credential carrying
+only headers and no API key is valid.
+
+`llms.StaticCredentials("...")` covers the single-provider case, and
+`errors.Is(err, llms.ErrNoCredentials)` detects a missing credential
+regardless of which source produced it.
 
 ### Driving the loop with `Session`
 

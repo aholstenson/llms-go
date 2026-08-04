@@ -13,13 +13,14 @@ import (
 // Manager is used to get access to different LLM models, with support for
 // dynamic selection based on environment variables.
 type Manager struct {
-	mu         sync.Mutex
-	logger     *slog.Logger
-	metrics    *Metrics
-	models     map[string]Model
-	aliases    map[string]string
-	overrides  map[string]string
-	subParsers map[string]SubParserConfig
+	mu          sync.Mutex
+	logger      *slog.Logger
+	metrics     *Metrics
+	credentials CredentialSource
+	models      map[string]Model
+	aliases     map[string]string
+	overrides   map[string]string
+	subParsers  map[string]SubParserConfig
 }
 
 // ManagerOption configures a Manager during construction.
@@ -43,14 +44,32 @@ func WithManagerMetrics(metrics *Metrics) ManagerOption {
 	}
 }
 
+// WithManagerCredentials sets the CredentialSource used to authenticate
+// requests for the models this Manager creates. Defaults to EnvCredentials,
+// which reads the conventional per-provider environment variables.
+//
+// The source is consulted once per model at construction and then once per
+// outbound HTTP request, so credentials can rotate without the models being
+// rebuilt. See CredentialSource for the full contract.
+func WithManagerCredentials(credentials CredentialSource) ManagerOption {
+	return func(m *Manager) error {
+		if credentials == nil {
+			return errors.New("credential source must not be nil")
+		}
+		m.credentials = credentials
+		return nil
+	}
+}
+
 func NewManager(opts ...ManagerOption) (*Manager, error) {
 	m := &Manager{
-		logger:     slog.Default(),
-		metrics:    NewNoopMetrics(),
-		models:     make(map[string]Model),
-		aliases:    map[string]string{},
-		overrides:  make(map[string]string),
-		subParsers: make(map[string]SubParserConfig),
+		logger:      slog.Default(),
+		metrics:     NewNoopMetrics(),
+		credentials: &EnvCredentials{},
+		models:      make(map[string]Model),
+		aliases:     map[string]string{},
+		overrides:   make(map[string]string),
+		subParsers:  make(map[string]SubParserConfig),
 	}
 	for _, opt := range opts {
 		if err := opt(m); err != nil {
@@ -152,6 +171,7 @@ func (m *Manager) GetModel(ctx context.Context, name string) (Model, error) {
 	registry := m.subParserRegistrySnapshot()
 	logger := m.logger
 	metrics := m.metrics
+	credentials := m.credentials
 	m.mu.Unlock()
 
 	slashIdx := strings.Index(resolved, "/")
@@ -166,42 +186,28 @@ func (m *Manager) GetModel(ctx context.Context, name string) (Model, error) {
 	// ModelInfo, which the behavior gates treat permissively.
 	info, _ := LookupModelInfo(resolved)
 
+	// Probe the credential source so a missing credential fails here rather
+	// than as an opaque transport error on the first generation. The models
+	// themselves resolve credentials per request, not from this result.
+	if modelProvider != "test" {
+		if _, err := credentials.Credential(ctx, modelProvider); err != nil {
+			return nil, fmt.Errorf("credentials for %s: %w", resolved, err)
+		}
+	}
+
 	var model Model
 	switch modelProvider {
 	case "anthropic":
-		apiKey := os.Getenv("ANTHROPIC_API_KEY")
-		if apiKey == "" {
-			return nil, errors.New("ANTHROPIC_API_KEY is not set")
-		}
-
-		model = newAnthropicModel(logger, metrics, apiKey, modelName, registry, info)
+		model = newAnthropicModel(logger, metrics, credentials, modelName, registry, info)
 	case "openai":
-		apiKey := os.Getenv("OPENAI_API_KEY")
-		if apiKey == "" {
-			return nil, errors.New("OPENAI_API_KEY is not set")
-		}
-
-		model = newOpenAIModel(logger, metrics, apiKey, modelName, registry, info)
+		model = newOpenAIModel(logger, metrics, credentials, modelName, registry, info)
 	case "openrouter":
-		apiKey := os.Getenv("OPENROUTER_API_KEY")
-		if apiKey == "" {
-			return nil, errors.New("OPENROUTER_API_KEY is not set")
-		}
-
-		model, err = newOpenRouterModel(logger, metrics, apiKey, modelName, registry, info)
+		model, err = newOpenRouterModel(logger, metrics, credentials, modelName, registry, info)
 		if err != nil {
 			return nil, err
 		}
 	case "google":
-		apiKey := os.Getenv("GEMINI_API_KEY")
-		if apiKey == "" {
-			apiKey = os.Getenv("GOOGLE_API_KEY")
-		}
-		if apiKey == "" {
-			return nil, errors.New("GEMINI_API_KEY (or GOOGLE_API_KEY) is not set")
-		}
-
-		model, err = newGoogleModel(ctx, logger, metrics, apiKey, modelName, registry, info)
+		model, err = newGoogleModel(ctx, logger, metrics, credentials, modelName, registry, info)
 		if err != nil {
 			return nil, err
 		}

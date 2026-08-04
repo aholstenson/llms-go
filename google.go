@@ -78,14 +78,18 @@ type googleModel struct {
 	headerCapture     *headerCapturingTransport
 }
 
-// newGoogleModel creates a new Google Gemini model. info carries embedded
-// model metadata used to gate request parameters; the zero value is treated
-// permissively.
-func newGoogleModel(ctx context.Context, logger *slog.Logger, metrics *Metrics, apiKey string, model string, registry map[string]SubParserConfig, info ModelInfo) (Model, error) {
+// newGoogleModel creates a new Google Gemini model. creds is consulted on
+// every request so rotating credentials take effect without rebuilding the
+// model. info carries embedded model metadata used to gate request
+// parameters; the zero value is treated permissively.
+func newGoogleModel(ctx context.Context, logger *slog.Logger, metrics *Metrics, creds CredentialSource, model string, registry map[string]SubParserConfig, info ModelInfo) (Model, error) {
 	transport := newHeaderCapturingTransport(http.DefaultTransport)
-	httpClient := &http.Client{Transport: transport}
+	// Auth wraps the header capture so x-goog-api-key is set per request. The
+	// SDK rejects an empty APIKey, so it gets the placeholder — which also
+	// keeps the real key out of genai errors that dump the whole config.
+	httpClient := newAuthHTTPClient(transport, creds, "google", applyGoogleCredential)
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
-		APIKey:     apiKey,
+		APIKey:     credentialPlaceholder,
 		Backend:    genai.BackendGeminiAPI,
 		HTTPClient: httpClient,
 	})

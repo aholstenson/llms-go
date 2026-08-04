@@ -74,10 +74,11 @@ func (m *openrouterModel) lastCapturedHeaders() http.Header {
 }
 
 // newOpenRouterModel creates a new model that routes requests through
-// OpenRouter using the github.com/revrost/go-openrouter SDK. info carries
-// embedded model metadata used to gate request parameters; the zero value is
-// treated permissively.
-func newOpenRouterModel(logger *slog.Logger, metrics *Metrics, apiKey string, model string, registry map[string]SubParserConfig, info ModelInfo, opts ...openRouterOption) (Model, error) {
+// OpenRouter using the github.com/revrost/go-openrouter SDK. creds is
+// consulted on every request so rotating credentials take effect without
+// rebuilding the model. info carries embedded model metadata used to gate
+// request parameters; the zero value is treated permissively.
+func newOpenRouterModel(logger *slog.Logger, metrics *Metrics, creds CredentialSource, model string, registry map[string]SubParserConfig, info ModelInfo, opts ...openRouterOption) (Model, error) {
 	m := &openrouterModel{
 		logger:            logger.With(slog.String("provider", "openrouter")),
 		metrics:           metrics,
@@ -93,9 +94,11 @@ func newOpenRouterModel(logger *slog.Logger, metrics *Metrics, apiKey string, mo
 	}
 	transport := newHeaderCapturingTransport(http.DefaultTransport)
 	m.headerCapture = transport
-	httpClient := &http.Client{Transport: transport}
+	// Auth wraps the header capture so the Authorization header is set per
+	// request; the placeholder key handed to the SDK is never sent.
+	httpClient := newAuthHTTPClient(transport, creds, "openrouter", applyBearerCredential)
 	clientOpts := append([]openrouter.Option{withOpenRouterHTTPClient(httpClient)}, m.clientOpts...)
-	m.client = openrouter.NewClient(apiKey, clientOpts...)
+	m.client = openrouter.NewClient(credentialPlaceholder, clientOpts...)
 	return m, nil
 }
 

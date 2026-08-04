@@ -44,12 +44,19 @@ type openaiModel struct {
 }
 
 // newOpenAIModel creates a new OpenAI model using the official OpenAI Go SDK
-// against the Responses API. info carries embedded model metadata used to
-// gate request parameters; the zero value is treated permissively. Optional
-// SDK request options can be passed for customization (e.g.
-// option.WithBaseURL for testing).
-func newOpenAIModel(logger *slog.Logger, metrics *Metrics, apiKey string, model string, registry map[string]SubParserConfig, info ModelInfo, opts ...option.RequestOption) Model {
-	allOpts := append([]option.RequestOption{option.WithAPIKey(apiKey)}, opts...)
+// against the Responses API. creds is consulted on every request so rotating
+// credentials take effect without rebuilding the model. info carries embedded
+// model metadata used to gate request parameters; the zero value is treated
+// permissively. Optional SDK request options can be passed for customization
+// (e.g. option.WithBaseURL for testing).
+func newOpenAIModel(logger *slog.Logger, metrics *Metrics, creds CredentialSource, model string, registry map[string]SubParserConfig, info ModelInfo, opts ...option.RequestOption) Model {
+	// The placeholder key satisfies the SDK; the transport replaces the
+	// Authorization header per request.
+	httpClient := newAuthHTTPClient(nil, creds, "openai", applyBearerCredential)
+	allOpts := append([]option.RequestOption{
+		option.WithAPIKey(credentialPlaceholder),
+		option.WithHTTPClient(httpClient),
+	}, opts...)
 	client := openai.NewClient(allOpts...)
 	return &openaiModel{
 		logger:            logger.With(slog.String("provider", "openai")),

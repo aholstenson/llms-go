@@ -42,12 +42,20 @@ type anthropicModel struct {
 }
 
 // newAnthropicModel creates a new Anthropic model using the official Anthropic Go SDK.
-// info carries embedded model metadata used to gate request parameters; the
-// zero value is treated permissively. Optional SDK request options can be
-// passed for customization (e.g., option.WithBaseURL for testing).
-func newAnthropicModel(logger *slog.Logger, metrics *Metrics, apiKey string, model string, registry map[string]SubParserConfig, info ModelInfo, opts ...option.RequestOption) Model {
-	// Prepend the API key option so it can be overridden by caller options
-	allOpts := append([]option.RequestOption{option.WithAPIKey(apiKey)}, opts...)
+// creds is consulted on every request so rotating credentials take effect
+// without rebuilding the model. info carries embedded model metadata used to
+// gate request parameters; the zero value is treated permissively. Optional
+// SDK request options can be passed for customization (e.g.,
+// option.WithBaseURL for testing).
+func newAnthropicModel(logger *slog.Logger, metrics *Metrics, creds CredentialSource, model string, registry map[string]SubParserConfig, info ModelInfo, opts ...option.RequestOption) Model {
+	// Prepend the auth options so they can be overridden by caller options.
+	// The placeholder key satisfies the SDK; the transport replaces the
+	// X-Api-Key header per request.
+	httpClient := newAuthHTTPClient(nil, creds, "anthropic", applyAnthropicCredential)
+	allOpts := append([]option.RequestOption{
+		option.WithAPIKey(credentialPlaceholder),
+		option.WithHTTPClient(httpClient),
+	}, opts...)
 	client := anthropic.NewClient(allOpts...)
 	return &anthropicModel{
 		logger:            logger.With(slog.String("provider", "anthropic")),
