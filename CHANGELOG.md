@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.0](https://github.com/aholstenson/llms-go/compare/v0.5.0...v0.6.0) (2026-08-04)
+
+
+### Features
+
+* Support supplying custom credentials to models ([4a7cb98](https://github.com/aholstenson/llms-go/commit/4a7cb982742070dbd86b2d1cc486b904fc83c4f2))
+* Update model metadata ([2360471](https://github.com/aholstenson/llms-go/commit/2360471e10132c42b4082d163b90f1060df6d22f))
+
 ## [0.5.0](https://github.com/aholstenson/llms-go/compare/v0.4.0...v0.5.0) (2026-06-24)
 
 
