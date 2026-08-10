@@ -23,6 +23,17 @@ type reasoningOverride struct {
 
 // reasoningOverrides is the ordered, most-specific-first override table.
 var reasoningOverrides = []reasoningOverride{
+	// Anthropic Fable/Mythos 5: adaptive-only thinking that cannot be turned
+	// off — an explicit disable is rejected, so reasoning is mandatory.
+	{Match: "claude-fable-5", Style: "adaptive", MaxEffort: "max", Mandatory: true},
+	{Match: "claude-mythos", Style: "adaptive", MaxEffort: "max", Mandatory: true},
+
+	// Anthropic Opus 5 / Opus 4.8 / Sonnet 5: adaptive thinking plus an effort
+	// tier; budget_tokens is rejected. Reasoning can still be disabled.
+	{Match: "claude-opus-5", Style: "adaptive", MaxEffort: "max"},
+	{Match: "claude-opus-4-8", Style: "adaptive", MaxEffort: "max"},
+	{Match: "claude-sonnet-5", Style: "adaptive", MaxEffort: "max"},
+
 	// Anthropic Opus 4.7: adaptive-only thinking, always reasons. (It also
 	// rejects temperature, but models.dev already reports temperature:false for
 	// it, so the Caps.Temperature gate handles that without an override.)

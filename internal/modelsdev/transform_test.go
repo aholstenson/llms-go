@@ -122,10 +122,14 @@ func TestTransformReasoningMetadata(t *testing.T) {
 	}
 	raw := modelsdev.RawData{
 		"anthropic": {ID: "anthropic", Models: map[string]modelsdev.RawModel{
-			"claude-opus-4-7":   reasoning(true), // adaptive, max, mandatory, rejects sampling
-			"claude-sonnet-4-6": reasoning(true), // adaptive
-			"claude-sonnet-4-5": reasoning(true), // effort
-			"claude-opus-4-1":   reasoning(true), // pre-4.5: budget default
+			"claude-fable-5":    reasoning(false), // adaptive, max, mandatory
+			"claude-opus-5":     reasoning(false), // adaptive, max
+			"claude-sonnet-5":   reasoning(false), // adaptive, max
+			"claude-opus-4-8":   reasoning(false), // adaptive, max
+			"claude-opus-4-7":   reasoning(true),  // adaptive, max, mandatory, rejects sampling
+			"claude-sonnet-4-6": reasoning(true),  // adaptive
+			"claude-sonnet-4-5": reasoning(true),  // effort
+			"claude-opus-4-1":   reasoning(true),  // pre-4.5: budget default
 			"claude-3-5-haiku":  {ToolCall: true, Temperature: true},
 		}},
 		"openai": {ID: "openai", Models: map[string]modelsdev.RawModel{
@@ -157,6 +161,12 @@ func TestTransformReasoningMetadata(t *testing.T) {
 		}
 	}
 
+	// Claude 5 family: adaptive thinking with a max effort ceiling; budget_tokens
+	// is rejected. Only Fable always reasons.
+	check("anthropic/claude-fable-5", "adaptive", "max", true, false)
+	check("anthropic/claude-opus-5", "adaptive", "max", false, false)
+	check("anthropic/claude-sonnet-5", "adaptive", "max", false, false)
+	check("anthropic/claude-opus-4-8", "adaptive", "max", false, false)
 	// Opus 4.7: adaptive, max ceiling, mandatory. Temperature is passed through
 	// from models.dev untouched (here the fixture reports it true).
 	check("anthropic/claude-opus-4-7", "adaptive", "max", true, true)

@@ -15,7 +15,9 @@
       "r": true,
       "tc": true,
       "a": true,
-      "rs": "budget"
+      "rs": "adaptive",
+      "me": "max",
+      "rm": true
     },
     "m": [
       "text",
@@ -259,7 +261,8 @@
       "r": true,
       "tc": true,
       "a": true,
-      "rs": "budget"
+      "rs": "adaptive",
+      "me": "max"
     },
     "m": [
       "text",
@@ -286,7 +289,8 @@
       "r": true,
       "tc": true,
       "a": true,
-      "rs": "budget"
+      "rs": "adaptive",
+      "me": "max"
     },
     "m": [
       "text",
@@ -394,7 +398,8 @@
       "r": true,
       "tc": true,
       "a": true,
-      "rs": "budget"
+      "rs": "adaptive",
+      "me": "max"
     },
     "m": [
       "text",
@@ -2928,8 +2933,9 @@
       "r": true,
       "tc": true,
       "a": true,
-      "rs": "effort",
-      "me": "high"
+      "rs": "adaptive",
+      "me": "max",
+      "rm": true
     },
     "m": [
       "text",
@@ -3154,8 +3160,8 @@
       "r": true,
       "tc": true,
       "a": true,
-      "rs": "effort",
-      "me": "high"
+      "rs": "adaptive",
+      "me": "max"
     },
     "m": [
       "text",
@@ -3182,8 +3188,8 @@
       "r": true,
       "tc": true,
       "a": true,
-      "rs": "effort",
-      "me": "high"
+      "rs": "adaptive",
+      "me": "max"
     },
     "m": [
       "text",
@@ -3210,8 +3216,8 @@
       "r": true,
       "tc": true,
       "a": true,
-      "rs": "effort",
-      "me": "high"
+      "rs": "adaptive",
+      "me": "max"
     },
     "m": [
       "text",
@@ -3238,8 +3244,8 @@
       "r": true,
       "tc": true,
       "a": true,
-      "rs": "effort",
-      "me": "high"
+      "rs": "adaptive",
+      "me": "max"
     },
     "m": [
       "text",
@@ -3350,8 +3356,8 @@
       "r": true,
       "tc": true,
       "a": true,
-      "rs": "effort",
-      "me": "high"
+      "rs": "adaptive",
+      "me": "max"
     },
     "m": [
       "text",

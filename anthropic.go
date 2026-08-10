@@ -211,10 +211,19 @@ func (m *anthropicModel) newSession(ctx context.Context, options ...GenerateOpti
 				}
 			}
 		}
-	case reasoningKindMandatory, reasoningKindDisable, reasoningKindSkip:
-		// Anthropic disables extended thinking by omitting the thinking param;
-		// mandatory-reasoning models (Opus 4.7) keep their built-in adaptive
-		// reasoning. Nothing to send in any case.
+	case reasoningKindDisable:
+		// Budget- and effort-style models think only when asked, so omitting the
+		// param is enough. Adaptive-style models may reason by default (Opus 5
+		// does), so they need the explicit disable form.
+		if style == reasoningStyleAdaptive {
+			params.Thinking = anthropic.BetaThinkingConfigParamUnion{
+				OfDisabled: &anthropic.BetaThinkingConfigDisabledParam{},
+			}
+		}
+	case reasoningKindMandatory, reasoningKindSkip:
+		// Mandatory-reasoning models (Opus 4.7, Fable 5) reject the disable form
+		// and keep their built-in adaptive reasoning; unknown or non-reasoning
+		// models get no reasoning params at all.
 	}
 
 	if clamped, didClamp := m.info.clampMaxOutputTokens(maxOutput); didClamp {
