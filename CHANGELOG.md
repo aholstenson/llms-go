@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1](https://github.com/aholstenson/llms-go/compare/v0.6.0...v0.6.1) (2026-08-10)
+
+
+### Bug Fixes
+
+* Use adaptive thinking for Claude 5 family models ([05ce5f2](https://github.com/aholstenson/llms-go/commit/05ce5f224b012824cc2c2f15adc4683ba36c1e3f))
+
 ## [0.6.0](https://github.com/aholstenson/llms-go/compare/v0.5.0...v0.6.0) (2026-08-04)
 
 
