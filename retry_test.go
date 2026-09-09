@@ -132,6 +132,57 @@ var _ = Describe("retryLoop", func() {
 		Expect(ue.RetryAfter).To(Equal(50 * time.Millisecond))
 	})
 
+	It("notifies once per wait, with the attempt that failed and the delay", func() {
+		opts := defaultOpts()
+		opts.RetryBackoff = &ExponentialBackoff{Base: 1 * time.Millisecond, Max: 1 * time.Millisecond, Jitter: 0}
+		var notices []RetryNotice
+		opts.RetryNotify = func(_ context.Context, n RetryNotice) {
+			notices = append(notices, n)
+		}
+		classify := func(error) (bool, int, time.Duration, bool) {
+			return true, 429, 2 * time.Millisecond, true
+		}
+		_, err := retryLoop(context.Background(), opts, "anthropic", "m", classify,
+			func(ctx context.Context) (int, error) { return 0, errors.New("boom") })
+		Expect(err).To(HaveOccurred())
+
+		// 3 attempts means 2 waits, so the last failure is not notified.
+		Expect(notices).To(HaveLen(2))
+		Expect(notices[0].Provider).To(Equal("anthropic"))
+		Expect(notices[0].Model).To(Equal("m"))
+		Expect(notices[0].Attempt).To(Equal(1))
+		Expect(notices[0].MaxAttempts).To(Equal(3))
+		Expect(notices[0].StatusCode).To(Equal(429))
+		Expect(notices[0].RetryAfter).To(Equal(2 * time.Millisecond))
+		Expect(notices[0].HasRetryAfter).To(BeTrue())
+		// The server hint wins over the exponential delay.
+		Expect(notices[0].Delay).To(Equal(2 * time.Millisecond))
+		Expect(notices[0].Err).To(MatchError("boom"))
+		Expect(notices[1].Attempt).To(Equal(2))
+	})
+
+	It("does not notify when the first attempt succeeds", func() {
+		opts := defaultOpts()
+		var count int
+		opts.RetryNotify = func(context.Context, RetryNotice) { count++ }
+		_, err := retryLoop(context.Background(), opts, "", "",
+			func(error) (bool, int, time.Duration, bool) { return false, 0, 0, false },
+			func(ctx context.Context) (int, error) { return 1, nil })
+		Expect(err).ToNot(HaveOccurred())
+		Expect(count).To(Equal(0))
+	})
+
+	It("does not notify for an error that is not retryable", func() {
+		opts := defaultOpts()
+		var count int
+		opts.RetryNotify = func(context.Context, RetryNotice) { count++ }
+		_, err := retryLoop(context.Background(), opts, "", "",
+			func(error) (bool, int, time.Duration, bool) { return false, 400, 0, false },
+			func(ctx context.Context) (int, error) { return 0, errors.New("nope") })
+		Expect(err).To(HaveOccurred())
+		Expect(count).To(Equal(0))
+	})
+
 	It("succeeds when a later attempt returns no error", func() {
 		var calls int32
 		classify := func(error) (bool, int, time.Duration, bool) {

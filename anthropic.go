@@ -14,6 +14,7 @@ import (
 	"github.com/aholstenson/llms-go/jsonstream"
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
+	"github.com/anthropics/anthropic-sdk-go/packages/ssestream"
 	"github.com/anthropics/anthropic-sdk-go/shared/constant"
 	"github.com/invopop/jsonschema"
 )
@@ -274,20 +275,65 @@ func (m *anthropicModel) newSession(ctx context.Context, options ...GenerateOpti
 	return newSession(turn, newTracker(opts), toolMap, opts, m.logger), nil
 }
 
-func (m *anthropicModel) handleStreaming(
+// openStream sends the request and returns the stream once the server has
+// accepted it. A failure to open the stream is retried, so a rate limit or
+// an overload before the first event only reaches the caller when the
+// retries run out. It also returns how many attempts were made, which the
+// caller stamps onto UnavailableError.
+func (m *anthropicModel) openStream(
 	ctx context.Context,
 	params anthropic.BetaMessageNewParams,
+	opts *generateContentOptions,
+) (*ssestream.Stream[anthropic.BetaRawMessageStreamEventUnion], int, error) {
+	reqOpts := []option.RequestOption{
+		option.WithHeader("anthropic-beta", "structured-outputs-2025-11-13"),
+		// llms-go owns the retry loop so WithRetryBackoff and
+		// WithRetryNotify apply to Anthropic like to every other provider.
+		option.WithMaxRetries(0),
+	}
+
+	classify := func(err error) (bool, int, time.Duration, bool) {
+		ae := &anthropic.Error{}
+		if !errors.As(err, &ae) {
+			return false, 0, 0, false
+		}
+		if !isUnavailableStatusCode(ae.StatusCode) {
+			return false, ae.StatusCode, 0, false
+		}
+		ra, hasRA := extractRetryAfter("anthropic", err, nil)
+		return true, ae.StatusCode, ra, hasRA
+	}
+
+	attempts := 0
+	stream, err := retryLoop(ctx, opts, string(GenAISystemAnthropic), m.model, classify,
+		func(ctx context.Context) (*ssestream.Stream[anthropic.BetaRawMessageStreamEventUnion], error) {
+			attempts++
+			stream := m.client.Beta.Messages.NewStreaming(ctx, params, reqOpts...)
+			// The SDK completes the request before it returns the stream, so
+			// an error here means the response never started.
+			if err := stream.Err(); err != nil {
+				if cerr := stream.Close(); cerr != nil {
+					m.logger.Warn("Failed to close stream", slog.Any("error", cerr))
+				}
+				return nil, err
+			}
+			return stream, nil
+		})
+	return stream, attempts, err
+}
+
+// handleStreaming reads an open stream to the end. The stream is never
+// reopened here: once events flow, a failure is reported to the caller with
+// whatever content and usage arrived first.
+func (m *anthropicModel) handleStreaming(
+	ctx context.Context,
+	stream *ssestream.Stream[anthropic.BetaRawMessageStreamEventUnion],
 	streamingFunc StreamingFunc,
 	structuredStreamingFunc StructuredStreamingFunc,
 	jsParser *jsonstream.Parser,
 	structuredContentBuilder *strings.Builder,
 	streamingEmitted *bool,
-	reqOpts ...option.RequestOption,
 ) (*anthropic.BetaMessage, error) {
-	allOpts := append([]option.RequestOption{
-		option.WithHeader("anthropic-beta", "structured-outputs-2025-11-13"),
-	}, reqOpts...)
-	stream := m.client.Beta.Messages.NewStreaming(ctx, params, allOpts...)
 	defer func() {
 		err := stream.Close()
 		if err != nil {
@@ -863,12 +909,30 @@ func (t *anthropicTurn) Next(ctx context.Context) (TurnOutput, error) {
 	}
 
 	var response *anthropic.BetaMessage
-	var err error
 	var streamingEmitted bool
 
 	// Anthropic's API rejects non-streaming requests for any generation that
 	// may exceed 10 minutes so we run in streaming mode for all requests.
-	response, err = m.handleStreaming(ctx, t.params, t.opts.StreamingFunc, t.opts.StructuredStreamingFunc, t.jsParser, &t.structuredContentBuilder, &streamingEmitted, option.WithMaxRetries(t.opts.MaxRetries))
+	stream, attempts, err := m.openStream(ctx, t.params, t.opts)
+	if err != nil {
+		if metrics := GetMetrics(ctx); metrics != nil {
+			metrics.RecordFailure(m.statsModel, collector)
+		}
+
+		// The stream never started, so there is no partial output or usage
+		// to preserve. A retryable failure is already an UnavailableError
+		// with the exact attempt count on it.
+		var ue *UnavailableError
+		if errors.As(err, &ue) {
+			m.metrics.RecordCallDuration(ctx, GenAISystemAnthropic, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeUnavailable)
+			return TurnOutput{}, ue
+		}
+
+		m.metrics.RecordCallDuration(ctx, GenAISystemAnthropic, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeInternal)
+		return TurnOutput{}, fmt.Errorf("error from Anthropic (model %s): %w", m.model, err)
+	}
+
+	response, err = m.handleStreaming(ctx, stream, t.opts.StreamingFunc, t.opts.StructuredStreamingFunc, t.jsParser, &t.structuredContentBuilder, &streamingEmitted)
 
 	anthropicError := &anthropic.Error{}
 	if errors.As(err, &anthropicError) {
@@ -905,7 +969,7 @@ func (t *anthropicTurn) Next(ctx context.Context) (TurnOutput, error) {
 				StatusCode:    anthropicError.StatusCode,
 				RetryAfter:    ra,
 				HasRetryAfter: hasRA,
-				Attempts:      t.opts.MaxRetries + 1,
+				Attempts:      attempts,
 				PartialOutput: streamingEmitted,
 				PartialUsage:  partialUsage,
 				Cause:         err,

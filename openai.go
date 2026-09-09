@@ -16,6 +16,7 @@ import (
 	"github.com/invopop/jsonschema"
 	"github.com/openai/openai-go/v2"
 	"github.com/openai/openai-go/v2/option"
+	"github.com/openai/openai-go/v2/packages/ssestream"
 	"github.com/openai/openai-go/v2/responses"
 	"github.com/openai/openai-go/v2/shared"
 )
@@ -486,6 +487,46 @@ func (t *openaiTurn) ObserveToolResults(_ context.Context, _ []ToolCall, outcome
 	return nil
 }
 
+// openStream sends the request and returns the stream once the server has
+// accepted it. A failure to open the stream is retried, so a rate limit or
+// an overload before the first event only reaches the caller when the
+// retries run out. It also returns how many attempts were made, which the
+// caller stamps onto UnavailableError.
+func (t *openaiTurn) openStream(ctx context.Context) (*ssestream.Stream[responses.ResponseStreamEventUnion], int, error) {
+	m := t.m
+
+	classify := func(err error) (bool, int, time.Duration, bool) {
+		oe := &openai.Error{}
+		if !errors.As(err, &oe) {
+			return false, 0, 0, false
+		}
+		if !isUnavailableStatusCode(oe.StatusCode) {
+			return false, oe.StatusCode, 0, false
+		}
+		ra, hasRA := extractRetryAfter("openai", err, nil)
+		return true, oe.StatusCode, ra, hasRA
+	}
+
+	attempts := 0
+	stream, err := retryLoop(ctx, t.opts, string(GenAISystemOpenAI), m.model, classify,
+		func(ctx context.Context) (*ssestream.Stream[responses.ResponseStreamEventUnion], error) {
+			attempts++
+			// llms-go owns the retry loop so WithRetryBackoff and
+			// WithRetryNotify apply to OpenAI like to every other provider.
+			stream := m.client.Responses.NewStreaming(ctx, t.params, option.WithMaxRetries(0))
+			// The SDK completes the request before it returns the stream, so
+			// an error here means the response never started.
+			if err := stream.Err(); err != nil {
+				if cerr := stream.Close(); cerr != nil {
+					m.logger.Warn("Error closing OpenAI stream", slog.Any("error", cerr))
+				}
+				return nil, err
+			}
+			return stream, nil
+		})
+	return stream, attempts, err
+}
+
 func (t *openaiTurn) Next(ctx context.Context) (TurnOutput, error) {
 	m := t.m
 
@@ -521,7 +562,24 @@ func (t *openaiTurn) Next(ctx context.Context) (TurnOutput, error) {
 	streamingEmitted := false
 	var structuredStreamErr error
 
-	stream := m.client.Responses.NewStreaming(ctx, t.params, option.WithMaxRetries(t.opts.MaxRetries))
+	stream, attempts, err := t.openStream(ctx)
+	if err != nil {
+		if metrics := GetMetrics(ctx); metrics != nil {
+			metrics.RecordFailure(m.statsModel, collector)
+		}
+
+		// The stream never started, so there is no partial output or usage
+		// to preserve. A retryable failure is already an UnavailableError
+		// with the exact attempt count on it.
+		var ue *UnavailableError
+		if errors.As(err, &ue) {
+			m.metrics.RecordCallDuration(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeUnavailable)
+			return TurnOutput{}, ue
+		}
+
+		m.metrics.RecordCallDuration(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeInternal)
+		return TurnOutput{}, fmt.Errorf("got error from OpenAI (model %s) while streaming: %w", m.model, err)
+	}
 
 	var finalResponse *responses.Response
 
@@ -664,7 +722,7 @@ func (t *openaiTurn) Next(ctx context.Context) (TurnOutput, error) {
 				StatusCode:    openaiError.StatusCode,
 				RetryAfter:    ra,
 				HasRetryAfter: hasRA,
-				Attempts:      t.opts.MaxRetries + 1,
+				Attempts:      attempts,
 				PartialOutput: streamingEmitted,
 				PartialUsage:  partialUsage,
 				Cause:         stream.Err(),
@@ -715,7 +773,7 @@ func (t *openaiTurn) Next(ctx context.Context) (TurnOutput, error) {
 				Provider:      string(GenAISystemOpenAI),
 				Model:         m.model,
 				StatusCode:    0,
-				Attempts:      t.opts.MaxRetries + 1,
+				Attempts:      attempts,
 				PartialOutput: streamingEmitted,
 				PartialUsage:  partialUsage,
 				Cause:         err,

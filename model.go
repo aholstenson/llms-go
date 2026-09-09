@@ -141,6 +141,7 @@ type generateContentOptions struct {
 	MaxRetries    int
 	RetryAfterCap time.Duration
 	RetryBackoff  BackoffPolicy
+	RetryNotify   RetryNotifyFunc
 	// Structured output options
 	ResponseSchema                   *ResponseSchema
 	StructuredStreamingFunc          StructuredStreamingFunc
@@ -355,14 +356,13 @@ func WithParentExecution(parent ExecutionContext) GenerateOption {
 // request. The total number of attempts is n+1. Default is DefaultMaxRetries
 // (2). Passing 0 disables retries; n < 0 returns an error.
 //
-// For Anthropic and OpenAI this is forwarded to the SDK, which runs its own
-// retry loop (with its own backoff policy — see WithRetryBackoff). For
-// Google and OpenRouter the retry loop is owned by llms-go and obeys
-// WithRetryBackoff.
+// The retry loop is owned by llms-go for every provider, so WithMaxRetries,
+// WithRetryBackoff and WithRetryNotify behave the same everywhere.
 //
-// Streaming generations are never retried at the body level by any
-// provider — once a stream has begun emitting events, mid-stream failures
-// surface to the caller with ErrStreamingPartialOutput.
+// A stream is never retried after its first event: mid-stream failures
+// surface to the caller with ErrStreamingPartialOutput. Anthropic and
+// OpenAI stream every generation and retry a failure to open the stream;
+// Google and OpenRouter retry their non-streaming requests.
 func WithMaxRetries(n int) GenerateOption {
 	return func(opts *generateContentOptions) error {
 		if n < 0 {
@@ -387,20 +387,33 @@ func WithRetryAfterCap(d time.Duration) GenerateOption {
 	}
 }
 
-// WithRetryBackoff overrides the BackoffPolicy used by the llms-go-owned
-// retry loop (Google and OpenRouter, non-streaming only).
-//
-// NOTE: This option does not affect Anthropic or OpenAI. Those SDKs run
-// their own internal backoff and llms-go cannot inject a policy into them;
-// only WithMaxRetries is plumbed through. The default ExponentialBackoff
-// parameters are chosen to match the SDK defaults so behavior is uniform
-// across all four providers out of the box. If you need identical custom
-// backoff for all providers, install a custom HTTP transport on the
-// Anthropic/OpenAI clients yourself, or set MaxRetries to 0 there and own
-// retries via an outer loop.
+// WithRetryBackoff overrides the BackoffPolicy that decides how long to wait
+// between attempts. It applies to every provider. The default is an
+// ExponentialBackoff with 500ms base, an 8s cap and 25% jitter, which honors
+// a server Retry-After hint when there is one.
 func WithRetryBackoff(p BackoffPolicy) GenerateOption {
 	return func(opts *generateContentOptions) error {
 		opts.RetryBackoff = p
+		return nil
+	}
+}
+
+// WithRetryNotify registers a callback that runs after a failed attempt,
+// just before the library waits to make the next attempt. Use it to show
+// retry progress to the user:
+//
+//	llms.WithRetryNotify(func(_ context.Context, n llms.RetryNotice) {
+//		log.Printf("Failed attempt %d of %d, waiting %s", n.Attempt, n.MaxAttempts, n.Delay)
+//	})
+//
+// The callback runs on the goroutine that made the request, so keep it
+// short. It is not called for an error that is not retryable, and not called
+// for the last attempt, because no wait follows it — use the returned
+// UnavailableError to report the final failure. Pass nil to remove a
+// callback.
+func WithRetryNotify(fn RetryNotifyFunc) GenerateOption {
+	return func(opts *generateContentOptions) error {
+		opts.RetryNotify = fn
 		return nil
 	}
 }

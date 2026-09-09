@@ -85,6 +85,38 @@ func defaultBackoffPolicy() BackoffPolicy {
 	}
 }
 
+// RetryNotice describes an attempt that failed and the pause that comes
+// before the next attempt. It is given to the callback registered with
+// WithRetryNotify.
+type RetryNotice struct {
+	// Provider is the GenAI system that failed, e.g. "anthropic".
+	Provider string
+	// Model is the model ID that was requested.
+	Model string
+	// Attempt is the 1-based number of the attempt that just failed.
+	Attempt int
+	// MaxAttempts is the total number of attempts allowed, which is
+	// MaxRetries+1.
+	MaxAttempts int
+	// Delay is how long the library waits before the next attempt.
+	Delay time.Duration
+	// StatusCode is the HTTP status of the failed attempt, or 0 when the
+	// provider did not report one.
+	StatusCode int
+	// RetryAfter is the server hint, after RetryAfterCap is applied. It is 0
+	// when the server gave no hint. The backoff policy decides whether to
+	// use it, so Delay can differ.
+	RetryAfter time.Duration
+	// HasRetryAfter is true when the server gave a hint.
+	HasRetryAfter bool
+	// Err is the error that caused the retry.
+	Err error
+}
+
+// RetryNotifyFunc is called after a failed attempt, just before the library
+// waits to try again.
+type RetryNotifyFunc func(ctx context.Context, notice RetryNotice)
+
 // headerCapturingTransport is an http.RoundTripper that records the latest
 // response headers it observes. Used by providers whose SDK error types do
 // not carry an *http.Response (Google, OpenRouter) so the retry loop can
@@ -200,6 +232,21 @@ func retryLoop[T any](
 		if delay < 0 {
 			delay = 0
 		}
+
+		if opts.RetryNotify != nil {
+			opts.RetryNotify(ctx, RetryNotice{
+				Provider:      provider,
+				Model:         model,
+				Attempt:       attempt + 1,
+				MaxAttempts:   maxAttempts,
+				Delay:         delay,
+				StatusCode:    lastStatus,
+				RetryAfter:    lastRetryAfter,
+				HasRetryAfter: lastHasRetryAfter,
+				Err:           lastErr,
+			})
+		}
+
 		if delay > 0 {
 			t := time.NewTimer(delay)
 			select {

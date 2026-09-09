@@ -22,6 +22,8 @@ touching application code.
   OpenTelemetry GenAI metrics and local stats aggregation.
 - **Capability-aware** — embedded model metadata gates temperature,
   reasoning, and modality behavior so missing features fail gracefully.
+- **Retries you can watch** — rate limits and overloads are retried with
+  backoff, and a callback reports each wait so the user sees the progress.
 - **Pluggable credentials** — environment variables by default, or supply
   your own source; credentials are resolved per request so they can rotate.
 
@@ -154,6 +156,43 @@ For finer control, `StepPlan` returns the model's tool calls without
 executing them and `RunTools` runs them on demand, useful when tools
 require approval or run out of process. See
 [`examples/agent`](./examples/agent) for the full pattern.
+
+### Retries
+
+A request that fails with a rate limit (429), a service that is unavailable
+(503), or an overload (529) is retried automatically. The library owns the
+retry loop for all four providers, so the same options apply everywhere:
+
+```go
+res, err := model.GenerateContent(ctx,
+    llms.WithMessages(llms.NewMessage(llms.RoleUser, llms.NewTextPart("..."))),
+    // Up to 10 attempts in total.
+    llms.WithMaxRetries(9),
+    // Tell the user what is going on between attempts.
+    llms.WithRetryNotify(func(_ context.Context, n llms.RetryNotice) {
+        log.Printf("Failed attempt %d of %d, waiting %s", n.Attempt, n.MaxAttempts, n.Delay)
+    }),
+)
+```
+
+Defaults: 2 retries (3 attempts), exponential backoff from 500ms to 8s with
+25% jitter, and a server `Retry-After` hint is used when there is one.
+`WithRetryBackoff` replaces the delay policy and `WithRetryAfterCap` limits
+how long a server hint can make the library wait.
+
+When the retries run out the error is an `*UnavailableError`, which carries
+the status code, the attempts made, and the last `Retry-After` hint:
+
+```go
+var ue *llms.UnavailableError
+if errors.As(err, &ue) {
+    log.Printf("gave up after %d attempts (status %d)", ue.Attempts, ue.StatusCode)
+}
+```
+
+A stream is never retried after its first event. Such a failure is reported
+with the `ErrStreamingPartialOutput` sentinel instead, so you never replay
+tokens the user has already seen.
 
 ## Examples
 

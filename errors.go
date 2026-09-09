@@ -39,10 +39,8 @@ var ErrStructuredStreamParse = errors.New("structured stream parse failed")
 //     what the SDK actually slept (jitter/cap may differ); outer-loop
 //     schedulers want the raw hint.
 //   - HasRetryAfter: true when the server provided a hint.
-//   - Attempts: number of attempts actually made (>=1). For Google/
-//     OpenRouter (where llms-go owns the retry loop) this is exact. For
-//     Anthropic/OpenAI (where the SDK runs its own retry loop and exposes
-//     no counter) this is an upper bound: MaxRetries+1.
+//   - Attempts: number of attempts actually made (>=1). llms-go owns the
+//     retry loop for every provider, so this count is exact.
 //   - PartialOutput: true when at least one content event was dispatched
 //     to StreamingFunc before the stream errored.
 //   - PartialUsage: usage accumulated up to the point of a mid-stream
