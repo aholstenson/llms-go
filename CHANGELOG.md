@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/aholstenson/llms-go/compare/v0.7.0...v0.8.0) (2026-09-09)
+
+
+### Features
+
+* Notify support for retries ([a248d98](https://github.com/aholstenson/llms-go/commit/a248d9826e6a9550afa43d7172139c1610261498))
+
 ## [0.7.0](https://github.com/aholstenson/llms-go/compare/v0.6.1...v0.7.0) (2026-08-28)
 
 
