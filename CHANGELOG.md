@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.9.0](https://github.com/aholstenson/llms-go/compare/v0.8.0...v0.9.0) (2026-09-23)
+
+
+### Features
+
+* Ability to detect when an answer is stalled ([aab443c](https://github.com/aholstenson/llms-go/commit/aab443c689cd8f3ff4e9c2537de207447b846c06))
+* Improve model info loading, price calculation and effort selection ([d67cb53](https://github.com/aholstenson/llms-go/commit/d67cb53b2cc938f07ea271a530b02a1b56fff5cf))
+
 ## [0.8.0](https://github.com/aholstenson/llms-go/compare/v0.7.0...v0.8.0) (2026-09-09)
 
 
