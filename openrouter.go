@@ -522,6 +522,11 @@ func (t *openrouterTurn) nextNonStreaming(ctx context.Context, start time.Time, 
 		if err == nil {
 			return false, 0, 0, false
 		}
+		// A stall is a transient failure like any other, except the provider
+		// never got as far as telling us so.
+		if isStallError(err) {
+			return true, 0, 0, false
+		}
 		status, ok := openrouter.HTTPStatusCode(err)
 		if !ok || !isUnavailableStatusCode(status) {
 			return false, status, 0, false
@@ -530,11 +535,13 @@ func (t *openrouterTurn) nextNonStreaming(ctx context.Context, start time.Time, 
 		return true, status, ra, hasRA
 	}
 
-	response, err := retryLoop(ctx, t.opts, string(GenAISystemOpenRouter), m.model, classify, func(ctx context.Context) (openrouter.ChatCompletionResponse, error) {
+	// The stall budgets ride on the context so the transport can fail a
+	// silent request instead of hanging on it.
+	response, err := retryLoop(withLiveness(ctx, m.model, t.opts), t.opts, string(GenAISystemOpenRouter), m.model, classify, func(ctx context.Context) (openrouter.ChatCompletionResponse, error) {
 		return m.client.CreateChatCompletion(ctx, t.params)
 	})
 	if err != nil {
-		return t.reportError(ctx, err, start, collector, false, false, nil)
+		return t.reportError(ctx, err, start, collector, false, false, nil, 1)
 	}
 
 	if len(response.Choices) == 0 {
@@ -612,38 +619,132 @@ func (t *openrouterTurn) nextNonStreaming(ctx context.Context, start time.Time, 
 	}, nil
 }
 
-func (t *openrouterTurn) nextStreaming(ctx context.Context, start time.Time, collector Collector) (TurnOutput, error) {
+// openrouterToolCallAcc accumulates one streamed tool call across deltas.
+type openrouterToolCallAcc struct {
+	ID        string
+	Name      string
+	Arguments strings.Builder
+}
+
+// openrouterStreamResult is what one drained stream attempt produced. The two
+// error flags are terminal for the turn — unlike a transport failure they say
+// nothing about whether another attempt would fare better — so they travel
+// beside the transport error rather than as one.
+type openrouterStreamResult struct {
+	text             string
+	toolCalls        map[int]*openrouterToolCallAcc
+	toolCallOrder    []int
+	reasoning        string
+	reasoningDetails []openrouter.ChatCompletionReasoningDetails
+	finishReason     openrouter.FinishReason
+	usage            *openrouter.Usage
+	// handling is true when a streaming callback failed, so the rest of the
+	// stream was ignored.
+	handling bool
+	// parseErr is a structured-output parse or dispatch failure.
+	parseErr error
+}
+
+// runStream sends the request and reads the response to the end, retrying the
+// whole attempt while nothing has reached the caller. Opening and draining sit
+// inside one retry loop because the failure this guards against — a rate
+// limit, an overload, or a stalled connection — is just as likely after the
+// server accepted the request as before it, and a stream that dies before its
+// first event is as safe to replay as one that never opened.
+//
+// The moment an event reaches a streaming callback the attempt becomes final:
+// retrying would replay tokens the user has already seen. On failure it
+// returns the last attempt's partial result so usage reported before the
+// failure is not lost.
+func (t *openrouterTurn) runStream(
+	ctx context.Context,
+	params openrouter.ChatCompletionRequest,
+	start time.Time,
+	hasRecordedFirstToken *bool,
+	streamingEmitted *bool,
+) (openrouterStreamResult, int, error) {
 	m := t.m
 
-	params := t.params
-	params.Stream = true
-	params.StreamOptions = &openrouter.StreamOptions{IncludeUsage: true}
+	classify := func(err error) (bool, int, time.Duration, bool) {
+		if err == nil {
+			return false, 0, 0, false
+		}
+		status, hasStatus := openrouter.HTTPStatusCode(err)
+
+		if *streamingEmitted {
+			// Events already reached the caller, so this attempt stands.
+			return false, status, 0, false
+		}
+
+		// A stall is a transient failure like any other, except the provider
+		// never got as far as telling us so.
+		if isStallError(err) {
+			return true, 0, 0, false
+		}
+
+		if !hasStatus || !isUnavailableStatusCode(status) {
+			return false, status, 0, false
+		}
+		ra, hasRA := extractRetryAfter("openrouter", err, m.lastCapturedHeaders())
+		return true, status, ra, hasRA
+	}
+
+	attempts := 0
+	var partial openrouterStreamResult
+	result, err := retryLoop(ctx, t.opts, string(GenAISystemOpenRouter), m.model, classify,
+		func(ctx context.Context) (openrouterStreamResult, error) {
+			attempts++
+			if attempts > 1 {
+				// A fresh attempt replays the whole response, so structured
+				// output state from the abandoned one must not linger. This is
+				// safe precisely because no event escaped.
+				if t.jsParser != nil {
+					t.jsParser.Reset()
+				}
+				t.structuredContentBuilder.Reset()
+			}
+			partial = openrouterStreamResult{}
+
+			res, streamErr := t.streamAttempt(ctx, params, start, hasRecordedFirstToken, streamingEmitted)
+			partial = res
+			// A parse or handling failure is the turn's answer, whatever the
+			// transport went on to do, and retrying it would fail the same
+			// way. Report it instead of the transport error.
+			if streamErr != nil && res.parseErr == nil && !res.handling {
+				return openrouterStreamResult{}, streamErr
+			}
+			return res, nil
+		})
+	if err != nil {
+		return partial, attempts, err
+	}
+	return result, attempts, nil
+}
+
+// streamAttempt opens one stream and reads it to the end, dispatching events
+// to the caller's callbacks. The returned error is the transport error, if
+// any; the result carries the failures that belong to this turn rather than to
+// the connection.
+func (t *openrouterTurn) streamAttempt(
+	ctx context.Context,
+	params openrouter.ChatCompletionRequest,
+	start time.Time,
+	hasRecordedFirstToken *bool,
+	streamingEmitted *bool,
+) (openrouterStreamResult, error) {
+	m := t.m
+
+	out := openrouterStreamResult{toolCalls: make(map[int]*openrouterToolCallAcc)}
 
 	stream, err := m.client.CreateChatCompletionStream(ctx, params)
 	if err != nil {
-		return t.reportError(ctx, err, start, collector, true, false, nil)
+		return out, err
 	}
 	defer stream.Close()
 
-	hasRecordedFirstToken := false
-	streamHasErrored := false
-	streamingEmitted := false
 	var structuredStreamErr error
-
 	var textContent strings.Builder
-
-	type accumulatedToolCall struct {
-		ID        string
-		Name      string
-		Arguments strings.Builder
-	}
-	accToolCalls := make(map[int]*accumulatedToolCall)
-	var toolCallOrder []int
-
 	var reasoningText strings.Builder
-	var reasoningDetails []openrouter.ChatCompletionReasoningDetails
-	var finishReason openrouter.FinishReason
-	var usage *openrouter.Usage
 
 	for {
 		chunk, recvErr := stream.Recv()
@@ -656,7 +757,7 @@ func (t *openrouterTurn) nextStreaming(ctx context.Context, start time.Time, col
 		}
 
 		if chunk.Usage != nil {
-			usage = chunk.Usage
+			out.usage = chunk.Usage
 		}
 
 		if len(chunk.Choices) == 0 {
@@ -667,13 +768,13 @@ func (t *openrouterTurn) nextStreaming(ctx context.Context, start time.Time, col
 		delta := choice.Delta
 
 		if choice.FinishReason != "" {
-			finishReason = choice.FinishReason
+			out.finishReason = choice.FinishReason
 		}
 
-		if delta.Content != "" && !streamHasErrored {
-			if !hasRecordedFirstToken {
+		if delta.Content != "" && !out.handling {
+			if !*hasRecordedFirstToken {
 				m.metrics.RecordTimeToFirstToken(ctx, GenAISystemOpenRouter, GenAIOperationChat, GenAIModel(m.model), time.Since(start))
-				hasRecordedFirstToken = true
+				*hasRecordedFirstToken = true
 			}
 
 			textContent.WriteString(delta.Content)
@@ -685,7 +786,7 @@ func (t *openrouterTurn) nextStreaming(ctx context.Context, start time.Time, col
 					structuredStreamErr = fmt.Errorf("%w: %w", ErrStructuredStreamParse, perr)
 				} else {
 					for _, event := range events {
-						streamingEmitted = true
+						*streamingEmitted = true
 						if perr := t.opts.StructuredStreamingFunc(ctx, event); perr != nil {
 							structuredStreamErr = perr
 							break
@@ -695,30 +796,30 @@ func (t *openrouterTurn) nextStreaming(ctx context.Context, start time.Time, col
 			}
 
 			if t.opts.StreamingFunc != nil {
-				streamingEmitted = true
+				*streamingEmitted = true
 				if perr := t.opts.StreamingFunc(ctx, StreamingEventTextChunk{Text: delta.Content}); perr != nil {
 					m.logger.Error("Error handling OpenRouter response", slog.Any("error", perr))
-					streamHasErrored = true
+					out.handling = true
 				}
 			}
 		}
 
 		if delta.Reasoning != nil && *delta.Reasoning != "" {
 			reasoningText.WriteString(*delta.Reasoning)
-			if t.opts.StreamingFunc != nil && !streamHasErrored {
-				streamingEmitted = true
+			if t.opts.StreamingFunc != nil && !out.handling {
+				*streamingEmitted = true
 				if perr := t.opts.StreamingFunc(ctx, StreamingEventThinking{Text: *delta.Reasoning}); perr != nil {
 					m.logger.Error("Error handling OpenRouter reasoning", slog.Any("error", perr))
-					streamHasErrored = true
+					out.handling = true
 				}
 			}
 		} else if delta.ReasoningContent != "" {
 			reasoningText.WriteString(delta.ReasoningContent)
-			if t.opts.StreamingFunc != nil && !streamHasErrored {
-				streamingEmitted = true
+			if t.opts.StreamingFunc != nil && !out.handling {
+				*streamingEmitted = true
 				if perr := t.opts.StreamingFunc(ctx, StreamingEventThinking{Text: delta.ReasoningContent}); perr != nil {
 					m.logger.Error("Error handling OpenRouter reasoning", slog.Any("error", perr))
-					streamHasErrored = true
+					out.handling = true
 				}
 			}
 		}
@@ -726,7 +827,7 @@ func (t *openrouterTurn) nextStreaming(ctx context.Context, start time.Time, col
 		// reasoning_details arrive only on whole blocks (not deltas) — accumulate
 		// the latest copy so we can preserve them on the next turn.
 		if len(delta.ReasoningDetails) > 0 {
-			reasoningDetails = append(reasoningDetails, delta.ReasoningDetails...)
+			out.reasoningDetails = append(out.reasoningDetails, delta.ReasoningDetails...)
 		}
 
 		for _, tc := range delta.ToolCalls {
@@ -734,11 +835,11 @@ func (t *openrouterTurn) nextStreaming(ctx context.Context, start time.Time, col
 			if tc.Index != nil {
 				idx = *tc.Index
 			}
-			acc, ok := accToolCalls[idx]
+			acc, ok := out.toolCalls[idx]
 			if !ok {
-				acc = &accumulatedToolCall{}
-				accToolCalls[idx] = acc
-				toolCallOrder = append(toolCallOrder, idx)
+				acc = &openrouterToolCallAcc{}
+				out.toolCalls[idx] = acc
+				out.toolCallOrder = append(out.toolCallOrder, idx)
 			}
 			if tc.ID != "" {
 				acc.ID = tc.ID
@@ -756,7 +857,7 @@ func (t *openrouterTurn) nextStreaming(ctx context.Context, start time.Time, col
 			structuredStreamErr = fmt.Errorf("%w: %w", ErrStructuredStreamParse, ferr)
 		} else {
 			for _, event := range events {
-				streamingEmitted = true
+				*streamingEmitted = true
 				if ferr := t.opts.StructuredStreamingFunc(ctx, event); ferr != nil {
 					structuredStreamErr = ferr
 					break
@@ -765,18 +866,38 @@ func (t *openrouterTurn) nextStreaming(ctx context.Context, start time.Time, col
 		}
 	}
 
-	if structuredStreamErr != nil {
+	out.text = textContent.String()
+	out.reasoning = reasoningText.String()
+	out.parseErr = structuredStreamErr
+	return out, err
+}
+
+func (t *openrouterTurn) nextStreaming(ctx context.Context, start time.Time, collector Collector) (TurnOutput, error) {
+	m := t.m
+
+	params := t.params
+	params.Stream = true
+	params.StreamOptions = &openrouter.StreamOptions{IncludeUsage: true}
+
+	hasRecordedFirstToken := false
+	streamingEmitted := false
+
+	// The stall budgets ride on the context so the transport can fail a
+	// silent request instead of hanging on it.
+	result, attempts, err := t.runStream(withLiveness(ctx, m.model, t.opts), params, start, &hasRecordedFirstToken, &streamingEmitted)
+
+	if result.parseErr != nil {
 		if metrics := GetMetrics(ctx); metrics != nil {
 			metrics.RecordFailure(m.statsModel, collector)
 		}
 		m.metrics.RecordCallDuration(ctx, GenAISystemOpenRouter, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeStreamProcessing)
 		if streamingEmitted {
-			return TurnOutput{}, errors.Join(ErrStreamingPartialOutput, structuredStreamErr)
+			return TurnOutput{}, errors.Join(ErrStreamingPartialOutput, result.parseErr)
 		}
-		return TurnOutput{}, structuredStreamErr
+		return TurnOutput{}, result.parseErr
 	}
 
-	if streamHasErrored {
+	if result.handling {
 		if metrics := GetMetrics(ctx); metrics != nil {
 			metrics.RecordFailure(m.statsModel, collector)
 		}
@@ -784,15 +905,17 @@ func (t *openrouterTurn) nextStreaming(ctx context.Context, start time.Time, col
 		return TurnOutput{}, fmt.Errorf("stream handling failed for OpenRouter (model %s)", m.model)
 	}
 	if err != nil {
-		return t.reportError(ctx, err, start, collector, true, streamingEmitted, m.extractUsage(usage))
+		return t.reportError(ctx, err, start, collector, true, streamingEmitted, m.extractUsage(result.usage), attempts)
 	}
 
+	usage := result.usage
+
 	// Rebuild assistant message + neutral tool calls in deterministic order.
-	finalText := textContent.String()
-	toolCalls := make([]ToolCall, 0, len(toolCallOrder))
-	nativeToolCalls := make([]openrouter.ToolCall, 0, len(toolCallOrder))
-	for _, idx := range toolCallOrder {
-		acc := accToolCalls[idx]
+	finalText := result.text
+	toolCalls := make([]ToolCall, 0, len(result.toolCallOrder))
+	nativeToolCalls := make([]openrouter.ToolCall, 0, len(result.toolCallOrder))
+	for _, idx := range result.toolCallOrder {
+		acc := result.toolCalls[idx]
 		args := acc.Arguments.String()
 		toolCalls = append(toolCalls, ToolCall{
 			ID:        acc.ID,
@@ -818,18 +941,18 @@ func (t *openrouterTurn) nextStreaming(ctx context.Context, start time.Time, col
 	if len(nativeToolCalls) > 0 {
 		assistant.ToolCalls = nativeToolCalls
 	}
-	if reasoningText.Len() > 0 {
-		r := reasoningText.String()
+	if result.reasoning != "" {
+		r := result.reasoning
 		assistant.Reasoning = &r
 	}
-	if len(reasoningDetails) > 0 {
-		assistant.ReasoningDetails = reasoningDetails
+	if len(result.reasoningDetails) > 0 {
+		assistant.ReasoningDetails = result.reasoningDetails
 	}
 	t.assistantMsg = assistant
 
 	var thinking []ThinkingBlock
-	if reasoningText.Len() > 0 {
-		thinking = append(thinking, ThinkingBlock{Text: reasoningText.String()})
+	if result.reasoning != "" {
+		thinking = append(thinking, ThinkingBlock{Text: result.reasoning})
 	}
 
 	var u TurnUsage
@@ -873,12 +996,12 @@ func (t *openrouterTurn) nextStreaming(ctx context.Context, start time.Time, col
 		Text:       finalText,
 		Thinking:   thinking,
 		ToolCalls:  toolCalls,
-		StopReason: openrouterStopReason(finishReason, len(toolCalls) > 0),
+		StopReason: openrouterStopReason(result.finishReason, len(toolCalls) > 0),
 		Usage:      u,
 	}, nil
 }
 
-func (t *openrouterTurn) reportError(ctx context.Context, err error, start time.Time, collector Collector, streaming bool, partialEmitted bool, partialUsage *TurnUsage) (TurnOutput, error) {
+func (t *openrouterTurn) reportError(ctx context.Context, err error, start time.Time, collector Collector, streaming bool, partialEmitted bool, partialUsage *TurnUsage, attempts int) (TurnOutput, error) {
 	m := t.m
 	if metrics := GetMetrics(ctx); metrics != nil {
 		metrics.RecordFailure(m.statsModel, collector)
@@ -901,25 +1024,35 @@ func (t *openrouterTurn) reportError(ctx context.Context, err error, start time.
 		)
 	}
 
-	// retryLoop already wrapped non-streaming retryable errors in
-	// UnavailableError; just stamp PartialOutput and re-attach the streaming
-	// sentinel where applicable.
+	// retryLoop already wrapped the errors it kept retrying in
+	// UnavailableError, with the exact attempt count on them; just stamp
+	// PartialOutput and re-attach the streaming sentinel where applicable.
 	var ue *UnavailableError
 	if errors.As(err, &ue) {
 		ue.PartialOutput = partialEmitted
 		ue.PartialUsage = partialUsage
-		m.metrics.RecordCallDuration(ctx, GenAISystemOpenRouter, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeUnavailable)
+		m.metrics.RecordCallDuration(ctx, GenAISystemOpenRouter, GenAIOperationChat, GenAIModel(m.model), time.Since(start), transientErrorType(err))
 		if partialEmitted {
 			return TurnOutput{}, errors.Join(ue, ErrStreamingPartialOutput)
 		}
 		return TurnOutput{}, ue
 	}
 
-	if status, ok := openrouter.HTTPStatusCode(err); ok && isUnavailableStatusCode(status) {
-		m.metrics.RecordCallDuration(ctx, GenAISystemOpenRouter, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeUnavailable)
-		ra, hasRA := extractRetryAfter("openrouter", err, m.lastCapturedHeaders())
-		if hasRA && t.opts.RetryAfterCap > 0 && ra > t.opts.RetryAfterCap {
-			ra = t.opts.RetryAfterCap
+	// A transient failure the retry loop declined to retry, because output had
+	// already reached the caller. Report it in the same shape so callers see
+	// one error type for "try again later".
+	status, hasStatus := openrouter.HTTPStatusCode(err)
+	if isStallError(err) || (hasStatus && isUnavailableStatusCode(status)) {
+		m.metrics.RecordCallDuration(ctx, GenAISystemOpenRouter, GenAIOperationChat, GenAIModel(m.model), time.Since(start), transientErrorType(err))
+		var ra time.Duration
+		var hasRA bool
+		if hasStatus && isUnavailableStatusCode(status) {
+			ra, hasRA = extractRetryAfter("openrouter", err, m.lastCapturedHeaders())
+			if hasRA && t.opts.RetryAfterCap > 0 && ra > t.opts.RetryAfterCap {
+				ra = t.opts.RetryAfterCap
+			}
+		} else {
+			status = 0
 		}
 		newUE := &UnavailableError{
 			Provider:      string(GenAISystemOpenRouter),
@@ -927,7 +1060,7 @@ func (t *openrouterTurn) reportError(ctx context.Context, err error, start time.
 			StatusCode:    status,
 			RetryAfter:    ra,
 			HasRetryAfter: hasRA,
-			Attempts:      1,
+			Attempts:      attempts,
 			PartialOutput: partialEmitted,
 			PartialUsage:  partialUsage,
 			Cause:         err,

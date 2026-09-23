@@ -706,6 +706,75 @@ func (t *googleTurn) ObserveToolResults(_ context.Context, _ []ToolCall, outcome
 	return nil
 }
 
+// runStream reads a streaming generation to the end, retrying the whole
+// attempt while nothing has reached the caller. A stream that dies before its
+// first event is as safe to replay as a request that never opened, so both
+// live under one retry budget.
+//
+// The moment an event reaches a streaming callback the attempt becomes final:
+// retrying would replay tokens the user has already seen. It returns how many
+// attempts were made and the last attempt's partial response, so usage
+// reported before the failure is not lost.
+func (m *googleModel) runStream(
+	ctx context.Context,
+	t *googleTurn,
+	start time.Time,
+	hasRecordedFirstToken *bool,
+	streamingEmitted *bool,
+) (*genai.GenerateContentResponse, int, error) {
+	classify := func(err error) (bool, int, time.Duration, bool) {
+		if err == nil {
+			return false, 0, 0, false
+		}
+		_, retryable, status := googleErrorDetails(err)
+
+		if *streamingEmitted {
+			// Events already reached the caller, so this attempt stands.
+			return false, status, 0, false
+		}
+
+		// A stall is a transient failure like any other, except the provider
+		// never got as far as telling us so.
+		if isStallError(err) {
+			return true, 0, 0, false
+		}
+
+		if !retryable {
+			return false, status, 0, false
+		}
+		ra, hasRA := extractRetryAfter("google", err, m.lastCapturedHeaders())
+		return true, status, ra, hasRA
+	}
+
+	attempts := 0
+	var partial *genai.GenerateContentResponse
+	response, err := retryLoop(ctx, t.opts, string(GenAISystemGoogle), m.model, classify,
+		func(ctx context.Context) (*genai.GenerateContentResponse, error) {
+			attempts++
+			if attempts > 1 {
+				// A fresh attempt replays the whole response, so structured
+				// output state from the abandoned one must not linger. This is
+				// safe precisely because no event escaped.
+				if t.jsParser != nil {
+					t.jsParser.Reset()
+				}
+				t.structuredContentBuilder.Reset()
+			}
+			partial = nil
+
+			resp, err := m.handleStreaming(ctx, t.config, t.messages, t.opts.StreamingFunc, t.opts.StructuredStreamingFunc, t.jsParser, &t.structuredContentBuilder, start, hasRecordedFirstToken, streamingEmitted)
+			if err != nil {
+				partial = resp
+				return nil, err
+			}
+			return resp, nil
+		})
+	if err != nil {
+		return partial, attempts, err
+	}
+	return response, attempts, nil
+}
+
 func (t *googleTurn) Next(ctx context.Context) (TurnOutput, error) {
 	m := t.m
 
@@ -735,15 +804,25 @@ func (t *googleTurn) Next(ctx context.Context) (TurnOutput, error) {
 
 	var response *genai.GenerateContentResponse
 	var err error
+	attempts := 1
 	streamingEmitted := false
 	streamingPath := t.opts.StreamingFunc != nil || t.opts.StructuredStreamingFunc != nil
 
+	// The stall budgets ride on the context so the transport can fail a
+	// silent request instead of hanging on it.
+	ctx = withLiveness(ctx, m.model, t.opts)
+
 	if streamingPath {
-		response, err = m.handleStreaming(ctx, t.config, t.messages, t.opts.StreamingFunc, t.opts.StructuredStreamingFunc, t.jsParser, &t.structuredContentBuilder, start, &hasRecordedFirstToken, &streamingEmitted)
+		response, attempts, err = m.runStream(ctx, t, start, &hasRecordedFirstToken, &streamingEmitted)
 	} else {
 		classify := func(err error) (bool, int, time.Duration, bool) {
 			if err == nil {
 				return false, 0, 0, false
+			}
+			// A stall is a transient failure like any other, except the
+			// provider never got as far as telling us so.
+			if isStallError(err) {
+				return true, 0, 0, false
 			}
 			_, retryable, status := googleErrorDetails(err)
 			if !retryable {
@@ -788,38 +867,44 @@ func (t *googleTurn) Next(ctx context.Context) (TurnOutput, error) {
 		if errors.As(err, &ue) {
 			ue.PartialOutput = streamingEmitted
 			ue.PartialUsage = partialUsage
-			m.metrics.RecordCallDuration(ctx, GenAISystemGoogle, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeUnavailable)
+			m.metrics.RecordCallDuration(ctx, GenAISystemGoogle, GenAIOperationChat, GenAIModel(m.model), time.Since(start), transientErrorType(err))
 			if streamingEmitted {
 				return TurnOutput{}, errors.Join(ue, ErrStreamingPartialOutput)
 			}
 			return TurnOutput{}, ue
 		}
 
-		// Streaming path: build UnavailableError ourselves since retryLoop
-		// is bypassed.
-		if streamingPath {
-			if _, retryable, status := googleErrorDetails(err); retryable {
-				ra, hasRA := extractRetryAfter("google", err, m.lastCapturedHeaders())
+		// A transient failure the retry loop declined to retry, because
+		// output had already reached the caller. Report it in the same shape
+		// so callers see one error type for "try again later".
+		_, retryable, status := googleErrorDetails(err)
+		if isStallError(err) || retryable {
+			var ra time.Duration
+			var hasRA bool
+			if retryable {
+				ra, hasRA = extractRetryAfter("google", err, m.lastCapturedHeaders())
 				if hasRA && t.opts.RetryAfterCap > 0 && ra > t.opts.RetryAfterCap {
 					ra = t.opts.RetryAfterCap
 				}
-				se := &UnavailableError{
-					Provider:      string(GenAISystemGoogle),
-					Model:         m.model,
-					StatusCode:    status,
-					RetryAfter:    ra,
-					HasRetryAfter: hasRA,
-					Attempts:      1,
-					PartialOutput: streamingEmitted,
-					PartialUsage:  partialUsage,
-					Cause:         err,
-				}
-				m.metrics.RecordCallDuration(ctx, GenAISystemGoogle, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeUnavailable)
-				if streamingEmitted {
-					return TurnOutput{}, errors.Join(se, ErrStreamingPartialOutput)
-				}
-				return TurnOutput{}, se
+			} else {
+				status = 0
 			}
+			se := &UnavailableError{
+				Provider:      string(GenAISystemGoogle),
+				Model:         m.model,
+				StatusCode:    status,
+				RetryAfter:    ra,
+				HasRetryAfter: hasRA,
+				Attempts:      attempts,
+				PartialOutput: streamingEmitted,
+				PartialUsage:  partialUsage,
+				Cause:         err,
+			}
+			m.metrics.RecordCallDuration(ctx, GenAISystemGoogle, GenAIOperationChat, GenAIModel(m.model), time.Since(start), transientErrorType(err))
+			if streamingEmitted {
+				return TurnOutput{}, errors.Join(se, ErrStreamingPartialOutput)
+			}
+			return TurnOutput{}, se
 		}
 
 		var apiErr genai.APIError

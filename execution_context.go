@@ -165,6 +165,16 @@ func (t *executionTracker) IncrementStep() {
 	t.currentStep++
 }
 
+// DecrementStep gives a step back after a model turn failed in a way that can
+// be attempted again, so a retry does not consume the step budget.
+func (t *executionTracker) DecrementStep() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.currentStep > 0 {
+		t.currentStep--
+	}
+}
+
 func (t *executionTracker) RecordToolCall(toolName string) {
 	t.mu.Lock()
 	t.toolCalls[toolName]++

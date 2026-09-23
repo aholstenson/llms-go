@@ -92,6 +92,41 @@ func (e *UnavailableError) Unwrap() error {
 	return e.Cause
 }
 
+// IsRetryable reports whether a failed model call can be attempted again
+// against the same conversation. It is true for a transient provider failure —
+// a rate limit, an overload, or a stall (see WithStallTimeout) — that the
+// library's own retries could not clear, and false once any of the turn's
+// output has reached a streaming callback, because a fresh attempt would
+// replay tokens the user has already seen.
+//
+// A retry is safe because a failed turn leaves the conversation untouched: the
+// provider-native history only grows when a turn succeeds and its tool results
+// are observed. So an unattended job can report the failure, wait, and call
+// Session.StepPlan (or Step) again, instead of cancelling the run and throwing
+// away the transcript it has built up:
+//
+//	info, done, err := session.Step(ctx)
+//	if err != nil && llms.IsRetryable(err) {
+//		// same session, same transcript, one more model call
+//		continue
+//	}
+//
+// A Session tracks this for its own last failure; see Session.Retryable.
+func IsRetryable(err error) bool {
+	if err == nil {
+		return false
+	}
+	// Output the caller has already seen cannot be replayed.
+	if errors.Is(err, ErrStreamingPartialOutput) {
+		return false
+	}
+	var ue *UnavailableError
+	if errors.As(err, &ue) {
+		return !ue.PartialOutput
+	}
+	return errors.Is(err, ErrStall)
+}
+
 // isUnavailableStatusCode returns true for HTTP status codes that indicate
 // the provider is temporarily unavailable:
 //   - 429: Too Many Requests / rate limited

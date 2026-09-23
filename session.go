@@ -95,6 +95,7 @@ type Session struct {
 	step       int
 	done       bool
 	lastErr    error
+	retryable  bool
 	stopReason StopReason
 	messages   []*Message
 
@@ -215,10 +216,14 @@ func NewSession(ctx context.Context, m Model, options ...GenerateOption) (*Sessi
 // cancelled. A non-nil error is returned for genuine failures (provider
 // error, context cancellation); step-limit termination is reported via
 // done=true with Result() returning a *MaxStepsError.
+//
+// An error with done=false is a transient model failure the session survived:
+// the turn can be attempted again by calling Step once more (see
+// Session.Retryable and IsRetryable).
 func (s *Session) Step(ctx context.Context) (StepInfo, bool, error) {
 	plan, done, err := s.StepPlan(ctx)
 	if err != nil {
-		return StepInfo{Step: plan.Step, Output: plan.Output, Exec: plan.Exec}, true, err
+		return StepInfo{Step: plan.Step, Output: plan.Output, Exec: plan.Exec}, done, err
 	}
 	if done {
 		return StepInfo{Step: plan.Step, Output: plan.Output, Exec: plan.Exec}, true, nil
@@ -276,9 +281,25 @@ func (s *Session) StepPlan(ctx context.Context) (PlanInfo, bool, error) {
 
 	out, err := s.turn.Next(ctx)
 	if err != nil {
+		if IsRetryable(err) {
+			// The turn left no trace: Turn.Next never appends to the
+			// provider-native history (Turn.Observe does), and nothing it
+			// produced reached the caller. So the session stays usable —
+			// calling StepPlan again retries this turn against the same
+			// transcript, instead of forcing the caller to cancel the run and
+			// throw the conversation away. The step is given back too, so a
+			// retry does not eat the budget.
+			s.step--
+			s.tracker.DecrementStep()
+			s.lastErr = err
+			s.retryable = true
+			return PlanInfo{Step: s.step, Exec: s.tracker}, false, err
+		}
 		s.fail(err)
 		return PlanInfo{Step: s.step, Exec: s.tracker}, true, err
 	}
+	s.lastErr = nil
+	s.retryable = false
 
 	s.stopReason = out.StopReason
 	s.tracker.AddTokens(out.Usage.InputTokens, out.Usage.OutputTokens, out.Usage.CachedReadTokens, out.Usage.CachedWriteTokens)
@@ -476,9 +497,22 @@ func toolOutcomeMessage(outcomes []ToolOutcome) *Message {
 	return NewMessage(RoleUser, parts...)
 }
 
+// Retryable reports whether the session's last failure left the session usable:
+// the model turn failed transiently before any of its output reached the
+// caller, so calling StepPlan (or Step) again retries that turn against the
+// same transcript. It is false on a clean session and after a failure that
+// ended the run.
+//
+// A retried turn starts a fresh model call, so a caller watching the stream
+// sees another StreamingEventMessageStart for it.
+func (s *Session) Retryable() bool {
+	return s.retryable
+}
+
 func (s *Session) fail(err error) {
 	s.done = true
 	s.lastErr = err
+	s.retryable = false
 	// Keep a failed session's phase consistent so a later StepPlan hits the
 	// done-guard rather than the awaiting-observe ordering error.
 	s.phase = phaseReady

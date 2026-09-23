@@ -487,17 +487,58 @@ func (t *openaiTurn) ObserveToolResults(_ context.Context, _ []ToolCall, outcome
 	return nil
 }
 
-// openStream sends the request and returns the stream once the server has
-// accepted it. A failure to open the stream is retried, so a rate limit or
-// an overload before the first event only reaches the caller when the
-// retries run out. It also returns how many attempts were made, which the
-// caller stamps onto UnavailableError.
-func (t *openaiTurn) openStream(ctx context.Context) (*ssestream.Stream[responses.ResponseStreamEventUnion], int, error) {
+// openaiStreamResult is what one drained stream attempt produced. The two
+// error flags are terminal for the turn — unlike a transport failure they say
+// nothing about whether another attempt would fare better — so they travel
+// beside the transport error rather than as one.
+type openaiStreamResult struct {
+	// response is the final response event, or nil when none arrived.
+	response *responses.Response
+	// handling is true when a streaming callback or an in-band error event
+	// failed, so the rest of the stream was ignored.
+	handling bool
+	// parseErr is a structured-output parse or dispatch failure.
+	parseErr error
+}
+
+// runStream sends the request and reads the response to the end, retrying the
+// whole attempt while nothing has reached the caller. Opening and draining sit
+// inside one retry loop because the failure this guards against — a rate
+// limit, an overload, or a stalled connection — is just as likely after the
+// server accepted the request as before it, and a stream that dies before its
+// first event is as safe to replay as one that never opened.
+//
+// The moment an event reaches a streaming callback the attempt becomes final:
+// retrying would replay tokens the user has already seen. It returns how many
+// attempts were made and, on failure, the last attempt's partial result so
+// usage reported before the failure is not lost.
+func (t *openaiTurn) runStream(
+	ctx context.Context,
+	start time.Time,
+	hasRecordedFirstToken *bool,
+	streamingEmitted *bool,
+) (openaiStreamResult, int, error) {
 	m := t.m
 
 	classify := func(err error) (bool, int, time.Duration, bool) {
 		oe := &openai.Error{}
-		if !errors.As(err, &oe) {
+		hasAPIErr := errors.As(err, &oe)
+
+		if *streamingEmitted {
+			// Events already reached the caller, so this attempt stands.
+			if hasAPIErr {
+				return false, oe.StatusCode, 0, false
+			}
+			return false, 0, 0, false
+		}
+
+		// A stall is a transient failure like any other, except the provider
+		// never got as far as telling us so.
+		if isStallError(err) {
+			return true, 0, 0, false
+		}
+
+		if !hasAPIErr {
 			return false, 0, 0, false
 		}
 		if !isUnavailableStatusCode(oe.StatusCode) {
@@ -508,9 +549,21 @@ func (t *openaiTurn) openStream(ctx context.Context) (*ssestream.Stream[response
 	}
 
 	attempts := 0
-	stream, err := retryLoop(ctx, t.opts, string(GenAISystemOpenAI), m.model, classify,
-		func(ctx context.Context) (*ssestream.Stream[responses.ResponseStreamEventUnion], error) {
+	var partial openaiStreamResult
+	result, err := retryLoop(ctx, t.opts, string(GenAISystemOpenAI), m.model, classify,
+		func(ctx context.Context) (openaiStreamResult, error) {
 			attempts++
+			if attempts > 1 {
+				// A fresh attempt replays the whole response, so structured
+				// output state from the abandoned one must not linger. This is
+				// safe precisely because no event escaped.
+				if t.jsParser != nil {
+					t.jsParser.Reset()
+				}
+				t.structuredContentBuilder.Reset()
+			}
+			partial = openaiStreamResult{}
+
 			// llms-go owns the retry loop so WithRetryBackoff and
 			// WithRetryNotify apply to OpenAI like to every other provider.
 			stream := m.client.Responses.NewStreaming(ctx, t.params, option.WithMaxRetries(0))
@@ -520,11 +573,129 @@ func (t *openaiTurn) openStream(ctx context.Context) (*ssestream.Stream[response
 				if cerr := stream.Close(); cerr != nil {
 					m.logger.Warn("Error closing OpenAI stream", slog.Any("error", cerr))
 				}
-				return nil, err
+				return openaiStreamResult{}, err
 			}
-			return stream, nil
+
+			res, streamErr := t.drainStream(ctx, stream, start, hasRecordedFirstToken, streamingEmitted)
+			partial = res
+			// A parse or handling failure is the turn's answer, whatever the
+			// transport went on to do, and retrying it would fail the same
+			// way. Report it instead of the transport error.
+			if streamErr != nil && res.parseErr == nil && !res.handling {
+				return openaiStreamResult{}, streamErr
+			}
+			return res, nil
 		})
-	return stream, attempts, err
+	if err != nil {
+		return partial, attempts, err
+	}
+	return result, attempts, nil
+}
+
+// drainStream reads an open stream to the end, dispatching events to the
+// caller's callbacks. The returned error is the transport error, if any; the
+// result carries the failures that belong to this turn rather than to the
+// connection.
+func (t *openaiTurn) drainStream(
+	ctx context.Context,
+	stream *ssestream.Stream[responses.ResponseStreamEventUnion],
+	start time.Time,
+	hasRecordedFirstToken *bool,
+	streamingEmitted *bool,
+) (openaiStreamResult, error) {
+	m := t.m
+
+	var out openaiStreamResult
+	var structuredStreamErr error
+
+	for stream.Next() {
+		event := stream.Current()
+
+		switch ev := event.AsAny().(type) {
+		case responses.ResponseTextDeltaEvent:
+			if out.handling {
+				continue
+			}
+			if !*hasRecordedFirstToken {
+				m.metrics.RecordTimeToFirstToken(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start))
+				*hasRecordedFirstToken = true
+			}
+
+			delta := ev.Delta
+			if structuredStreamErr == nil && t.jsParser != nil && t.opts.StructuredStreamingFunc != nil {
+				t.structuredContentBuilder.WriteString(delta)
+				parsed, err := t.jsParser.Feed(delta)
+				if err != nil {
+					structuredStreamErr = fmt.Errorf("%w: %w", ErrStructuredStreamParse, err)
+				} else {
+					for _, e := range parsed {
+						*streamingEmitted = true
+						if err := t.opts.StructuredStreamingFunc(ctx, e); err != nil {
+							structuredStreamErr = err
+							break
+						}
+					}
+				}
+			}
+
+			if t.opts.StreamingFunc != nil && !out.handling {
+				*streamingEmitted = true
+				if err := t.opts.StreamingFunc(ctx, StreamingEventTextChunk{Text: delta}); err != nil {
+					m.logger.Error("Error handling OpenAI response", slog.Any("error", err))
+					out.handling = true
+				}
+			}
+
+		case responses.ResponseReasoningSummaryTextDeltaEvent:
+			if out.handling || t.opts.StreamingFunc == nil {
+				continue
+			}
+			*streamingEmitted = true
+			if err := t.opts.StreamingFunc(ctx, StreamingEventThinking{Text: ev.Delta}); err != nil {
+				m.logger.Error("Error handling OpenAI thinking", slog.Any("error", err))
+				out.handling = true
+			}
+
+		case responses.ResponseCompletedEvent:
+			r := ev.Response
+			out.response = &r
+
+		case responses.ResponseFailedEvent:
+			r := ev.Response
+			out.response = &r
+
+		case responses.ResponseIncompleteEvent:
+			r := ev.Response
+			out.response = &r
+
+		case responses.ResponseErrorEvent:
+			m.logger.Error("OpenAI stream error",
+				slog.String("code", ev.Code), slog.String("message", ev.Message))
+			out.handling = true
+		}
+	}
+
+	if err := stream.Close(); err != nil {
+		m.logger.Warn("Error closing OpenAI stream", slog.Any("error", err))
+	}
+
+	if structuredStreamErr == nil && t.jsParser != nil && t.opts.StructuredStreamingFunc != nil {
+		parsed, err := t.jsParser.Flush()
+		if err != nil {
+			structuredStreamErr = fmt.Errorf("%w: %w", ErrStructuredStreamParse, err)
+		} else {
+			for _, e := range parsed {
+				*streamingEmitted = true
+				if err := t.opts.StructuredStreamingFunc(ctx, e); err != nil {
+					structuredStreamErr = err
+					break
+				}
+			}
+		}
+	}
+
+	out.parseErr = structuredStreamErr
+	return out, stream.Err()
 }
 
 func (t *openaiTurn) Next(ctx context.Context) (TurnOutput, error) {
@@ -558,144 +729,20 @@ func (t *openaiTurn) Next(ctx context.Context) (TurnOutput, error) {
 		OfInputItemList: t.inputItems,
 	}
 
-	streamHasErrored := false
 	streamingEmitted := false
-	var structuredStreamErr error
 
-	stream, attempts, err := t.openStream(ctx)
+	// The stall budgets ride on the context so the transport can fail a
+	// silent request instead of hanging on it.
+	result, attempts, err := t.runStream(withLiveness(ctx, m.model, t.opts), start, &hasRecordedFirstToken, &streamingEmitted)
 	if err != nil {
 		if metrics := GetMetrics(ctx); metrics != nil {
 			metrics.RecordFailure(m.statsModel, collector)
 		}
 
-		// The stream never started, so there is no partial output or usage
-		// to preserve. A retryable failure is already an UnavailableError
-		// with the exact attempt count on it.
-		var ue *UnavailableError
-		if errors.As(err, &ue) {
-			m.metrics.RecordCallDuration(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeUnavailable)
-			return TurnOutput{}, ue
-		}
-
-		m.metrics.RecordCallDuration(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeInternal)
-		return TurnOutput{}, fmt.Errorf("got error from OpenAI (model %s) while streaming: %w", m.model, err)
-	}
-
-	var finalResponse *responses.Response
-
-	for stream.Next() {
-		event := stream.Current()
-
-		switch ev := event.AsAny().(type) {
-		case responses.ResponseTextDeltaEvent:
-			if streamHasErrored {
-				continue
-			}
-			if !hasRecordedFirstToken {
-				m.metrics.RecordTimeToFirstToken(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start))
-				hasRecordedFirstToken = true
-			}
-
-			delta := ev.Delta
-			if structuredStreamErr == nil && t.jsParser != nil && t.opts.StructuredStreamingFunc != nil {
-				t.structuredContentBuilder.WriteString(delta)
-				parsed, err := t.jsParser.Feed(delta)
-				if err != nil {
-					structuredStreamErr = fmt.Errorf("%w: %w", ErrStructuredStreamParse, err)
-				} else {
-					for _, e := range parsed {
-						streamingEmitted = true
-						if err := t.opts.StructuredStreamingFunc(ctx, e); err != nil {
-							structuredStreamErr = err
-							break
-						}
-					}
-				}
-			}
-
-			if t.opts.StreamingFunc != nil && !streamHasErrored {
-				streamingEmitted = true
-				if err := t.opts.StreamingFunc(ctx, StreamingEventTextChunk{Text: delta}); err != nil {
-					m.logger.Error("Error handling OpenAI response", slog.Any("error", err))
-					streamHasErrored = true
-				}
-			}
-
-		case responses.ResponseReasoningSummaryTextDeltaEvent:
-			if streamHasErrored || t.opts.StreamingFunc == nil {
-				continue
-			}
-			streamingEmitted = true
-			if err := t.opts.StreamingFunc(ctx, StreamingEventThinking{Text: ev.Delta}); err != nil {
-				m.logger.Error("Error handling OpenAI thinking", slog.Any("error", err))
-				streamHasErrored = true
-			}
-
-		case responses.ResponseCompletedEvent:
-			r := ev.Response
-			finalResponse = &r
-
-		case responses.ResponseFailedEvent:
-			r := ev.Response
-			finalResponse = &r
-
-		case responses.ResponseIncompleteEvent:
-			r := ev.Response
-			finalResponse = &r
-
-		case responses.ResponseErrorEvent:
-			m.logger.Error("OpenAI stream error",
-				slog.String("code", ev.Code), slog.String("message", ev.Message))
-			streamHasErrored = true
-		}
-	}
-
-	if err := stream.Close(); err != nil {
-		m.logger.Warn("Error closing OpenAI stream", slog.Any("error", err))
-	}
-
-	if structuredStreamErr == nil && t.jsParser != nil && t.opts.StructuredStreamingFunc != nil {
-		parsed, err := t.jsParser.Flush()
-		if err != nil {
-			structuredStreamErr = fmt.Errorf("%w: %w", ErrStructuredStreamParse, err)
-		} else {
-			for _, e := range parsed {
-				streamingEmitted = true
-				if err := t.opts.StructuredStreamingFunc(ctx, e); err != nil {
-					structuredStreamErr = err
-					break
-				}
-			}
-		}
-	}
-
-	if structuredStreamErr != nil {
-		if metrics := GetMetrics(ctx); metrics != nil {
-			metrics.RecordFailure(m.statsModel, collector)
-		}
-		m.metrics.RecordCallDuration(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeStreamProcessing)
-		if streamingEmitted {
-			return TurnOutput{}, errors.Join(ErrStreamingPartialOutput, structuredStreamErr)
-		}
-		return TurnOutput{}, structuredStreamErr
-	}
-
-	if streamHasErrored {
-		if metrics := GetMetrics(ctx); metrics != nil {
-			metrics.RecordFailure(m.statsModel, collector)
-		}
-		m.metrics.RecordCallDuration(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeStreamProcessing)
-		return TurnOutput{}, fmt.Errorf("stream handling failed for OpenAI (model %s)", m.model)
-	}
-	if stream.Err() != nil {
-		if metrics := GetMetrics(ctx); metrics != nil {
-			metrics.RecordFailure(m.statsModel, collector)
-		}
-
 		// If a ResponseIncomplete/Failed event landed before the transport
-		// errored, finalResponse already carries usage — preserve it so
+		// errored, the partial result already carries usage — preserve it so
 		// cost accounting is not lost.
-		partialUsage := m.extractUsage(finalResponse)
+		partialUsage := m.extractUsage(result.response)
 		if partialUsage != nil {
 			collector.Counter("input_tokens").Add(int(partialUsage.InputTokens))
 			collector.Counter("output_tokens").Add(int(partialUsage.OutputTokens))
@@ -709,31 +756,76 @@ func (t *openaiTurn) Next(ctx context.Context) (TurnOutput, error) {
 			)
 		}
 
+		// A failure the retry loop kept retrying is already an
+		// UnavailableError with the exact attempt count on it.
+		var ue *UnavailableError
+		if errors.As(err, &ue) {
+			ue.PartialOutput = streamingEmitted
+			ue.PartialUsage = partialUsage
+			m.metrics.RecordCallDuration(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start), transientErrorType(err))
+			if streamingEmitted {
+				return TurnOutput{}, errors.Join(ue, ErrStreamingPartialOutput)
+			}
+			return TurnOutput{}, ue
+		}
+
+		// A transient failure the retry loop declined to retry, because
+		// output had already reached the caller. Report it in the same shape
+		// so callers see one error type for "try again later".
 		openaiError := &openai.Error{}
-		if errors.As(stream.Err(), &openaiError) && isUnavailableStatusCode(openaiError.StatusCode) {
-			m.metrics.RecordCallDuration(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeUnavailable)
-			ra, hasRA := extractRetryAfter("openai", stream.Err(), nil)
-			if hasRA && t.opts.RetryAfterCap > 0 && ra > t.opts.RetryAfterCap {
-				ra = t.opts.RetryAfterCap
+		isAPIErr := errors.As(err, &openaiError)
+		if isStallError(err) || (isAPIErr && isUnavailableStatusCode(openaiError.StatusCode)) {
+			m.metrics.RecordCallDuration(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start), transientErrorType(err))
+			status := 0
+			var ra time.Duration
+			var hasRA bool
+			if isAPIErr {
+				status = openaiError.StatusCode
+				ra, hasRA = extractRetryAfter("openai", err, nil)
+				if hasRA && t.opts.RetryAfterCap > 0 && ra > t.opts.RetryAfterCap {
+					ra = t.opts.RetryAfterCap
+				}
 			}
 			ue := &UnavailableError{
 				Provider:      string(GenAISystemOpenAI),
 				Model:         m.model,
-				StatusCode:    openaiError.StatusCode,
+				StatusCode:    status,
 				RetryAfter:    ra,
 				HasRetryAfter: hasRA,
 				Attempts:      attempts,
 				PartialOutput: streamingEmitted,
 				PartialUsage:  partialUsage,
-				Cause:         stream.Err(),
+				Cause:         err,
 			}
 			if streamingEmitted {
 				return TurnOutput{}, errors.Join(ue, ErrStreamingPartialOutput)
 			}
 			return TurnOutput{}, ue
 		}
+
 		m.metrics.RecordCallDuration(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeInternal)
-		return TurnOutput{}, fmt.Errorf("got error from OpenAI (model %s) while streaming: %w", m.model, stream.Err())
+		return TurnOutput{}, fmt.Errorf("got error from OpenAI (model %s) while streaming: %w", m.model, err)
+	}
+
+	finalResponse := result.response
+
+	if result.parseErr != nil {
+		if metrics := GetMetrics(ctx); metrics != nil {
+			metrics.RecordFailure(m.statsModel, collector)
+		}
+		m.metrics.RecordCallDuration(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeStreamProcessing)
+		if streamingEmitted {
+			return TurnOutput{}, errors.Join(ErrStreamingPartialOutput, result.parseErr)
+		}
+		return TurnOutput{}, result.parseErr
+	}
+
+	if result.handling {
+		if metrics := GetMetrics(ctx); metrics != nil {
+			metrics.RecordFailure(m.statsModel, collector)
+		}
+		m.metrics.RecordCallDuration(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeStreamProcessing)
+		return TurnOutput{}, fmt.Errorf("stream handling failed for OpenAI (model %s)", m.model)
 	}
 
 	if finalResponse == nil {

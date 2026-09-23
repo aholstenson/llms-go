@@ -275,16 +275,25 @@ func (m *anthropicModel) newSession(ctx context.Context, options ...GenerateOpti
 	return newSession(turn, newTracker(opts), toolMap, opts, m.logger), nil
 }
 
-// openStream sends the request and returns the stream once the server has
-// accepted it. A failure to open the stream is retried, so a rate limit or
-// an overload before the first event only reaches the caller when the
-// retries run out. It also returns how many attempts were made, which the
-// caller stamps onto UnavailableError.
-func (m *anthropicModel) openStream(
+// runStream sends the request and reads the response to the end, retrying the
+// whole attempt while nothing has reached the caller. Opening and draining sit
+// inside one retry loop because the failure this guards against — a rate
+// limit, an overload, or a stalled connection — is just as likely after the
+// server accepted the request as before it, and a stream that dies before its
+// first event is as safe to replay as one that never opened.
+//
+// The moment an event reaches a streaming callback the attempt becomes final:
+// retrying would replay tokens the user has already seen. That failure is
+// handed back raw for the caller to report as partial output.
+//
+// It also returns how many attempts were made, which the caller stamps onto an
+// UnavailableError it builds itself, and the partially accumulated message of
+// the last attempt so usage reported before the failure is not lost.
+func (m *anthropicModel) runStream(
 	ctx context.Context,
-	params anthropic.BetaMessageNewParams,
-	opts *generateContentOptions,
-) (*ssestream.Stream[anthropic.BetaRawMessageStreamEventUnion], int, error) {
+	t *anthropicTurn,
+	streamingEmitted *bool,
+) (*anthropic.BetaMessage, int, error) {
 	reqOpts := []option.RequestOption{
 		option.WithHeader("anthropic-beta", "structured-outputs-2025-11-13"),
 		// llms-go owns the retry loop so WithRetryBackoff and
@@ -294,7 +303,23 @@ func (m *anthropicModel) openStream(
 
 	classify := func(err error) (bool, int, time.Duration, bool) {
 		ae := &anthropic.Error{}
-		if !errors.As(err, &ae) {
+		hasAPIErr := errors.As(err, &ae)
+
+		if *streamingEmitted {
+			// Events already reached the caller, so this attempt stands.
+			if hasAPIErr {
+				return false, ae.StatusCode, 0, false
+			}
+			return false, 0, 0, false
+		}
+
+		// A stall is a transient failure like any other, except the provider
+		// never got as far as telling us so.
+		if isStallError(err) {
+			return true, 0, 0, false
+		}
+
+		if !hasAPIErr {
 			return false, 0, 0, false
 		}
 		if !isUnavailableStatusCode(ae.StatusCode) {
@@ -305,10 +330,23 @@ func (m *anthropicModel) openStream(
 	}
 
 	attempts := 0
-	stream, err := retryLoop(ctx, opts, string(GenAISystemAnthropic), m.model, classify,
-		func(ctx context.Context) (*ssestream.Stream[anthropic.BetaRawMessageStreamEventUnion], error) {
+	var partial *anthropic.BetaMessage
+	message, err := retryLoop(ctx, t.opts, string(GenAISystemAnthropic), m.model, classify,
+		func(ctx context.Context) (*anthropic.BetaMessage, error) {
 			attempts++
-			stream := m.client.Beta.Messages.NewStreaming(ctx, params, reqOpts...)
+			if attempts > 1 {
+				// A fresh attempt replays the whole response, so structured
+				// output state from the abandoned one must not linger. This is
+				// safe precisely because no event escaped: the parser fed no
+				// events to the caller before it stopped.
+				if t.jsParser != nil {
+					t.jsParser.Reset()
+				}
+				t.structuredContentBuilder.Reset()
+			}
+			partial = nil
+
+			stream := m.client.Beta.Messages.NewStreaming(ctx, t.params, reqOpts...)
 			// The SDK completes the request before it returns the stream, so
 			// an error here means the response never started.
 			if err := stream.Err(); err != nil {
@@ -317,9 +355,18 @@ func (m *anthropicModel) openStream(
 				}
 				return nil, err
 			}
-			return stream, nil
+
+			msg, err := m.handleStreaming(ctx, stream, t.opts.StreamingFunc, t.opts.StructuredStreamingFunc, t.jsParser, &t.structuredContentBuilder, streamingEmitted)
+			if err != nil {
+				partial = msg
+				return nil, err
+			}
+			return msg, nil
 		})
-	return stream, attempts, err
+	if err != nil {
+		return partial, attempts, err
+	}
+	return message, attempts, nil
 }
 
 // handleStreaming reads an open stream to the end. The stream is never
@@ -908,39 +955,17 @@ func (t *anthropicTurn) Next(ctx context.Context) (TurnOutput, error) {
 		collector.Counter("requests").Add(1)
 	}
 
-	var response *anthropic.BetaMessage
 	var streamingEmitted bool
 
 	// Anthropic's API rejects non-streaming requests for any generation that
 	// may exceed 10 minutes so we run in streaming mode for all requests.
-	stream, attempts, err := m.openStream(ctx, t.params, t.opts)
+	response, attempts, err := m.runStream(withLiveness(ctx, m.model, t.opts), t, &streamingEmitted)
 	if err != nil {
 		if metrics := GetMetrics(ctx); metrics != nil {
 			metrics.RecordFailure(m.statsModel, collector)
 		}
 
-		// The stream never started, so there is no partial output or usage
-		// to preserve. A retryable failure is already an UnavailableError
-		// with the exact attempt count on it.
-		var ue *UnavailableError
-		if errors.As(err, &ue) {
-			m.metrics.RecordCallDuration(ctx, GenAISystemAnthropic, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeUnavailable)
-			return TurnOutput{}, ue
-		}
-
-		m.metrics.RecordCallDuration(ctx, GenAISystemAnthropic, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeInternal)
-		return TurnOutput{}, fmt.Errorf("error from Anthropic (model %s): %w", m.model, err)
-	}
-
-	response, err = m.handleStreaming(ctx, stream, t.opts.StreamingFunc, t.opts.StructuredStreamingFunc, t.jsParser, &t.structuredContentBuilder, &streamingEmitted)
-
-	anthropicError := &anthropic.Error{}
-	if errors.As(err, &anthropicError) {
-		if metrics := GetMetrics(ctx); metrics != nil {
-			metrics.RecordFailure(m.statsModel, collector)
-		}
-
-		// On a mid-stream failure the SDK may already have surfaced
+		// A stream that failed part-way may already have surfaced
 		// message_start usage; preserve it so cost accounting is not lost.
 		partialUsage := m.extractUsage(response)
 		if partialUsage != nil {
@@ -957,16 +982,40 @@ func (t *anthropicTurn) Next(ctx context.Context) (TurnOutput, error) {
 			)
 		}
 
-		if isUnavailableStatusCode(anthropicError.StatusCode) {
-			m.metrics.RecordCallDuration(ctx, GenAISystemAnthropic, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeUnavailable)
-			ra, hasRA := extractRetryAfter("anthropic", err, nil)
-			if hasRA && t.opts.RetryAfterCap > 0 && ra > t.opts.RetryAfterCap {
-				ra = t.opts.RetryAfterCap
+		// A failure the retry loop kept retrying is already an
+		// UnavailableError with the exact attempt count on it.
+		var ue *UnavailableError
+		if errors.As(err, &ue) {
+			ue.PartialOutput = streamingEmitted
+			ue.PartialUsage = partialUsage
+			m.metrics.RecordCallDuration(ctx, GenAISystemAnthropic, GenAIOperationChat, GenAIModel(m.model), time.Since(start), transientErrorType(err))
+			if streamingEmitted {
+				return TurnOutput{}, errors.Join(ue, ErrStreamingPartialOutput)
+			}
+			return TurnOutput{}, ue
+		}
+
+		// A transient failure the retry loop declined to retry, because
+		// output had already reached the caller. Report it in the same shape
+		// so callers see one error type for "try again later".
+		anthropicError := &anthropic.Error{}
+		isAPIErr := errors.As(err, &anthropicError)
+		if isStallError(err) || (isAPIErr && isUnavailableStatusCode(anthropicError.StatusCode)) {
+			m.metrics.RecordCallDuration(ctx, GenAISystemAnthropic, GenAIOperationChat, GenAIModel(m.model), time.Since(start), transientErrorType(err))
+			status := 0
+			var ra time.Duration
+			var hasRA bool
+			if isAPIErr {
+				status = anthropicError.StatusCode
+				ra, hasRA = extractRetryAfter("anthropic", err, nil)
+				if hasRA && t.opts.RetryAfterCap > 0 && ra > t.opts.RetryAfterCap {
+					ra = t.opts.RetryAfterCap
+				}
 			}
 			ue := &UnavailableError{
 				Provider:      string(GenAISystemAnthropic),
 				Model:         m.model,
-				StatusCode:    anthropicError.StatusCode,
+				StatusCode:    status,
 				RetryAfter:    ra,
 				HasRetryAfter: hasRA,
 				Attempts:      attempts,
@@ -978,29 +1027,6 @@ func (t *anthropicTurn) Next(ctx context.Context) (TurnOutput, error) {
 				return TurnOutput{}, errors.Join(ue, ErrStreamingPartialOutput)
 			}
 			return TurnOutput{}, ue
-		}
-
-		m.metrics.RecordCallDuration(ctx, GenAISystemAnthropic, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeInternal)
-		return TurnOutput{}, fmt.Errorf("error from Anthropic (model %s): %w", m.model, err)
-	} else if err != nil {
-		if metrics := GetMetrics(ctx); metrics != nil {
-			metrics.RecordFailure(m.statsModel, collector)
-		}
-
-		// Non-SDK errors (e.g. structured stream parse failure) can still
-		// land after message_start surfaced usage; preserve it.
-		if partialUsage := m.extractUsage(response); partialUsage != nil {
-			collector.Counter("input_tokens").Add(int(partialUsage.InputTokens))
-			collector.Counter("output_tokens").Add(int(partialUsage.OutputTokens))
-			collector.Counter("cached_read_tokens").Add(int(partialUsage.CachedReadTokens))
-			collector.Counter("cached_write_tokens").Add(int(partialUsage.CachedWriteTokens))
-			m.metrics.RecordCall(ctx,
-				GenAISystemAnthropic, GenAIOperationChat, GenAIModel(m.model),
-				partialUsage.InputTokens,
-				partialUsage.OutputTokens,
-				partialUsage.CachedReadTokens,
-				partialUsage.CachedWriteTokens,
-			)
 		}
 
 		m.metrics.RecordCallDuration(ctx, GenAISystemAnthropic, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeInternal)

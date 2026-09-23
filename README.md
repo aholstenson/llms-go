@@ -14,24 +14,30 @@ touching application code.
   behind one interface.
 - **Typed structured output** — get strongly-typed Go values back via
   generics; JSON schemas are derived automatically from your types.
-- **Streaming** — stream text, thinking/reasoning tokens, and incrementally
+- **Streaming** — stream text, thinking and reasoning tokens, and incrementally
   parsed structured output as it arrives.
-- **Tool calling & agentic loops** — composable toolkits, multi-step
+- **Tool calling and agentic loops** — composable toolkits, multi-step
   execution, per-call timeouts, and built-in web search.
-- **Cost & usage tracking** — automatic pricing from models.dev data plus
+- **Cost and usage tracking** — automatic pricing from models.dev data plus
   OpenTelemetry GenAI metrics and local stats aggregation.
 - **Capability-aware** — embedded model metadata gates temperature,
   reasoning, and modality behavior so missing features fail gracefully.
 - **Retries you can watch** — rate limits and overloads are retried with
-  backoff, and a callback reports each wait so the user sees the progress.
+  backoff, and a callback reports each wait so you can see the progress.
+- **Stalls become errors** — a call that goes silent fails, retries, and
+  reports itself instead of hanging until an operator kills the job.
 - **Pluggable credentials** — environment variables by default, or supply
   your own source; credentials are resolved per request so they can rotate.
 
 ## Installation
 
+To install `llms-go`, run:
+
 ```sh
 go get github.com/aholstenson/llms-go
 ```
+
+Import the package in your code:
 
 ```go
 import llms "github.com/aholstenson/llms-go"
@@ -40,10 +46,12 @@ import llms "github.com/aholstenson/llms-go"
 ## Quick start
 
 Models are resolved through a `Manager` using fully-qualified
-`provider/model` names (e.g. `anthropic/claude-sonnet-4-5`). By default API
+`provider/model` names (for example, `anthropic/claude-sonnet-4-5`). By default, API
 keys are read from environment variables: `ANTHROPIC_API_KEY`,
 `OPENAI_API_KEY`, `OPENROUTER_API_KEY`, or `GEMINI_API_KEY` (also accepts
 `GOOGLE_API_KEY`). See [Credentials](#credentials) to supply them yourself.
+
+The following example initializes a manager and generates text:
 
 ```go
 manager := llms.NewManager()
@@ -65,7 +73,7 @@ if err != nil {
 fmt.Println(result.(llms.TextResult).Text)
 ```
 
-### Aliases
+## Aliases
 
 Register friendly names and let environment variables override them at
 deploy time without code changes:
@@ -75,7 +83,7 @@ manager.RegisterAlias("fast", "anthropic/claude-haiku-4-5")
 model, _ := manager.GetModel(ctx, "fast") // or set LLM_MODEL_FAST=openai/gpt-4o
 ```
 
-### Credentials
+## Credentials
 
 A `Manager` gets its API keys from a `CredentialSource`. The default is
 `EnvCredentials`, which reads the environment variables listed above and
@@ -114,7 +122,7 @@ only headers and no API key is valid.
 `errors.Is(err, llms.ErrNoCredentials)` detects a missing credential
 regardless of which source produced it.
 
-### Driving the loop with `Session`
+## Driving the loop with Session
 
 `GenerateContent` runs the agentic loop to completion. `Session` exposes the
 same loop one step at a time, so you can inspect what the model did, inject
@@ -157,7 +165,7 @@ executing them and `RunTools` runs them on demand, useful when tools
 require approval or run out of process. See
 [`examples/agent`](./examples/agent) for the full pattern.
 
-### Retries
+## Retries
 
 A request that fails with a rate limit (429), a service that is unavailable
 (503), or an overload (529) is retried automatically. The library owns the
@@ -190,9 +198,76 @@ if errors.As(err, &ue) {
 }
 ```
 
-A stream is never retried after its first event. Such a failure is reported
-with the `ErrStreamingPartialOutput` sentinel instead, so you never replay
-tokens the user has already seen.
+A stream is never retried after its first event reaches your streaming
+callbacks. Such a failure is reported with the `ErrStreamingPartialOutput`
+sentinel instead, so you never replay tokens you have already received. Up to
+that point the whole model call — opening the request and reading the response
+— is retried as one attempt.
+
+## Stalls
+
+A model call that goes silent is not a failure any provider reports: there is
+no error and no token, only a gap. `WithStallTimeout` turns that gap into a
+retryable error:
+
+```go
+res, err := model.GenerateContent(ctx,
+    llms.WithMessages(llms.NewMessage(llms.RoleUser, llms.NewTextPart("..."))),
+    // Fail an attempt that has been quiet for 90 seconds.
+    llms.WithStallTimeout(90*time.Second),
+)
+```
+
+The budget measures bytes from the provider, not the events the library hands
+you. Keepalives and ping events are bytes, so a model that spends minutes
+reasoning keeps resetting it; a connection that died does not. The budget
+applies per attempt and only to the model call, so it never cuts short a slow
+tool call or a long agentic loop.
+
+A stall is an ordinary transient failure: it is reported through
+`WithRetryNotify`, retried while nothing has reached your callbacks, and
+surfaces as an `*UnavailableError` wrapping a `*StallError` when the attempts
+run out. Detect it with `errors.Is(err, llms.ErrStall)`.
+
+`WithRequestTimeout` bounds the other half — how long an attempt may wait for
+the provider to start responding at all. Both default to off.
+
+To tell whether the model is thinking or the connection is dead while a
+turn produces no tokens, register `WithLivenessNotify`. It fires whenever data
+arrives after a quiet second, and stops the moment the provider goes silent:
+
+```go
+llms.WithLivenessNotify(func(_ context.Context, n llms.LivenessNotice) {
+    log.Printf("%s alive, quiet for %s", n.Provider, n.Idle)
+})
+```
+
+## Recovering a failed turn
+
+A model turn that fails transiently does not end a `Session`. The turn left no
+trace — the conversation only grows when a turn succeeds — so the same session
+can try again, instead of cancelling the run and losing the transcript
+it has built up. This is what lets a long unattended job survive a stall:
+
+```go
+for {
+    info, done, err := s.Step(ctx)
+    if err != nil {
+        if llms.IsRetryable(err) {
+            log.Printf("step %d failed, retrying: %v", info.Step, err)
+            continue // same session, same transcript, one more model call
+        }
+        return err
+    }
+    if done {
+        break
+    }
+}
+```
+
+`Step` returns `done == false` alongside such an error, and `Session.Retryable`
+reports the same thing. A retried turn does not consume step budget, and emits
+a fresh `StreamingEventMessageStart`.
 
 ## Examples
 

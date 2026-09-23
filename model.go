@@ -142,6 +142,10 @@ type generateContentOptions struct {
 	RetryAfterCap time.Duration
 	RetryBackoff  BackoffPolicy
 	RetryNotify   RetryNotifyFunc
+	// Liveness options
+	StallTimeout   time.Duration
+	RequestTimeout time.Duration
+	LivenessNotify LivenessNotifyFunc
 	// Structured output options
 	ResponseSchema                   *ResponseSchema
 	StructuredStreamingFunc          StructuredStreamingFunc
@@ -414,6 +418,80 @@ func WithRetryBackoff(p BackoffPolicy) GenerateOption {
 func WithRetryNotify(fn RetryNotifyFunc) GenerateOption {
 	return func(opts *generateContentOptions) error {
 		opts.RetryNotify = fn
+		return nil
+	}
+}
+
+// WithStallTimeout fails a model call that has already started responding and
+// then goes quiet for longer than d. Pass 0 (the default) to disable it.
+//
+// The budget measures bytes from the provider, not the events the library
+// hands you. Keepalives and provider ping events are bytes, so a model that
+// spends minutes reasoning keeps resetting the budget; a connection that died
+// mid-response does not. This is the setting that turns a silent hang into a
+// visible failure.
+//
+// A stall is retryable. It is reported through WithRetryNotify like a rate
+// limit, retried while nothing has reached your streaming callbacks, and
+// surfaces as an UnavailableError wrapping a *StallError when the attempts run
+// out. Because the budget applies per attempt, and only to the model call, it
+// does not cut short a slow tool call (see WithToolCallTimeout) or a long
+// agentic loop.
+//
+// Pick a value well above the provider's keepalive interval — a minute or two
+// is generous for every supported provider:
+//
+//	llms.WithStallTimeout(90 * time.Second)
+func WithStallTimeout(d time.Duration) GenerateOption {
+	return func(opts *generateContentOptions) error {
+		if d < 0 {
+			return fmt.Errorf("llms.WithStallTimeout: duration must be >= 0, got %s", d)
+		}
+		opts.StallTimeout = d
+		return nil
+	}
+}
+
+// WithRequestTimeout bounds how long one attempt may wait for the provider to
+// start responding. Pass 0 (the default) to disable it.
+//
+// What that covers depends on the provider. Anthropic and OpenAI stream, so it
+// is the time to open the stream and the rest is governed by WithStallTimeout.
+// Google and OpenRouter make non-streaming requests when no streaming callback
+// is set, and those send nothing until the answer is complete — so for them
+// this is effectively a deadline on the whole generation. Size it accordingly,
+// or leave it off and rely on WithStallTimeout for the streaming paths.
+//
+// The budget applies per attempt, so exceeding it is a retryable *StallError
+// rather than the end of the run.
+func WithRequestTimeout(d time.Duration) GenerateOption {
+	return func(opts *generateContentOptions) error {
+		if d < 0 {
+			return fmt.Errorf("llms.WithRequestTimeout: duration must be >= 0, got %s", d)
+		}
+		opts.RequestTimeout = d
+		return nil
+	}
+}
+
+// WithLivenessNotify registers a callback that runs when data arrives from the
+// provider after a quiet gap of at least LivenessQuietThreshold. Use it to
+// tell "the model is thinking" apart from "the connection is dead" while a
+// turn produces no tokens:
+//
+//	llms.WithLivenessNotify(func(_ context.Context, n llms.LivenessNotice) {
+//		log.Printf("%s alive, quiet for %s", n.Provider, n.Idle)
+//	})
+//
+// Notices stop arriving the moment the provider goes silent, so a watcher can
+// show the growing gap instead of guessing. Gaps shorter than the threshold
+// are not reported: while tokens flow you already have the stream.
+//
+// The callback runs on the goroutine reading the response, so keep it short.
+// Pass nil to remove a callback.
+func WithLivenessNotify(fn LivenessNotifyFunc) GenerateOption {
+	return func(opts *generateContentOptions) error {
+		opts.LivenessNotify = fn
 		return nil
 	}
 }
