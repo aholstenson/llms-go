@@ -58,7 +58,7 @@ type openrouterModel struct {
 	clientOpts        []openrouter.Option
 	statsModel        string
 	model             string
-	info              ModelInfo
+	info              modelInfoRef
 	subParserRegistry map[string]SubParserConfig
 	provider          *openrouter.ChatProvider
 	headerCapture     *headerCapturingTransport
@@ -74,11 +74,11 @@ func (m *openrouterModel) lastCapturedHeaders() http.Header {
 }
 
 // newOpenRouterModel creates a new model that routes requests through
-// OpenRouter using the github.com/revrost/go-openrouter SDK. creds is
-// consulted on every request so rotating credentials take effect without
-// rebuilding the model. info carries embedded model metadata used to gate
-// request parameters; the zero value is treated permissively.
-func newOpenRouterModel(logger *slog.Logger, metrics *Metrics, creds CredentialSource, model string, registry map[string]SubParserConfig, info ModelInfo, opts ...openRouterOption) (Model, error) {
+// OpenRouter using the github.com/revrost/go-openrouter SDK. creds is consulted
+// on every request so rotating credentials take effect without rebuilding the
+// model. info supplies model metadata used to gate request parameters; an
+// unknown model is treated permissively.
+func newOpenRouterModel(logger *slog.Logger, metrics *Metrics, creds CredentialSource, model string, registry map[string]SubParserConfig, info modelInfoRef, opts ...openRouterOption) (Model, error) {
 	m := &openrouterModel{
 		logger:            logger.With(slog.String("provider", "openrouter")),
 		metrics:           metrics,
@@ -129,11 +129,9 @@ func (m *openrouterModel) newSession(ctx context.Context, options ...GenerateOpt
 		return nil, err
 	}
 
-	if len(opts.Tools) > 0 && !m.info.allowsToolCall() {
-		return nil, fmt.Errorf("model %s does not support tool calling", m.statsModel)
-	}
-	if modality := firstUnsupportedModality(opts.Messages, m.info); modality != "" {
-		return nil, fmt.Errorf("model %s does not support %s input", m.statsModel, modality)
+	info := m.info.get()
+	if err := checkRequestCapabilities(m.statsModel, info, opts); err != nil {
+		return nil, err
 	}
 
 	messages, err := m.convertMessages(opts.SystemPrompt, opts.Messages)
@@ -152,16 +150,16 @@ func (m *openrouterModel) newSession(ctx context.Context, options ...GenerateOpt
 		Provider: m.provider,
 	}
 
-	if opts.Temperature != 0 && m.info.allowsTemperature() {
+	if opts.Temperature != 0 && info.allowsTemperature() {
 		params.Temperature = float32(opts.Temperature)
 	}
 
-	maxOutput := m.info.resolveMaxOutputTokens(opts.MaxOutputTokens, 0)
+	maxOutput := info.resolveMaxOutputTokens(opts.MaxOutputTokens, 0)
 
 	// Resolve reasoning. OpenRouter accepts either an effort or a max-tokens
 	// budget (never both), and disables reasoning via enabled:false. A
 	// WithMaxThinkingTokens budget takes precedence over effort.
-	switch route := resolveReasoningRoute(opts, m.info, true, m.logger); route.Kind {
+	switch route := resolveReasoningRoute(opts, info, true, m.logger); route.Kind {
 	case reasoningKindBudget:
 		budget := route.Budget
 		params.Reasoning = &openrouter.ChatCompletionReasoning{MaxTokens: &budget}
@@ -173,18 +171,24 @@ func (m *openrouterModel) newSession(ctx context.Context, options ...GenerateOpt
 			maxOutput += budget
 		}
 	case reasoningKindEffort:
-		effort := string(route.Effort)
-		params.Reasoning = &openrouter.ChatCompletionReasoning{Effort: &effort}
+		if route.Effort == "" {
+			// Reasoning on at OpenRouter's default effort (medium).
+			enabled := true
+			params.Reasoning = &openrouter.ChatCompletionReasoning{Enabled: &enabled}
+		} else {
+			effort := string(route.Effort)
+			params.Reasoning = &openrouter.ChatCompletionReasoning{Effort: &effort}
+		}
 	case reasoningKindDisable:
 		disabled := false
 		params.Reasoning = &openrouter.ChatCompletionReasoning{Enabled: &disabled}
-	case reasoningKindMandatory, reasoningKindSkip:
-		// Mandatory-reasoning models reject enabled:false; non-reasoning or
-		// unknown models get no reasoning param.
+	case reasoningKindDefault, reasoningKindMandatory, reasoningKindSkip:
+		// No reasoning param: the model's default applies, the model always
+		// reasons (rejects enabled:false), or it cannot reason.
 	}
 
 	if maxOutput > 0 {
-		if clamped, didClamp := m.info.clampMaxOutputTokens(maxOutput); didClamp {
+		if clamped, didClamp := info.clampMaxOutputTokens(maxOutput); didClamp {
 			m.logger.Warn("Clamping max tokens to model output limit",
 				slog.Int("requested", maxOutput), slog.Int("limit", clamped))
 			maxOutput = clamped
@@ -218,6 +222,7 @@ func (m *openrouterModel) newSession(ctx context.Context, options ...GenerateOpt
 
 	turn := &openrouterTurn{
 		m:        m,
+		info:     info,
 		opts:     opts,
 		params:   params,
 		jsParser: jsParser,
@@ -421,6 +426,7 @@ func (m *openrouterModel) convertTools(tools []ToolDef) ([]openrouter.Tool, map[
 // through neutral types.
 type openrouterTurn struct {
 	m    *openrouterModel
+	info ModelInfo
 	opts *generateContentOptions
 
 	params openrouter.ChatCompletionRequest
@@ -593,6 +599,7 @@ func (t *openrouterTurn) nextNonStreaming(ctx context.Context, start time.Time, 
 		collector.Counter("output_tokens").Add(int(u.OutputTokens))
 		collector.Counter("cached_read_tokens").Add(int(u.CachedReadTokens))
 		collector.Counter("cached_write_tokens").Add(int(u.CachedWriteTokens))
+		recordTierUsage(collector, t.info, *u)
 		m.metrics.RecordCall(ctx,
 			GenAISystemOpenRouter, GenAIOperationChat, GenAIModel(m.model),
 			u.InputTokens, u.OutputTokens, u.CachedReadTokens, u.CachedWriteTokens,
@@ -975,6 +982,7 @@ func (t *openrouterTurn) nextStreaming(ctx context.Context, start time.Time, col
 		collector.Counter("output_tokens").Add(int(outputTokens))
 		collector.Counter("cached_read_tokens").Add(int(cachedTokens))
 		collector.Counter("cached_write_tokens").Add(int(cachedWriteTokens))
+		recordTierUsage(collector, t.info, u)
 		m.metrics.RecordCall(ctx,
 			GenAISystemOpenRouter, GenAIOperationChat, GenAIModel(m.model),
 			inputTokens, outputTokens, cachedTokens, cachedWriteTokens,
@@ -1015,6 +1023,7 @@ func (t *openrouterTurn) reportError(ctx context.Context, err error, start time.
 		collector.Counter("output_tokens").Add(int(partialUsage.OutputTokens))
 		collector.Counter("cached_read_tokens").Add(int(partialUsage.CachedReadTokens))
 		collector.Counter("cached_write_tokens").Add(int(partialUsage.CachedWriteTokens))
+		recordTierUsage(collector, t.info, *partialUsage)
 		m.metrics.RecordCall(ctx,
 			GenAISystemOpenRouter, GenAIOperationChat, GenAIModel(m.model),
 			partialUsage.InputTokens,

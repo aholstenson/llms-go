@@ -148,6 +148,58 @@ var _ = Describe("PricingManager", func() {
 			Expect(costs["openai/gpt-4.1"]).To(BeNumerically("~", 6.0, 0.001))
 		})
 
+		It("should add the tier price difference for tokens in a large request", func() {
+			tmpDir := GinkgoT().TempDir()
+			pricingFile := filepath.Join(tmpDir, "pricing.json")
+			pricingJSON := `{"test/tiered": {"input": 1, "output": 10,
+				"tiers": [{"context_over": 200000, "input": 2, "output": 15}]}}`
+			Expect(os.WriteFile(pricingFile, []byte(pricingJSON), 0o644)).To(Succeed()) //nolint:gosec
+			GinkgoT().Setenv("LLM_PRICING_FILE", pricingFile)
+			pm := llms.NewPricingManager(logger)
+
+			// Two requests: a small one and one over the 200k tier. The base
+			// counters hold both; the _over_ counters repeat the large one.
+			stats := llms.CallStats{
+				Success: map[string]map[string]int{
+					"test/tiered": {
+						"input_tokens":                 1_300_000,
+						"output_tokens":                200_000,
+						"input_tokens_over_200000":     300_000,
+						"output_tokens_over_200000":    100_000,
+						"cached_read_tokens_over_1234": 5, // no such tier: ignored
+					},
+				},
+			}
+
+			costs := pm.CalculateCosts(stats)
+
+			// Base: 1.3M * 1 + 0.2M * 10 = 3.3
+			// Tier: 0.3M * (2-1) + 0.1M * (15-10) = 0.8
+			Expect(costs["test/tiered"]).To(BeNumerically("~", 4.1, 0.0001))
+		})
+
+		It("should bill thinking tokens at the reasoning rate when there is one", func() {
+			tmpDir := GinkgoT().TempDir()
+			pricingFile := filepath.Join(tmpDir, "pricing.json")
+			pricingJSON := `{"test/reasoning": {"input": 1, "output": 10, "reasoning": 3},
+				"test/no-reasoning-rate": {"input": 1, "output": 10}}`
+			Expect(os.WriteFile(pricingFile, []byte(pricingJSON), 0o644)).To(Succeed()) //nolint:gosec
+			GinkgoT().Setenv("LLM_PRICING_FILE", pricingFile)
+			pm := llms.NewPricingManager(logger)
+
+			stats := llms.CallStats{
+				Success: map[string]map[string]int{
+					"test/reasoning":         {"thinking_tokens": 1_000_000},
+					"test/no-reasoning-rate": {"thinking_tokens": 1_000_000},
+				},
+			}
+
+			costs := pm.CalculateCosts(stats)
+
+			Expect(costs["test/reasoning"]).To(BeNumerically("~", 3.0, 0.0001))
+			Expect(costs["test/no-reasoning-rate"]).To(BeNumerically("~", 10.0, 0.0001))
+		})
+
 		It("should calculate costs with cached tokens", func() {
 			stats := llms.CallStats{
 				Success: map[string]map[string]int{

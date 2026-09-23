@@ -32,7 +32,7 @@ var _ = Describe("OpenAI retries", func() {
 			),
 			model:      "m",
 			statsModel: "openai/m",
-			info:       ModelInfo{Caps: Capabilities{Temperature: true, ToolCall: true}},
+			info:       fixedModelInfo(ModelInfo{Caps: Capabilities{Temperature: true, ToolCall: true}}),
 		}
 	}
 

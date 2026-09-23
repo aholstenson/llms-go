@@ -315,7 +315,7 @@ var _ = Describe("Anthropic stalls", func() {
 			),
 			model:      "m",
 			statsModel: "anthropic/m",
-			info:       ModelInfo{Caps: Capabilities{Temperature: true, ToolCall: true}},
+			info:       fixedModelInfo(ModelInfo{Caps: Capabilities{Temperature: true, ToolCall: true}}),
 		}
 	}
 

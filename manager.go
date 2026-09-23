@@ -182,9 +182,14 @@ func (m *Manager) GetModel(ctx context.Context, name string) (Model, error) {
 	modelName := resolved[slashIdx+1:]
 	modelProvider := resolved[:slashIdx]
 
-	// Embedded model metadata (pricing/capabilities). A miss yields the zero
-	// ModelInfo, which the behavior gates treat permissively.
-	info, _ := LookupModelInfo(resolved)
+	// Model metadata (pricing/capabilities) is read from the registry on
+	// every request, so later RegisterModelInfo or RefreshModelInfo calls
+	// apply. An unknown model yields the zero ModelInfo, which the behavior
+	// gates treat permissively.
+	info := registeredModelInfo(resolved)
+	if current := info.get(); current.Status == ModelStatusDeprecated {
+		logger.Warn("Model is deprecated by its provider", slog.String("name", resolved))
+	}
 
 	// Probe the credential source so a missing credential fails here rather
 	// than as an opaque transport error on the first generation. The models

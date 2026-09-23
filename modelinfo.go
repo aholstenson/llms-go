@@ -1,77 +1,173 @@
 package llms
 
-import "strings"
+import (
+	"encoding/json"
+	"fmt"
+	"reflect"
+	"slices"
+	"strings"
+)
 
 //go:generate go run ./cmd/genmodelinfo
 
-// ModelInfo holds the embedded, build-time-generated metadata for a model.
-// It is sourced from models.dev (see cmd/genmodelinfo) and is used both for
-// pricing and for gating provider behavior (temperature, reasoning, tool
-// calling, input modalities).
+// ModelInfo holds the metadata for a model: pricing, token limits, and the
+// capabilities that gate what providers send to the API.
 //
-// The JSON keys are deliberately short because the data is embedded as a
-// committed artifact (modelinfo_data.json); see cmd/genmodelinfo.
+// It is built from models.dev data (embedded at build time, or loaded with
+// LoadModelInfo, LLM_MODELS_FILE or RefreshModelInfo), from RegisterModelInfo,
+// and for Anthropic models also from the Anthropic Models API at runtime.
 type ModelInfo struct {
-	Cost       Cost         `json:"c"`
-	Limits     Limits       `json:"l"`
-	Caps       Capabilities `json:"f"`
-	Modalities []string     `json:"m,omitempty"` // input modalities: text/image/audio/pdf/video
-	Family     string       `json:"fam,omitempty"`
-	Knowledge  string       `json:"k,omitempty"`  // training cutoff
-	Released   string       `json:"rd,omitempty"` // release_date
+	Cost       Cost         `json:"cost"`
+	Limits     Limits       `json:"limits"`
+	Caps       Capabilities `json:"capabilities"`
+	Modalities []string     `json:"modalities,omitempty"` // input modalities: text/image/audio/pdf/video
+	Family     string       `json:"family,omitempty"`
+	Knowledge  string       `json:"knowledge,omitempty"` // training cutoff
+	Released   string       `json:"released,omitempty"`  // release date
+	// Status is empty for generally available models, otherwise one of
+	// ModelStatusAlpha, ModelStatusBeta or ModelStatusDeprecated.
+	Status string `json:"status,omitempty"`
 }
+
+// Model status values used in ModelInfo.Status.
+const (
+	ModelStatusAlpha      = "alpha"
+	ModelStatusBeta       = "beta"
+	ModelStatusDeprecated = "deprecated"
+)
 
 // Cost is the per-model token pricing, in USD per 1 million tokens.
 // A zero value means the dimension is unsupported or free.
 type Cost struct {
-	Input      float64 `json:"i"`
-	Output     float64 `json:"o"`
-	CacheRead  float64 `json:"r,omitempty"`
-	CacheWrite float64 `json:"w,omitempty"`
+	Input      float64 `json:"input"`
+	Output     float64 `json:"output"`
+	CacheRead  float64 `json:"cache_read,omitempty"`
+	CacheWrite float64 `json:"cache_write,omitempty"`
+	// Reasoning is the rate for thinking tokens that a provider reports
+	// apart from output tokens. Zero means thinking tokens use the Output
+	// rate.
+	Reasoning float64 `json:"reasoning,omitempty"`
+	// Tiers are higher prices for large requests, ordered by ContextOver.
+	Tiers []CostTier `json:"tiers,omitempty"`
+}
+
+// CostTier is the pricing for requests whose prompt is larger than
+// ContextOver tokens. The prompt size is the input tokens plus the cached
+// (read and written) tokens of one request. A zero rate keeps the base rate.
+type CostTier struct {
+	ContextOver int     `json:"context_over"`
+	Input       float64 `json:"input,omitempty"`
+	Output      float64 `json:"output,omitempty"`
+	CacheRead   float64 `json:"cache_read,omitempty"`
+	CacheWrite  float64 `json:"cache_write,omitempty"`
+	Reasoning   float64 `json:"reasoning,omitempty"`
+}
+
+// UnmarshalJSON decodes a Cost from the models.dev key names. It also accepts
+// the short keys "i", "o", "r" and "w" that earlier pricing files use.
+func (c *Cost) UnmarshalJSON(data []byte) error {
+	type plain Cost
+	var v struct {
+		plain
+		ShortInput      *float64 `json:"i"`
+		ShortOutput     *float64 `json:"o"`
+		ShortCacheRead  *float64 `json:"r"`
+		ShortCacheWrite *float64 `json:"w"`
+	}
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	*c = Cost(v.plain)
+	for _, f := range []struct {
+		short *float64
+		dst   *float64
+	}{
+		{v.ShortInput, &c.Input},
+		{v.ShortOutput, &c.Output},
+		{v.ShortCacheRead, &c.CacheRead},
+		{v.ShortCacheWrite, &c.CacheWrite},
+	} {
+		if f.short != nil {
+			*f.dst = *f.short
+		}
+	}
+	return nil
 }
 
 // Limits describes the token limits for a model.
 type Limits struct {
-	Context int `json:"c,omitempty"`
-	Output  int `json:"o,omitempty"`
+	Context int `json:"context,omitempty"`
+	// Input is the maximum prompt size when it is lower than Context.
+	Input  int `json:"input,omitempty"`
+	Output int `json:"output,omitempty"`
+}
+
+// TokenRange is an inclusive token count range. A zero Max means no upper
+// limit is known.
+type TokenRange struct {
+	Min int `json:"min,omitempty"`
+	Max int `json:"max,omitempty"`
 }
 
 // Capabilities describes which behaviors a model supports. These flags gate
 // what providers send to the API.
 type Capabilities struct {
-	Temperature bool `json:"t"`
-	Reasoning   bool `json:"r"`
-	ToolCall    bool `json:"tc"`
-	Attachment  bool `json:"a"`
-	// ReasoningStyle is the mechanism this model uses to control reasoning:
-	// "budget" (token budget), "effort" (effort tier), "adaptive" (model
-	// chooses its own budget; effort tier optional) or "level" (Gemini
-	// thinking level). Empty for non-reasoning models; providers fall back to
-	// their natural default when unset.
-	ReasoningStyle string `json:"rs,omitempty"`
-	// MaxEffort is the highest effort tier this model accepts ("low"/"medium"/
-	// "high"/"max"), used to clamp WithReasoningEffort. Empty means no known
-	// ceiling. The public Effort enum tops out at "high", so this only clamps
-	// models whose ceiling is below that; it also records higher ceilings
-	// ("max") for tiers that may be exposed later.
-	MaxEffort string `json:"me,omitempty"`
-	// ReasoningMandatory marks models that always reason and cannot be turned
-	// off (OpenAI o-series, Anthropic Opus 4.7 adaptive, etc.). Providers omit
-	// any disable form for these and warn on an explicit EffortNone.
-	ReasoningMandatory bool `json:"rm,omitempty"`
+	Temperature      bool `json:"temperature"`
+	Reasoning        bool `json:"reasoning"`
+	ToolCall         bool `json:"tool_call"`
+	Attachment       bool `json:"attachment"`
+	StructuredOutput bool `json:"structured_output"`
+	// ReasoningEfforts lists the effort tiers the model accepts, lowest
+	// first. Empty means the model has no effort control or that it is not
+	// known. WithReasoningEffort values the model does not accept are moved to
+	// the nearest tier in this list.
+	ReasoningEfforts []Effort `json:"reasoning_efforts,omitempty"`
+	// ReasoningBudget is the thinking-token budget range the model accepts.
+	// Nil means the model does not take a thinking-token budget.
+	ReasoningBudget *TokenRange `json:"reasoning_budget,omitempty"`
+	// AdaptiveThinking marks Anthropic models that accept adaptive thinking,
+	// where the model decides how much to think.
+	AdaptiveThinking bool `json:"adaptive_thinking,omitempty"`
+	// ReasoningMandatory marks models that always reason and reject every
+	// form of turning reasoning off.
+	ReasoningMandatory bool `json:"reasoning_mandatory,omitempty"`
 }
 
 // isUnknown reports whether this is the zero ModelInfo, i.e. the model was
-// not found in the embedded data. Unknown models are treated permissively by
+// not found in any model data. Unknown models are treated permissively by
 // the behavior gates so a model missing from models.dev never silently breaks.
 func (mi ModelInfo) isUnknown() bool {
-	return mi.Cost == (Cost{}) &&
-		mi.Limits == (Limits{}) &&
-		mi.Caps == (Capabilities{}) &&
-		len(mi.Modalities) == 0 &&
-		mi.Family == "" &&
-		mi.Knowledge == "" &&
-		mi.Released == ""
+	// Empty slices count as zero, so an entry decoded from "modalities": []
+	// is not taken as known.
+	if len(mi.Modalities) == 0 {
+		mi.Modalities = nil
+	}
+	if len(mi.Caps.ReasoningEfforts) == 0 {
+		mi.Caps.ReasoningEfforts = nil
+	}
+	if len(mi.Cost.Tiers) == 0 {
+		mi.Cost.Tiers = nil
+	}
+	return reflect.ValueOf(mi).IsZero()
+}
+
+// allowsStructuredOutput reports whether a response JSON schema may be sent.
+func (mi ModelInfo) allowsStructuredOutput() bool {
+	return mi.isUnknown() || mi.Caps.StructuredOutput
+}
+
+// minEffort returns the lowest effort tier the model accepts, or "" when the
+// model has no known effort tiers.
+func (mi ModelInfo) minEffort() Effort {
+	if len(mi.Caps.ReasoningEfforts) == 0 {
+		return ""
+	}
+	return mi.Caps.ReasoningEfforts[0]
+}
+
+// acceptsEffort reports whether the model lists e as an accepted effort tier.
+func (mi ModelInfo) acceptsEffort(e Effort) bool {
+	return slices.Contains(mi.Caps.ReasoningEfforts, e)
 }
 
 // allowsTemperature reports whether a temperature parameter may be sent.
@@ -171,12 +267,18 @@ func firstUnsupportedModality(messages []*Message, info ModelInfo) string {
 	return ""
 }
 
-// LookupModelInfo returns the embedded ModelInfo for a fully qualified model
-// name (e.g. "anthropic/claude-haiku-4-5" or
-// "openrouter/google/gemini-2.5-flash-lite"). The boolean is false when the
-// model is not present in the embedded data, in which case the zero ModelInfo
-// is returned and callers should treat the model permissively.
-func LookupModelInfo(qualifiedName string) (ModelInfo, bool) {
-	info, ok := modelInfoData()[qualifiedName]
-	return info, ok
+// checkRequestCapabilities rejects a request that uses a capability the model
+// is known not to have (tools, an input modality, or a response schema), so it
+// fails before any network call.
+func checkRequestCapabilities(statsModel string, info ModelInfo, opts *generateContentOptions) error {
+	if len(opts.Tools) > 0 && !info.allowsToolCall() {
+		return fmt.Errorf("model %s does not support tool calling", statsModel)
+	}
+	if modality := firstUnsupportedModality(opts.Messages, info); modality != "" {
+		return fmt.Errorf("model %s does not support %s input", statsModel, modality)
+	}
+	if opts.ResponseSchema != nil && !info.allowsStructuredOutput() {
+		return fmt.Errorf("model %s does not support structured output", statsModel)
+	}
+	return nil
 }

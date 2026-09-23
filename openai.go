@@ -40,17 +40,17 @@ type openaiModel struct {
 	client            openai.Client
 	statsModel        string
 	model             string
-	info              ModelInfo
+	info              modelInfoRef
 	subParserRegistry map[string]SubParserConfig
 }
 
 // newOpenAIModel creates a new OpenAI model using the official OpenAI Go SDK
 // against the Responses API. creds is consulted on every request so rotating
-// credentials take effect without rebuilding the model. info carries embedded
-// model metadata used to gate request parameters; the zero value is treated
+// credentials take effect without rebuilding the model. info supplies model
+// metadata used to gate request parameters; an unknown model is treated
 // permissively. Optional SDK request options can be passed for customization
 // (e.g. option.WithBaseURL for testing).
-func newOpenAIModel(logger *slog.Logger, metrics *Metrics, creds CredentialSource, model string, registry map[string]SubParserConfig, info ModelInfo, opts ...option.RequestOption) Model {
+func newOpenAIModel(logger *slog.Logger, metrics *Metrics, creds CredentialSource, model string, registry map[string]SubParserConfig, info modelInfoRef, opts ...option.RequestOption) Model {
 	// The placeholder key satisfies the SDK; the transport replaces the
 	// Authorization header per request.
 	httpClient := newAuthHTTPClient(nil, creds, "openai", applyBearerCredential)
@@ -89,11 +89,9 @@ func (m *openaiModel) newSession(ctx context.Context, options ...GenerateOption)
 		return nil, err
 	}
 
-	if len(opts.Tools) > 0 && !m.info.allowsToolCall() {
-		return nil, fmt.Errorf("model %s does not support tool calling", m.statsModel)
-	}
-	if modality := firstUnsupportedModality(opts.Messages, m.info); modality != "" {
-		return nil, fmt.Errorf("model %s does not support %s input", m.statsModel, modality)
+	info := m.info.get()
+	if err := checkRequestCapabilities(m.statsModel, info, opts); err != nil {
+		return nil, err
 	}
 
 	inputItems, err := m.convertMessages(opts.Messages)
@@ -119,30 +117,38 @@ func (m *openaiModel) newSession(ctx context.Context, options ...GenerateOption)
 		params.Instructions = openai.String(opts.SystemPrompt)
 	}
 
-	if opts.Temperature != 0 && m.info.allowsTemperature() {
+	if opts.Temperature != 0 && info.allowsTemperature() {
 		params.Temperature = openai.Float(opts.Temperature)
 	}
 
-	maxOutput := m.info.resolveMaxOutputTokens(opts.MaxOutputTokens, 0)
+	maxOutput := info.resolveMaxOutputTokens(opts.MaxOutputTokens, 0)
 
-	// Resolve reasoning. OpenAI has no token budget — effort drives — and the
-	// default is off. A WithMaxThinkingTokens value cannot control reasoning
-	// (warned in resolveReasoningRoute) but still reserves output headroom,
-	// since OpenAI counts reasoning tokens against max_output_tokens.
-	switch route := resolveReasoningRoute(opts, m.info, false, m.logger); route.Kind {
+	// Resolve reasoning. OpenAI has no token budget — effort drives. A
+	// WithMaxThinkingTokens value cannot control reasoning (warned in
+	// resolveReasoningRoute) but still reserves output headroom, since OpenAI
+	// counts reasoning tokens against max_output_tokens. Known reasoning
+	// models always ask for encrypted reasoning so reasoning items replay.
+	encryptedReasoning := []responses.ResponseIncludable{responses.ResponseIncludableReasoningEncryptedContent}
+	switch route := resolveReasoningRoute(opts, info, false, m.logger); route.Kind {
 	case reasoningKindEffort:
-		params.Reasoning = shared.ReasoningParam{Effort: openaiReasoningEffort(route.Effort)}
-		params.Include = []responses.ResponseIncludable{responses.ResponseIncludableReasoningEncryptedContent}
-	case reasoningKindMandatory:
-		// o-series always reasons (rejects "none"); send no reasoning param
-		// but still ask for encrypted content so reasoning items replay.
-		params.Include = []responses.ResponseIncludable{responses.ResponseIncludableReasoningEncryptedContent}
+		effort := route.Effort
+		if effort == "" {
+			// Some models default to no reasoning, so "on" needs a tier.
+			effort = clampEffort(EffortMedium, info, m.logger)
+		}
+		params.Reasoning = shared.ReasoningParam{Effort: openaiReasoningEffort(effort)}
+		params.Include = encryptedReasoning
 	case reasoningKindDisable:
-		// gpt-5-family reasoning models accept effort "none" to disable.
-		params.Reasoning = shared.ReasoningParam{Effort: shared.ReasoningEffort("none")}
+		// Models that list a "none" effort accept it to turn reasoning off.
+		params.Reasoning = shared.ReasoningParam{Effort: shared.ReasoningEffort(EffortNone)}
+	case reasoningKindDefault, reasoningKindMandatory:
+		// No reasoning param, so the model's default applies.
+		if info.Caps.Reasoning {
+			params.Include = encryptedReasoning
+		}
 	case reasoningKindSkip, reasoningKindBudget:
-		// Non-reasoning/unknown models get no reasoning param and no
-		// encrypted-content include (would 400). Budget is not applicable.
+		// Non-reasoning models get no reasoning param and no encrypted-content
+		// include (would 400). Budget is not applicable.
 	}
 
 	if opts.MaxThinkingTokens > 0 && maxOutput > 0 {
@@ -150,7 +156,7 @@ func (m *openaiModel) newSession(ctx context.Context, options ...GenerateOption)
 	}
 
 	if maxOutput > 0 {
-		if clamped, didClamp := m.info.clampMaxOutputTokens(maxOutput); didClamp {
+		if clamped, didClamp := info.clampMaxOutputTokens(maxOutput); didClamp {
 			m.logger.Warn("Clamping max tokens to model output limit",
 				slog.Int("requested", maxOutput), slog.Int("limit", clamped))
 			maxOutput = clamped
@@ -189,6 +195,7 @@ func (m *openaiModel) newSession(ctx context.Context, options ...GenerateOption)
 
 	turn := &openaiTurn{
 		m:          m,
+		info:       info,
 		opts:       opts,
 		params:     params,
 		inputItems: inputItems,
@@ -418,6 +425,7 @@ func (m *openaiModel) convertTools(tools []ToolDef) ([]responses.ToolUnionParam,
 // neutral types.
 type openaiTurn struct {
 	m    *openaiModel
+	info ModelInfo
 	opts *generateContentOptions
 
 	params     responses.ResponseNewParams
@@ -747,6 +755,7 @@ func (t *openaiTurn) Next(ctx context.Context) (TurnOutput, error) {
 			collector.Counter("input_tokens").Add(int(partialUsage.InputTokens))
 			collector.Counter("output_tokens").Add(int(partialUsage.OutputTokens))
 			collector.Counter("cached_read_tokens").Add(int(partialUsage.CachedReadTokens))
+			recordTierUsage(collector, t.info, *partialUsage)
 			m.metrics.RecordCall(ctx,
 				GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model),
 				partialUsage.InputTokens,
@@ -848,6 +857,7 @@ func (t *openaiTurn) Next(ctx context.Context) (TurnOutput, error) {
 			collector.Counter("input_tokens").Add(int(partialUsage.InputTokens))
 			collector.Counter("output_tokens").Add(int(partialUsage.OutputTokens))
 			collector.Counter("cached_read_tokens").Add(int(partialUsage.CachedReadTokens))
+			recordTierUsage(collector, t.info, *partialUsage)
 			m.metrics.RecordCall(ctx,
 				GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model),
 				partialUsage.InputTokens,
@@ -947,6 +957,11 @@ func (t *openaiTurn) Next(ctx context.Context) (TurnOutput, error) {
 	collector.Counter("input_tokens").Add(int(inputTokens))
 	collector.Counter("output_tokens").Add(int(outputTokens))
 	collector.Counter("cached_read_tokens").Add(int(cachedTokens))
+	recordTierUsage(collector, t.info, TurnUsage{
+		InputTokens:      inputTokens,
+		OutputTokens:     outputTokens,
+		CachedReadTokens: cachedTokens,
+	})
 
 	m.metrics.RecordCall(
 		ctx,
@@ -985,6 +1000,12 @@ func (t *openaiTurn) Next(ctx context.Context) (TurnOutput, error) {
 // the raw "none" string); unrecognized values fall back to medium.
 func openaiReasoningEffort(e Effort) shared.ReasoningEffort {
 	switch e {
+	case EffortMinimal:
+		return shared.ReasoningEffortMinimal
+	case EffortXHigh, EffortMax:
+		// The SDK has no constants for these tiers yet; the API accepts them
+		// on models that list them.
+		return shared.ReasoningEffort(e)
 	case EffortLow:
 		return shared.ReasoningEffortLow
 	case EffortMedium:

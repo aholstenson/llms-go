@@ -125,6 +125,7 @@ type generateContentOptions struct {
 	MaxOutputTokens   int
 	MaxThinkingTokens int
 	ReasoningEffort   Effort
+	ReasoningMode     ReasoningMode
 	Temperature       float64
 	Tools             []ToolDef
 	MaxSteps          int
@@ -248,38 +249,74 @@ func WithMaxOutputTokens(maxOutputTokens int) GenerateOption {
 // independent knob for how much a model reasons before answering. It is
 // translated per-provider (OpenAI reasoning effort, Anthropic output-config
 // effort / adaptive thinking, Gemini thinking level, OpenRouter effort) using
-// per-model metadata, and converted to a token budget for legacy budget-style
-// models (Anthropic pre-4.5, Gemini 2.5).
+// per-model metadata, and converted to a token budget for budget-style models
+// (older Anthropic models, Gemini 2.5).
 //
-// The set is intentionally small and extensible: higher tiers (e.g. "xhigh",
-// "max") may be added later without breaking callers. A tier a model does not
-// support is clamped to the nearest level it does (with a warning), matching
-// how temperature is gated — portability over strictness.
+// Not every model accepts every tier. A tier the model does not accept is
+// moved to the nearest tier it does accept (with a warning), matching how
+// temperature is gated — portability over strictness.
 //
 // The zero value is the empty string, meaning "no reasoning option given",
-// which resolves to the same reasoning-off default as EffortNone.
+// which leaves reasoning at the provider's default (see ReasoningDefault).
 type Effort string
 
 const (
-	// EffortNone disables reasoning. On models that cannot disable reasoning
-	// (e.g. OpenAI o-series, Anthropic Opus 4.7) it is ignored with a warning.
+	// EffortNone turns reasoning off, the same as WithReasoning(ReasoningOff).
 	EffortNone Effort = "none"
-	// EffortLow requests minimal reasoning.
+	// EffortMinimal requests the least reasoning a model can do without
+	// turning it off.
+	EffortMinimal Effort = "minimal"
+	// EffortLow requests little reasoning.
 	EffortLow Effort = "low"
 	// EffortMedium requests a moderate amount of reasoning.
 	EffortMedium Effort = "medium"
 	// EffortHigh requests extensive reasoning.
 	EffortHigh Effort = "high"
+	// EffortXHigh requests more reasoning than EffortHigh.
+	EffortXHigh Effort = "xhigh"
+	// EffortMax requests the most reasoning the model can do.
+	EffortMax Effort = "max"
 )
 
-// WithReasoningEffort sets the reasoning effort for the request. This is the
+// ReasoningMode selects whether a model reasons (thinks) before answering.
+type ReasoningMode int
+
+const (
+	// ReasoningDefault sends no reasoning setting, so the provider's default
+	// for the model applies. Some models reason by default (for example
+	// Claude Opus 5 and later, Gemini 2.5 and 3, most OpenAI reasoning
+	// models) and some do not.
+	ReasoningDefault ReasoningMode = iota
+	// ReasoningOff turns reasoning off. Models that cannot turn reasoning
+	// off use their lowest effort tier instead, with a warning.
+	ReasoningOff
+	// ReasoningOn turns reasoning on. Without WithReasoningEffort the
+	// provider's default depth applies, except for OpenAI and OpenRouter,
+	// which use EffortMedium.
+	ReasoningOn
+)
+
+// WithReasoning sets whether the model reasons. ReasoningOff and
+// ReasoningDefault clear an effort set with WithReasoningEffort; ReasoningOn
+// keeps it.
+func WithReasoning(mode ReasoningMode) GenerateOption {
+	return func(opts *generateContentOptions) error {
+		opts.ReasoningMode = mode
+		if mode != ReasoningOn {
+			opts.ReasoningEffort = ""
+		}
+		return nil
+	}
+}
+
+// WithReasoningEffort turns reasoning on at the given effort. This is the
 // recommended way to control reasoning/thinking across providers: the effort
-// is mapped to each provider's native control, or to a token budget for legacy
-// budget-style models.
+// is mapped to each provider's native control, or to a token budget for
+// budget-style models. EffortNone turns reasoning off.
 //
-// When no reasoning option is set (and for EffortNone), reasoning is disabled
-// by default for every provider that can disable it. Models that always reason
-// are the documented exception.
+// Without a reasoning option the provider's default applies; see
+// ReasoningDefault. An effort given after WithReasoning(ReasoningOff) turns
+// reasoning back on: the last reasoning option wins.
 func WithReasoningEffort(e Effort) GenerateOption {
 	return func(opts *generateContentOptions) error {
 		opts.ReasoningEffort = e
@@ -290,11 +327,12 @@ func WithReasoningEffort(e Effort) GenerateOption {
 // WithMaxThinkingTokens sets the maximum number of tokens to use for thinking.
 //
 // Deprecated: prefer WithReasoningEffort, the portable reasoning knob. This
-// option remains as an advanced escape hatch for budget-style models
-// (Anthropic pre-4.5, Gemini 2.5) and OpenRouter, where it takes precedence
-// over WithReasoningEffort. On effort-only models (OpenAI, newer Anthropic and
-// Gemini) it does not control reasoning and is ignored except for reserving
-// output headroom; use WithReasoningEffort there instead.
+// option remains as an advanced escape hatch for budget-style models (older
+// Anthropic models, Gemini 2.5) and OpenRouter, where it turns reasoning on
+// and takes precedence over WithReasoningEffort. On effort-only models
+// (OpenAI, newer Anthropic and Gemini) it does not control reasoning and is
+// ignored except for reserving output headroom; use WithReasoningEffort there
+// instead.
 func WithMaxThinkingTokens(maxThinkingTokens int) GenerateOption {
 	return func(opts *generateContentOptions) error {
 		opts.MaxThinkingTokens = maxThinkingTokens

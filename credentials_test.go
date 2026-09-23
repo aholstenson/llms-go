@@ -257,7 +257,7 @@ var _ = Describe("Credentials", func() {
 			DeferCleanup(srv.Close)
 
 			m := newAnthropicModel(discardLogger(), NewNoopMetrics(), StaticCredentials("real-key"), "m", nil,
-				ModelInfo{Caps: Capabilities{Temperature: true, ToolCall: true}},
+				fixedModelInfo(ModelInfo{Caps: Capabilities{Temperature: true, ToolCall: true}}),
 				option.WithBaseURL(srv.URL))
 
 			_, err := m.GenerateContent(context.Background(),

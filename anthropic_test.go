@@ -260,7 +260,7 @@ var _ = Describe("Anthropic retries", func() {
 			),
 			model:      "m",
 			statsModel: "anthropic/m",
-			info:       ModelInfo{Caps: Capabilities{Temperature: true, ToolCall: true}},
+			info:       fixedModelInfo(ModelInfo{Caps: Capabilities{Temperature: true, ToolCall: true}}),
 		}
 	}
 

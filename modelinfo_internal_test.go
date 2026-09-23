@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"maps"
 	"strings"
 	"testing"
 
@@ -161,7 +162,7 @@ func testMetrics(t *testing.T) *Metrics {
 func TestToolCallGateBlocksBeforeAPI(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	m := newOpenAIModel(logger, testMetrics(t), StaticCredentials("test-key"), "no-tools-model", nil,
-		knownInfo(Capabilities{ToolCall: false}, "text"))
+		fixedModelInfo(knownInfo(Capabilities{ToolCall: false}, "text")))
 
 	_, err := m.GenerateContent(context.Background(),
 		WithMessages(NewMessage(RoleUser, NewTextPart("hi"))),
@@ -177,12 +178,73 @@ func TestToolCallGateBlocksBeforeAPI(t *testing.T) {
 func TestImageModalityGateBlocksBeforeAPI(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	m := newOpenAIModel(logger, testMetrics(t), StaticCredentials("test-key"), "text-only-model", nil,
-		knownInfo(Capabilities{ToolCall: true}, "text"))
+		fixedModelInfo(knownInfo(Capabilities{ToolCall: true}, "text")))
 
 	_, err := m.GenerateContent(context.Background(),
 		WithMessages(NewMessage(RoleUser, NewImagePart("http://x/y.png"))),
 	)
 	if err == nil || !strings.Contains(err.Error(), "does not support image input") {
 		t.Fatalf("expected image-modality gate error, got %v", err)
+	}
+}
+
+// TestStructuredOutputGateBlocksBeforeAPI verifies a known model without
+// structured output rejects a response schema before any network call.
+func TestStructuredOutputGateBlocksBeforeAPI(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	m := newOpenAIModel(logger, testMetrics(t), StaticCredentials("test-key"), "no-schema-model", nil,
+		fixedModelInfo(knownInfo(Capabilities{ToolCall: true, StructuredOutput: false}, "text")))
+
+	_, err := m.GenerateContent(context.Background(),
+		WithMessages(NewMessage(RoleUser, NewTextPart("hi"))),
+		WithResponseSchema[echoInput](),
+	)
+	if err == nil || !strings.Contains(err.Error(), "does not support structured output") {
+		t.Fatalf("expected structured output gate error, got %v", err)
+	}
+}
+
+// testCollector is a minimal Collector for checking recorded counters.
+type testCollector map[string]int
+
+type testCounter struct {
+	c    testCollector
+	name string
+}
+
+func (c testCollector) Counter(name string) Counter { return testCounter{c, name} }
+func (c testCollector) GetCounters() map[string]int { return c }
+func (tc testCounter) Add(v int)                    { tc.c[tc.name] += v }
+
+func TestRecordTierUsage(t *testing.T) {
+	info := ModelInfo{Cost: Cost{Input: 1, Tiers: []CostTier{
+		{ContextOver: 32000, Input: 2},
+		{ContextOver: 128000, Input: 3},
+	}}}
+
+	small := testCollector{}
+	recordTierUsage(small, info, TurnUsage{InputTokens: 1000, OutputTokens: 10})
+	if len(small) != 0 {
+		t.Errorf("a small request should record no tier counters, got %v", small)
+	}
+
+	// The prompt size counts cached tokens too: 100k + 30k + 5k > 128k.
+	large := testCollector{}
+	recordTierUsage(large, info, TurnUsage{InputTokens: 100000, CachedReadTokens: 30000, CachedWriteTokens: 5000, OutputTokens: 10})
+	want := testCollector{
+		"input_tokens_over_128000":        100000,
+		"cached_read_tokens_over_128000":  30000,
+		"cached_write_tokens_over_128000": 5000,
+		"output_tokens_over_128000":       10,
+	}
+	if !maps.Equal(large, want) {
+		t.Errorf("large request counters = %v, want %v", large, want)
+	}
+}
+
+func TestModelInfoWithEmptySlicesIsUnknown(t *testing.T) {
+	info := ModelInfo{Modalities: []string{}, Caps: Capabilities{ReasoningEfforts: []Effort{}}, Cost: Cost{Tiers: []CostTier{}}}
+	if !info.isUnknown() {
+		t.Error("a ModelInfo with only empty slices should be unknown")
 	}
 }

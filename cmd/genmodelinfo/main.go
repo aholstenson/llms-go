@@ -1,29 +1,29 @@
-// Command genmodelinfo regenerates modelinfo_data.json from models.dev.
+// Command genmodelinfo regenerates modelinfo_data.json.gz from models.dev.
 //
 // Usage:
 //
 //	go run ./cmd/genmodelinfo            # fetch https://models.dev/api.json
-//	go run ./cmd/genmodelinfo -in api.json -o modelinfo_data.json
+//	go run ./cmd/genmodelinfo -in api.json -o modelinfo_data.json.gz
 //
-// CI runs the generator and then `git diff --exit-code modelinfo_data.json`
-// to detect drift. Output is deterministic (encoding/json sorts map keys) so
-// diffs are clean. The -in flag lets CI pin a committed snapshot for
-// reproducibility.
+// The output is models.dev's api.json reduced to the providers the llms
+// package supports, without model descriptions, minified and gzipped. It
+// stays in the models.dev format, so the same data can also be given to
+// llms.LoadModelInfo or LLM_MODELS_FILE. The output is deterministic, so
+// equal input gives an equal file. A summary of added and removed models is
+// written to stderr for use in pull request descriptions.
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"slices"
 	"time"
 
 	"github.com/aholstenson/llms-go/internal/modelsdev"
 )
-
-const apiURL = "https://models.dev/api.json"
 
 func main() {
 	if err := run(); err != nil {
@@ -33,8 +33,8 @@ func main() {
 }
 
 func run() error {
-	in := flag.String("in", "", "path to a local models.dev api.json; if empty, fetched over HTTP")
-	out := flag.String("o", "modelinfo_data.json", "output path for the generated artifact")
+	in := flag.String("in", "", "path to a local models.dev api.json (plain or gzip); if empty, fetched over HTTP")
+	out := flag.String("o", "modelinfo_data.json.gz", "output path for the generated file")
 	flag.Parse()
 
 	data, err := loadRaw(*in)
@@ -42,26 +42,31 @@ func run() error {
 		return err
 	}
 
-	var raw modelsdev.RawData
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return fmt.Errorf("parsing api.json: %w", err)
-	}
-
-	info := modelsdev.Transform(raw)
-
-	// encoding/json marshals map keys in sorted order, giving deterministic
-	// output for clean diffs.
-	encoded, err := json.MarshalIndent(info, "", "  ")
+	filtered, err := modelsdev.Filter(data)
 	if err != nil {
-		return fmt.Errorf("encoding artifact: %w", err)
+		return err
 	}
-	encoded = append(encoded, '\n')
+	raw, err := modelsdev.Parse(filtered)
+	if err != nil {
+		return err
+	}
+	compressed, err := modelsdev.Compress(filtered)
+	if err != nil {
+		return err
+	}
 
-	if err := os.WriteFile(*out, encoded, 0o644); err != nil { //nolint:gosec
+	previous := readPrevious(*out)
+
+	if err := os.WriteFile(*out, compressed, 0o644); err != nil { //nolint:gosec
 		return fmt.Errorf("writing %s: %w", *out, err)
 	}
 
-	fmt.Fprintf(os.Stderr, "genmodelinfo: wrote %d models to %s\n", len(info), *out)
+	current := modelKeys(raw)
+	fmt.Fprintf(os.Stderr, "genmodelinfo: wrote %d models (data version %s, %d bytes) to %s\n",
+		len(current), modelsdev.Version(raw), len(compressed), *out)
+	if previous != nil {
+		printDiff(previous, current)
+	}
 	return nil
 }
 
@@ -75,14 +80,14 @@ func loadRaw(path string) ([]byte, error) {
 	}
 
 	client := &http.Client{Timeout: 60 * time.Second}
-	resp, err := client.Get(apiURL)
+	resp, err := client.Get(modelsdev.APIURL)
 	if err != nil {
-		return nil, fmt.Errorf("fetching %s: %w", apiURL, err)
+		return nil, fmt.Errorf("fetching %s: %w", modelsdev.APIURL, err)
 	}
 	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("fetching %s: unexpected status %s", apiURL, resp.Status)
+		return nil, fmt.Errorf("fetching %s: unexpected status %s", modelsdev.APIURL, resp.Status)
 	}
 
 	data, err := io.ReadAll(resp.Body)
@@ -90,4 +95,42 @@ func loadRaw(path string) ([]byte, error) {
 		return nil, fmt.Errorf("reading response body: %w", err)
 	}
 	return data, nil
+}
+
+// readPrevious returns the model keys of an earlier generated file, or nil
+// when there is none.
+func readPrevious(path string) []string {
+	data, err := os.ReadFile(path) //nolint:gosec
+	if err != nil {
+		return nil
+	}
+	raw, err := modelsdev.Parse(data)
+	if err != nil {
+		return nil
+	}
+	return modelKeys(raw)
+}
+
+func modelKeys(raw modelsdev.RawData) []string {
+	var keys []string
+	for _, provider := range modelsdev.Providers {
+		for id := range raw[provider].Models {
+			keys = append(keys, provider+"/"+id)
+		}
+	}
+	slices.Sort(keys)
+	return keys
+}
+
+func printDiff(previous, current []string) {
+	for _, k := range current {
+		if _, found := slices.BinarySearch(previous, k); !found {
+			fmt.Fprintln(os.Stderr, "  added:  ", k)
+		}
+	}
+	for _, k := range previous {
+		if _, found := slices.BinarySearch(current, k); !found {
+			fmt.Fprintln(os.Stderr, "  removed:", k)
+		}
+	}
 }

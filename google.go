@@ -73,16 +73,16 @@ type googleModel struct {
 	client            *genai.Client
 	statsModel        string
 	model             string
-	info              ModelInfo
+	info              modelInfoRef
 	subParserRegistry map[string]SubParserConfig
 	headerCapture     *headerCapturingTransport
 }
 
-// newGoogleModel creates a new Google Gemini model. creds is consulted on
-// every request so rotating credentials take effect without rebuilding the
-// model. info carries embedded model metadata used to gate request
-// parameters; the zero value is treated permissively.
-func newGoogleModel(ctx context.Context, logger *slog.Logger, metrics *Metrics, creds CredentialSource, model string, registry map[string]SubParserConfig, info ModelInfo) (Model, error) {
+// newGoogleModel creates a new Google Gemini model. creds is consulted on every
+// request so rotating credentials take effect without rebuilding the model.
+// info supplies model metadata used to gate request parameters; an unknown
+// model is treated permissively.
+func newGoogleModel(ctx context.Context, logger *slog.Logger, metrics *Metrics, creds CredentialSource, model string, registry map[string]SubParserConfig, info modelInfoRef) (Model, error) {
 	transport := newHeaderCapturingTransport(http.DefaultTransport)
 	// Auth wraps the header capture so x-goog-api-key is set per request. The
 	// SDK rejects an empty APIKey, so it gets the placeholder — which also
@@ -127,12 +127,9 @@ func (m *googleModel) newSession(ctx context.Context, options ...GenerateOption)
 		return nil, err
 	}
 
-	// Gate request parameters against the model's known capabilities.
-	if len(opts.Tools) > 0 && !m.info.allowsToolCall() {
-		return nil, fmt.Errorf("model %s does not support tool calling", m.statsModel)
-	}
-	if modality := firstUnsupportedModality(opts.Messages, m.info); modality != "" {
-		return nil, fmt.Errorf("model %s does not support %s input", m.statsModel, modality)
+	info := m.info.get()
+	if err := checkRequestCapabilities(m.statsModel, info, opts); err != nil {
+		return nil, err
 	}
 
 	messages, err := m.convertMessages(opts.Messages)
@@ -152,20 +149,19 @@ func (m *googleModel) newSession(ctx context.Context, options ...GenerateOption)
 		}
 	}
 
-	if opts.Temperature != 0 && m.info.allowsTemperature() {
+	if opts.Temperature != 0 && info.allowsTemperature() {
 		t := float32(opts.Temperature)
 		config.Temperature = &t
 	}
 
-	maxOutput := m.info.resolveMaxOutputTokens(opts.MaxOutputTokens, 0)
+	maxOutput := info.resolveMaxOutputTokens(opts.MaxOutputTokens, 0)
 
-	// Resolve reasoning. Gemini 2.5 uses a thinking budget; Gemini 3+ uses a
-	// thinking level. Only the budget style accepts WithMaxThinkingTokens.
-	style := m.info.Caps.ReasoningStyle
-	if style == "" {
-		style = reasoningStyleBudget
-	}
-	switch route := resolveReasoningRoute(opts, m.info, style == reasoningStyleBudget, m.logger); route.Kind {
+	// Resolve reasoning. Gemini 3 and later take a thinking level (the
+	// model's effort tiers); Gemini 2.5 takes a thinking budget. Unknown
+	// models get a budget, which both accept. Only budget models accept an
+	// explicit WithMaxThinkingTokens budget.
+	levels := len(info.Caps.ReasoningEfforts) > 0
+	switch route := resolveReasoningRoute(opts, info, !levels, m.logger); route.Kind {
 	case reasoningKindBudget:
 		thinkingBudget := int32(route.Budget) //nolint:gosec
 		config.ThinkingConfig = &genai.ThinkingConfig{
@@ -178,13 +174,17 @@ func (m *googleModel) newSession(ctx context.Context, options ...GenerateOption)
 			maxOutput += route.Budget
 		}
 	case reasoningKindEffort:
-		if style == reasoningStyleLevel {
+		switch {
+		case route.Effort == "":
+			// Reasoning on at the model's default depth.
+			config.ThinkingConfig = &genai.ThinkingConfig{IncludeThoughts: true}
+		case levels:
 			config.ThinkingConfig = &genai.ThinkingConfig{
 				ThinkingLevel:   googleThinkingLevel(route.Effort),
 				IncludeThoughts: true,
 			}
-		} else {
-			budget := effortToBudget(route.Effort, m.info)
+		default:
+			budget := effortToBudget(route.Effort, info)
 			thinkingBudget := int32(budget) //nolint:gosec
 			config.ThinkingConfig = &genai.ThinkingConfig{
 				ThinkingBudget:  &thinkingBudget,
@@ -194,13 +194,10 @@ func (m *googleModel) newSession(ctx context.Context, options ...GenerateOption)
 				maxOutput += budget
 			}
 		}
-	case reasoningKindMandatory:
-		// Model always reasons; omit the thinking config and let it decide.
-	case reasoningKindDisable, reasoningKindSkip:
-		// Disable reasoning explicitly. Some Gemini models think by default and
-		// silently count thinking against max output tokens, so always send the
-		// disable form: budget 0 (2.5) or the minimal level (3+).
-		if style == reasoningStyleLevel {
+	case reasoningKindDisable:
+		// Gemini 3 has no off switch; the minimal level is its lowest.
+		// Gemini 2.5 turns thinking off with a zero budget.
+		if levels {
 			config.ThinkingConfig = &genai.ThinkingConfig{
 				ThinkingLevel: genai.ThinkingLevelMinimal,
 			}
@@ -210,10 +207,13 @@ func (m *googleModel) newSession(ctx context.Context, options ...GenerateOption)
 				ThinkingBudget: &zero,
 			}
 		}
+	case reasoningKindDefault, reasoningKindMandatory, reasoningKindSkip:
+		// Send nothing: the model's default applies, the model always reasons
+		// and has no lower level to fall back to, or it cannot reason.
 	}
 
 	if maxOutput > 0 {
-		if clamped, didClamp := m.info.clampMaxOutputTokens(maxOutput); didClamp {
+		if clamped, didClamp := info.clampMaxOutputTokens(maxOutput); didClamp {
 			m.logger.Warn("Clamping max tokens to model output limit",
 				slog.Int("requested", maxOutput), slog.Int("limit", clamped))
 			maxOutput = clamped
@@ -241,6 +241,7 @@ func (m *googleModel) newSession(ctx context.Context, options ...GenerateOption)
 
 	turn := &googleTurn{
 		m:        m,
+		info:     info,
 		opts:     opts,
 		config:   config,
 		messages: messages,
@@ -626,6 +627,7 @@ func (m *googleModel) convertTools(tools []ToolDef) ([]*genai.Tool, map[string]T
 // googleModel.handleStreaming and are never exposed through neutral types.
 type googleTurn struct {
 	m    *googleModel
+	info ModelInfo
 	opts *generateContentOptions
 
 	config   *genai.GenerateContentConfig
@@ -852,6 +854,7 @@ func (t *googleTurn) Next(ctx context.Context) (TurnOutput, error) {
 			if partialUsage.ThinkingTokens > 0 {
 				collector.Counter("thinking_tokens").Add(int(partialUsage.ThinkingTokens))
 			}
+			recordTierUsage(collector, t.info, *partialUsage)
 
 			m.metrics.RecordCall(
 				ctx,
@@ -924,6 +927,7 @@ func (t *googleTurn) Next(ctx context.Context) (TurnOutput, error) {
 		if u.ThinkingTokens > 0 {
 			collector.Counter("thinking_tokens").Add(int(u.ThinkingTokens))
 		}
+		recordTierUsage(collector, t.info, *u)
 
 		usage = *u
 
@@ -994,11 +998,13 @@ func (t *googleTurn) Next(ctx context.Context) (TurnOutput, error) {
 // values fall back to medium.
 func googleThinkingLevel(e Effort) genai.ThinkingLevel {
 	switch e {
+	case EffortMinimal:
+		return genai.ThinkingLevelMinimal
 	case EffortLow:
 		return genai.ThinkingLevelLow
 	case EffortMedium:
 		return genai.ThinkingLevelMedium
-	case EffortHigh:
+	case EffortHigh, EffortXHigh, EffortMax:
 		return genai.ThinkingLevelHigh
 	default:
 		return genai.ThinkingLevelMedium

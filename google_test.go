@@ -58,7 +58,7 @@ var _ = Describe("Google", func() {
 				client:     client,
 				statsModel: "google/m",
 				model:      "m",
-				info:       ModelInfo{Caps: Capabilities{Temperature: true, ToolCall: true}},
+				info:       fixedModelInfo(ModelInfo{Caps: Capabilities{Temperature: true, ToolCall: true}}),
 			}
 
 			var streamed string
@@ -112,7 +112,7 @@ var _ = Describe("Google", func() {
 				client:     client,
 				statsModel: "google/m",
 				model:      "m",
-				info:       ModelInfo{Caps: Capabilities{Temperature: true, ToolCall: true}},
+				info:       fixedModelInfo(ModelInfo{Caps: Capabilities{Temperature: true, ToolCall: true}}),
 			}
 
 			_, err = m.GenerateContent(ctx,

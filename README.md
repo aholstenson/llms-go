@@ -18,10 +18,12 @@ touching application code.
   parsed structured output as it arrives.
 - **Tool calling and agentic loops** — composable toolkits, multi-step
   execution, per-call timeouts, and built-in web search.
-- **Cost and usage tracking** — automatic pricing from models.dev data plus
-  OpenTelemetry GenAI metrics and local stats aggregation.
-- **Capability-aware** — embedded model metadata gates temperature,
-  reasoning, and modality behavior so missing features fail gracefully.
+- **Cost and usage tracking** — automatic pricing from models.dev data,
+  including long-context price tiers, plus OpenTelemetry GenAI metrics and
+  local stats aggregation.
+- **Capability-aware** — model metadata gates temperature, reasoning,
+  structured output, and modality behavior so missing features fail
+  gracefully. The metadata can be refreshed without a new release.
 - **Retries you can watch** — rate limits and overloads are retried with
   backoff, and a callback reports each wait so you can see the progress.
 - **Stalls become errors** — a call that goes silent fails, retries, and
@@ -82,6 +84,45 @@ deploy time without code changes:
 manager.RegisterAlias("fast", "anthropic/claude-haiku-4-5")
 model, _ := manager.GetModel(ctx, "fast") // or set LLM_MODEL_FAST=openai/gpt-4o
 ```
+
+## Reasoning
+
+Reasoning (thinking) has three modes. Without an option, the provider's
+default for the model applies:
+
+```go
+model.GenerateContent(ctx, llms.WithReasoning(llms.ReasoningOff), ...)  // turn it off
+model.GenerateContent(ctx, llms.WithReasoning(llms.ReasoningOn), ...)   // on, default depth
+model.GenerateContent(ctx, llms.WithReasoningEffort(llms.EffortHigh), ...) // on, at an effort
+```
+
+Efforts go from `EffortMinimal` to `EffortMax`. An effort the model does not
+accept is moved to the nearest one it does accept. A model that cannot turn
+reasoning off (for example Claude Opus 5.5) uses its lowest effort when asked
+to turn it off. Both cases log a warning.
+
+## Model data
+
+Pricing, limits and capabilities come from [models.dev](https://models.dev),
+embedded in the build. For Anthropic models, the Anthropic Models API is also
+asked one time for each model, so new Claude models work before the embedded
+data knows them.
+
+You can use newer data without a new release:
+
+```go
+llms.RefreshModelInfo(ctx)             // get models.dev now and cache it for later processes
+llms.LoadModelInfo(file)               // use a models.dev api.json that you downloaded
+llms.RegisterModelInfo("openai/my-model", llms.ModelInfo{...}) // add or correct one model
+```
+
+Set `LLM_MODELS_FILE` to the path of a models.dev `api.json` to use that file
+in place of the embedded data. Prices can be overridden with a JSON file in
+`LLM_PRICING_FILE` (default `llms-pricing.json`) that maps model names to
+`{"input": ..., "output": ..., "cache_read": ..., "cache_write": ...}` in USD
+per million tokens.
+
+To update the embedded data, run `go generate ./...`.
 
 ## Credentials
 

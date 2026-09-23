@@ -38,17 +38,22 @@ type anthropicModel struct {
 	client            anthropic.Client
 	model             string
 	statsModel        string
-	info              ModelInfo
+	info              modelInfoRef
 	subParserRegistry map[string]SubParserConfig
+
+	// capabilities caches the Anthropic Models API answer for this model.
+	// A nil value turns the lookup off.
+	capabilities *anthropicCapabilities
 }
 
 // newAnthropicModel creates a new Anthropic model using the official Anthropic Go SDK.
 // creds is consulted on every request so rotating credentials take effect
-// without rebuilding the model. info carries embedded model metadata used to
-// gate request parameters; the zero value is treated permissively. Optional
+// without rebuilding the model. info supplies model metadata used to gate
+// request parameters; an unknown model is treated permissively. On first use
+// the model also asks the Anthropic Models API for its capabilities. Optional
 // SDK request options can be passed for customization (e.g.,
 // option.WithBaseURL for testing).
-func newAnthropicModel(logger *slog.Logger, metrics *Metrics, creds CredentialSource, model string, registry map[string]SubParserConfig, info ModelInfo, opts ...option.RequestOption) Model {
+func newAnthropicModel(logger *slog.Logger, metrics *Metrics, creds CredentialSource, model string, registry map[string]SubParserConfig, info modelInfoRef, opts ...option.RequestOption) Model {
 	// Prepend the auth options so they can be overridden by caller options.
 	// The placeholder key satisfies the SDK; the transport replaces the
 	// X-Api-Key header per request.
@@ -66,6 +71,7 @@ func newAnthropicModel(logger *slog.Logger, metrics *Metrics, creds CredentialSo
 		statsModel:        "anthropic/" + model,
 		info:              info,
 		subParserRegistry: registry,
+		capabilities:      &anthropicCapabilities{},
 	}
 }
 
@@ -136,12 +142,10 @@ func (m *anthropicModel) newSession(ctx context.Context, options ...GenerateOpti
 		return nil, err
 	}
 
-	// Gate request parameters against the model's known capabilities.
-	if len(opts.Tools) > 0 && !m.info.allowsToolCall() {
-		return nil, fmt.Errorf("model %s does not support tool calling", m.statsModel)
-	}
-	if modality := firstUnsupportedModality(opts.Messages, m.info); modality != "" {
-		return nil, fmt.Errorf("model %s does not support %s input", m.statsModel, modality)
+	info := m.modelInfo(ctx)
+
+	if err := checkRequestCapabilities(m.statsModel, info, opts); err != nil {
+		return nil, err
 	}
 
 	// Convert messages to Anthropic format
@@ -170,7 +174,7 @@ func (m *anthropicModel) newSession(ctx context.Context, options ...GenerateOpti
 		}
 	}
 
-	if opts.Temperature != 0 && m.info.allowsTemperature() {
+	if opts.Temperature != 0 && info.allowsTemperature() {
 		params.Temperature = anthropic.Float(opts.Temperature)
 	}
 
@@ -178,56 +182,60 @@ func (m *anthropicModel) newSession(ctx context.Context, options ...GenerateOpti
 	// limit; for unknown models fall back to a conservative ceiling that fits
 	// every current Claude model. Thinking tokens count against this cap, so
 	// they're added before clamping against the model's output limit.
-	maxOutput := m.info.resolveMaxOutputTokens(opts.MaxOutputTokens, 4096)
+	maxOutput := info.resolveMaxOutputTokens(opts.MaxOutputTokens, 4096)
 
-	// Resolve reasoning. The effective style picks the SDK shape: legacy budget
-	// (pre-4.5) uses thinking budget_tokens; effort (4.5) uses output_config
-	// effort; adaptive (4.6/4.7) adds the adaptive thinking config. Only the
-	// budget style accepts an explicit WithMaxThinkingTokens budget.
-	style := m.info.Caps.ReasoningStyle
-	if style == "" {
-		style = reasoningStyleBudget
-	}
-	switch route := resolveReasoningRoute(opts, m.info, style == reasoningStyleBudget, m.logger); route.Kind {
+	// Resolve reasoning. Adaptive thinking (Opus 4.6 and later) lets the model
+	// decide how much to think, steered by the output_config effort. Older
+	// models take a budget_tokens thinking config, and Opus 4.5 takes both a
+	// budget and an effort. Unknown models are treated as adaptive, like every
+	// new model. Known models without any listed reasoning control get budget
+	// thinking, the form every Claude model before adaptive thinking accepts.
+	// Only budget models accept an explicit WithMaxThinkingTokens budget.
+	adaptive := info.Caps.AdaptiveThinking || info.isUnknown()
+	budgetSupported := info.Caps.ReasoningBudget != nil ||
+		(!adaptive && len(info.Caps.ReasoningEfforts) == 0)
+	switch route := resolveReasoningRoute(opts, info, budgetSupported, m.logger); route.Kind {
 	case reasoningKindBudget:
 		params.Thinking = anthropic.BetaThinkingConfigParamOfEnabled(int64(route.Budget))
 		maxOutput += route.Budget
 		// Budget-style thinking requires temperature 1.0.
-		if m.info.allowsTemperature() {
+		if info.allowsTemperature() {
 			params.Temperature = anthropic.Float(1.0)
 		}
 	case reasoningKindEffort:
-		if style == reasoningStyleBudget {
-			budget := effortToBudget(route.Effort, m.info)
+		switch {
+		case adaptive:
+			params.Thinking = anthropic.BetaThinkingConfigParamUnion{
+				OfAdaptive: &anthropic.BetaThinkingConfigAdaptiveParam{},
+			}
+		case budgetSupported:
+			budget := effortToBudget(route.Effort, info)
 			params.Thinking = anthropic.BetaThinkingConfigParamOfEnabled(int64(budget))
 			maxOutput += budget
-			if m.info.allowsTemperature() {
+			if info.allowsTemperature() {
 				params.Temperature = anthropic.Float(1.0)
 			}
-		} else {
+		}
+		// A model with an effort but neither thinking form gets the effort
+		// alone, which still controls how many tokens it spends.
+		if route.Effort != "" && (info.isUnknown() || len(info.Caps.ReasoningEfforts) > 0) {
 			params.OutputConfig.Effort = anthropicOutputEffort(route.Effort)
-			if style == reasoningStyleAdaptive {
-				params.Thinking = anthropic.BetaThinkingConfigParamUnion{
-					OfAdaptive: &anthropic.BetaThinkingConfigAdaptiveParam{},
-				}
-			}
 		}
 	case reasoningKindDisable:
-		// Budget- and effort-style models think only when asked, so omitting the
-		// param is enough. Adaptive-style models may reason by default (Opus 5
-		// does), so they need the explicit disable form.
-		if style == reasoningStyleAdaptive {
+		// Models without adaptive thinking think only when asked, so omitting
+		// the thinking config is enough. Adaptive models may think by default
+		// (Opus 5 does), so they need the explicit disable form.
+		if adaptive {
 			params.Thinking = anthropic.BetaThinkingConfigParamUnion{
 				OfDisabled: &anthropic.BetaThinkingConfigDisabledParam{},
 			}
 		}
-	case reasoningKindMandatory, reasoningKindSkip:
-		// Mandatory-reasoning models (Opus 4.7, Fable 5) reject the disable form
-		// and keep their built-in adaptive reasoning; unknown or non-reasoning
-		// models get no reasoning params at all.
+	case reasoningKindDefault, reasoningKindMandatory, reasoningKindSkip:
+		// Send nothing: the model's default applies, the model always reasons
+		// and has no lower effort to fall back to, or it cannot reason.
 	}
 
-	if clamped, didClamp := m.info.clampMaxOutputTokens(maxOutput); didClamp {
+	if clamped, didClamp := info.clampMaxOutputTokens(maxOutput); didClamp {
 		m.logger.Warn("Clamping max tokens to model output limit",
 			slog.Int("requested", maxOutput), slog.Int("limit", clamped))
 		maxOutput = clamped
@@ -267,6 +275,7 @@ func (m *anthropicModel) newSession(ctx context.Context, options ...GenerateOpti
 
 	turn := &anthropicTurn{
 		m:        m,
+		info:     info,
 		opts:     opts,
 		params:   params,
 		jsParser: jsParser,
@@ -831,6 +840,7 @@ func (m *anthropicModel) convertTools(tools []ToolDef) ([]anthropic.BetaToolUnio
 // the request's only source of truth; the neutral transcript never feeds it.
 type anthropicTurn struct {
 	m    *anthropicModel
+	info ModelInfo
 	opts *generateContentOptions
 
 	params anthropic.BetaMessageNewParams
@@ -973,6 +983,7 @@ func (t *anthropicTurn) Next(ctx context.Context) (TurnOutput, error) {
 			collector.Counter("output_tokens").Add(int(partialUsage.OutputTokens))
 			collector.Counter("cached_read_tokens").Add(int(partialUsage.CachedReadTokens))
 			collector.Counter("cached_write_tokens").Add(int(partialUsage.CachedWriteTokens))
+			recordTierUsage(collector, t.info, *partialUsage)
 			m.metrics.RecordCall(ctx,
 				GenAISystemAnthropic, GenAIOperationChat, GenAIModel(m.model),
 				partialUsage.InputTokens,
@@ -1062,6 +1073,12 @@ func (t *anthropicTurn) Next(ctx context.Context) (TurnOutput, error) {
 	collector.Counter("output_tokens").Add(int(response.Usage.OutputTokens))
 	collector.Counter("cached_read_tokens").Add(int(response.Usage.CacheReadInputTokens))
 	collector.Counter("cached_write_tokens").Add(int(response.Usage.CacheCreationInputTokens))
+	recordTierUsage(collector, t.info, TurnUsage{
+		InputTokens:       response.Usage.InputTokens,
+		OutputTokens:      response.Usage.OutputTokens,
+		CachedReadTokens:  response.Usage.CacheReadInputTokens,
+		CachedWriteTokens: response.Usage.CacheCreationInputTokens,
+	})
 
 	m.metrics.RecordCall(ctx,
 		GenAISystemAnthropic, GenAIOperationChat, GenAIModel(m.model),
@@ -1136,13 +1153,15 @@ func clearAnthropicCacheControl(msgs []anthropic.BetaMessageParam) {
 // unrecognized values fall back to medium.
 func anthropicOutputEffort(e Effort) anthropic.BetaOutputConfigEffort {
 	switch e {
-	case EffortLow:
+	case EffortMinimal, EffortLow:
 		return anthropic.BetaOutputConfigEffortLow
 	case EffortMedium:
 		return anthropic.BetaOutputConfigEffortMedium
 	case EffortHigh:
 		return anthropic.BetaOutputConfigEffortHigh
-	case "max":
+	case EffortXHigh:
+		return anthropic.BetaOutputConfigEffort(EffortXHigh)
+	case EffortMax:
 		return anthropic.BetaOutputConfigEffortMax
 	default:
 		return anthropic.BetaOutputConfigEffortMedium
