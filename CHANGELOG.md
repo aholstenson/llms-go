@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.0](https://github.com/aholstenson/llms-go/compare/v0.9.0...v0.10.0) (2026-09-29)
+
+
+### Features
+
+* Update model metadata ([001f42b](https://github.com/aholstenson/llms-go/commit/001f42b084a37fb17175383c67418f69c5d1e9be))
+
 ## [0.9.0](https://github.com/aholstenson/llms-go/compare/v0.8.0...v0.9.0) (2026-09-23)
 
 
