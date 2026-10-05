@@ -32,6 +32,72 @@ func anthropicResponseFromError(err error) *http.Response {
 	return nil
 }
 
+// anthropicStreamError is an error that Anthropic sent as an "error" event
+// inside a stream that had already opened with status 200.
+type anthropicStreamError struct {
+	// Type is the error type, e.g. "overloaded_error".
+	Type    string
+	Message string
+	// err is the SDK error that carried the event.
+	err error
+}
+
+func (e *anthropicStreamError) Error() string {
+	return e.err.Error()
+}
+
+func (e *anthropicStreamError) Unwrap() error {
+	return e.err
+}
+
+// unavailable reports whether the error is a rate limit or an overload.
+func (e *anthropicStreamError) unavailable() bool {
+	return e.Type == "overloaded_error" || e.Type == "rate_limit_error"
+}
+
+// anthropicStreamErrorPrefix starts the text of the error that the SDK
+// makes from an "error" event in the stream.
+const anthropicStreamErrorPrefix = "received error while streaming: "
+
+// asAnthropicStreamError changes an SDK stream error into an
+// *anthropicStreamError when the SDK made it from an "error" event. The SDK
+// keeps only the JSON text of the event, so it is parsed here. Other errors
+// are returned unchanged.
+func asAnthropicStreamError(err error) error {
+	if err == nil {
+		return nil
+	}
+	body, ok := strings.CutPrefix(err.Error(), anthropicStreamErrorPrefix)
+	if !ok {
+		return err
+	}
+	var event struct {
+		Error struct {
+			Type    string `json:"type"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if json.Unmarshal([]byte(body), &event) != nil || event.Error.Type == "" {
+		return err
+	}
+	return &anthropicStreamError{Type: event.Error.Type, Message: event.Error.Message, err: err}
+}
+
+// anthropicUnavailable reports whether err means that Anthropic is rate
+// limited or overloaded. status is the HTTP status, or 0 when the error
+// came inside an open stream.
+func anthropicUnavailable(err error) (status int, ok bool) {
+	var ae *anthropic.Error
+	if errors.As(err, &ae) {
+		return ae.StatusCode, isUnavailableStatusCode(ae.StatusCode)
+	}
+	var se *anthropicStreamError
+	if errors.As(err, &se) {
+		return 0, se.unavailable()
+	}
+	return 0, false
+}
+
 type anthropicModel struct {
 	logger            *slog.Logger
 	metrics           *Metrics
@@ -289,7 +355,9 @@ func (m *anthropicModel) newSession(ctx context.Context, options ...GenerateOpti
 // inside one retry loop because the failure this guards against — a rate
 // limit, an overload, or a stalled connection — is just as likely after the
 // server accepted the request as before it, and a stream that dies before its
-// first event is as safe to replay as one that never opened.
+// first event is as safe to replay as one that never opened. This includes a
+// rate limit or an overload that Anthropic sends as an "error" event inside a
+// stream that opened with status 200.
 //
 // The moment an event reaches a streaming callback the attempt becomes final:
 // retrying would replay tokens the user has already seen. That failure is
@@ -311,15 +379,11 @@ func (m *anthropicModel) runStream(
 	}
 
 	classify := func(err error) (bool, int, time.Duration, bool) {
-		ae := &anthropic.Error{}
-		hasAPIErr := errors.As(err, &ae)
+		status, unavailable := anthropicUnavailable(err)
 
 		if *streamingEmitted {
 			// Events already reached the caller, so this attempt stands.
-			if hasAPIErr {
-				return false, ae.StatusCode, 0, false
-			}
-			return false, 0, 0, false
+			return false, status, 0, false
 		}
 
 		// A stall is a transient failure like any other, except the provider
@@ -328,14 +392,11 @@ func (m *anthropicModel) runStream(
 			return true, 0, 0, false
 		}
 
-		if !hasAPIErr {
-			return false, 0, 0, false
-		}
-		if !isUnavailableStatusCode(ae.StatusCode) {
-			return false, ae.StatusCode, 0, false
+		if !unavailable {
+			return false, status, 0, false
 		}
 		ra, hasRA := extractRetryAfter("anthropic", err, nil)
-		return true, ae.StatusCode, ra, hasRA
+		return true, status, ra, hasRA
 	}
 
 	attempts := 0
@@ -593,7 +654,7 @@ func (m *anthropicModel) handleStreaming(
 		// Return the accumulated message so the caller can recover any
 		// usage emitted before the stream errored (Anthropic reports input
 		// usage on message_start, very early in the stream).
-		return &message, fmt.Errorf("streaming error from Anthropic: %w", stream.Err())
+		return &message, fmt.Errorf("streaming error from Anthropic: %w", asAnthropicStreamError(stream.Err()))
 	}
 	if structuredStreamErr != nil {
 		if streamingEmitted != nil && *streamingEmitted {
@@ -1009,19 +1070,18 @@ func (t *anthropicTurn) Next(ctx context.Context) (TurnOutput, error) {
 		// A transient failure the retry loop declined to retry, because
 		// output had already reached the caller. Report it in the same shape
 		// so callers see one error type for "try again later".
-		anthropicError := &anthropic.Error{}
-		isAPIErr := errors.As(err, &anthropicError)
-		if isStallError(err) || (isAPIErr && isUnavailableStatusCode(anthropicError.StatusCode)) {
+		status, unavailable := anthropicUnavailable(err)
+		if isStallError(err) || unavailable {
 			m.metrics.RecordCallDuration(ctx, GenAISystemAnthropic, GenAIOperationChat, GenAIModel(m.model), time.Since(start), transientErrorType(err))
-			status := 0
 			var ra time.Duration
 			var hasRA bool
-			if isAPIErr {
-				status = anthropicError.StatusCode
+			if unavailable {
 				ra, hasRA = extractRetryAfter("anthropic", err, nil)
 				if hasRA && t.opts.RetryAfterCap > 0 && ra > t.opts.RetryAfterCap {
 					ra = t.opts.RetryAfterCap
 				}
+			} else {
+				status = 0
 			}
 			ue := &UnavailableError{
 				Provider:      string(GenAISystemAnthropic),

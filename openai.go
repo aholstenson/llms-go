@@ -34,6 +34,81 @@ func openaiResponseFromError(err error) *http.Response {
 	return nil
 }
 
+// openaiStreamError is an error that OpenAI sent inside a stream that had
+// already opened with status 200. It comes from an "error" event, or from
+// the SDK when an event has an "error" field.
+type openaiStreamError struct {
+	Type    string
+	Code    string
+	Message string
+	// err is the SDK error, if the SDK made one.
+	err error
+}
+
+func (e *openaiStreamError) Error() string {
+	if e.err != nil {
+		return e.err.Error()
+	}
+	return fmt.Sprintf("received error while streaming: %s: %s", e.Code, e.Message)
+}
+
+func (e *openaiStreamError) Unwrap() error {
+	return e.err
+}
+
+// unavailable reports whether the error is a rate limit or an overload.
+func (e *openaiStreamError) unavailable() bool {
+	return openaiUnavailableCode(e.Code) || e.Type == "service_unavailable_error"
+}
+
+// openaiUnavailableCode reports whether an OpenAI error code means that
+// the request can succeed if it is sent again later.
+func openaiUnavailableCode(code string) bool {
+	return code == "rate_limit_exceeded" || code == "server_is_overloaded"
+}
+
+// openaiStreamErrorPrefix starts the text of the error that the SDK makes
+// when an event in the stream has an "error" field.
+const openaiStreamErrorPrefix = "received error while streaming: "
+
+// asOpenAIStreamError changes an SDK stream error into an
+// *openaiStreamError when the SDK made it from an "error" field in the
+// stream. The SDK keeps only the JSON text of that field, so it is parsed
+// here. Other errors are returned unchanged.
+func asOpenAIStreamError(err error) error {
+	if err == nil {
+		return nil
+	}
+	body, ok := strings.CutPrefix(err.Error(), openaiStreamErrorPrefix)
+	if !ok {
+		return err
+	}
+	var fields struct {
+		Type    string `json:"type"`
+		Code    string `json:"code"`
+		Message string `json:"message"`
+	}
+	if json.Unmarshal([]byte(body), &fields) != nil {
+		return err
+	}
+	return &openaiStreamError{Type: fields.Type, Code: fields.Code, Message: fields.Message, err: err}
+}
+
+// openaiUnavailable reports whether err means that OpenAI is rate limited or
+// overloaded. status is the HTTP status, or 0 when the error came inside an
+// open stream.
+func openaiUnavailable(err error) (status int, ok bool) {
+	var oe *openai.Error
+	if errors.As(err, &oe) {
+		return oe.StatusCode, isUnavailableStatusCode(oe.StatusCode)
+	}
+	var se *openaiStreamError
+	if errors.As(err, &se) {
+		return 0, se.unavailable()
+	}
+	return 0, false
+}
+
 type openaiModel struct {
 	logger            *slog.Logger
 	metrics           *Metrics
@@ -514,7 +589,9 @@ type openaiStreamResult struct {
 // inside one retry loop because the failure this guards against — a rate
 // limit, an overload, or a stalled connection — is just as likely after the
 // server accepted the request as before it, and a stream that dies before its
-// first event is as safe to replay as one that never opened.
+// first event is as safe to replay as one that never opened. This includes a
+// rate limit or an overload that OpenAI sends inside a stream that opened with
+// status 200.
 //
 // The moment an event reaches a streaming callback the attempt becomes final:
 // retrying would replay tokens the user has already seen. It returns how many
@@ -529,15 +606,11 @@ func (t *openaiTurn) runStream(
 	m := t.m
 
 	classify := func(err error) (bool, int, time.Duration, bool) {
-		oe := &openai.Error{}
-		hasAPIErr := errors.As(err, &oe)
+		status, unavailable := openaiUnavailable(err)
 
 		if *streamingEmitted {
 			// Events already reached the caller, so this attempt stands.
-			if hasAPIErr {
-				return false, oe.StatusCode, 0, false
-			}
-			return false, 0, 0, false
+			return false, status, 0, false
 		}
 
 		// A stall is a transient failure like any other, except the provider
@@ -546,14 +619,11 @@ func (t *openaiTurn) runStream(
 			return true, 0, 0, false
 		}
 
-		if !hasAPIErr {
-			return false, 0, 0, false
-		}
-		if !isUnavailableStatusCode(oe.StatusCode) {
-			return false, oe.StatusCode, 0, false
+		if !unavailable {
+			return false, status, 0, false
 		}
 		ra, hasRA := extractRetryAfter("openai", err, nil)
-		return true, oe.StatusCode, ra, hasRA
+		return true, status, ra, hasRA
 	}
 
 	attempts := 0
@@ -615,7 +685,11 @@ func (t *openaiTurn) drainStream(
 
 	var out openaiStreamResult
 	var structuredStreamErr error
+	// unavailableErr is a rate limit or an overload that OpenAI sent inside
+	// the stream. Unlike other error events, another attempt can succeed.
+	var unavailableErr error
 
+events:
 	for stream.Next() {
 		event := stream.Current()
 
@@ -677,6 +751,10 @@ func (t *openaiTurn) drainStream(
 			out.response = &r
 
 		case responses.ResponseErrorEvent:
+			if se := (&openaiStreamError{Code: ev.Code, Message: ev.Message}); se.unavailable() {
+				unavailableErr = se
+				break events
+			}
 			m.logger.Error("OpenAI stream error",
 				slog.String("code", ev.Code), slog.String("message", ev.Message))
 			out.handling = true
@@ -703,7 +781,18 @@ func (t *openaiTurn) drainStream(
 	}
 
 	out.parseErr = structuredStreamErr
-	return out, stream.Err()
+	if err := asOpenAIStreamError(stream.Err()); err != nil {
+		return out, err
+	}
+	if unavailableErr != nil {
+		return out, unavailableErr
+	}
+	// A response that failed with a rate limit or an overload can succeed on
+	// another attempt, so it is a transport error and not the turn's answer.
+	if r := out.response; r != nil && r.Status == responses.ResponseStatusFailed && openaiUnavailableCode(string(r.Error.Code)) {
+		return out, &openaiStreamError{Code: string(r.Error.Code), Message: r.Error.Message}
+	}
+	return out, nil
 }
 
 func (t *openaiTurn) Next(ctx context.Context) (TurnOutput, error) {
@@ -781,19 +870,18 @@ func (t *openaiTurn) Next(ctx context.Context) (TurnOutput, error) {
 		// A transient failure the retry loop declined to retry, because
 		// output had already reached the caller. Report it in the same shape
 		// so callers see one error type for "try again later".
-		openaiError := &openai.Error{}
-		isAPIErr := errors.As(err, &openaiError)
-		if isStallError(err) || (isAPIErr && isUnavailableStatusCode(openaiError.StatusCode)) {
+		status, unavailable := openaiUnavailable(err)
+		if isStallError(err) || unavailable {
 			m.metrics.RecordCallDuration(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start), transientErrorType(err))
-			status := 0
 			var ra time.Duration
 			var hasRA bool
-			if isAPIErr {
-				status = openaiError.StatusCode
+			if unavailable {
 				ra, hasRA = extractRetryAfter("openai", err, nil)
 				if hasRA && t.opts.RetryAfterCap > 0 && ra > t.opts.RetryAfterCap {
 					ra = t.opts.RetryAfterCap
 				}
+			} else {
+				status = 0
 			}
 			ue := &UnavailableError{
 				Provider:      string(GenAISystemOpenAI),
@@ -868,23 +956,9 @@ func (t *openaiTurn) Next(ctx context.Context) (TurnOutput, error) {
 		}
 
 		respErr := finalResponse.Error
+		// A failure with a rate limit or an overload does not come here:
+		// drainStream reports it as a transport error, so it is retried.
 		err := fmt.Errorf("OpenAI response failed (model %s): %s: %s", m.model, respErr.Code, respErr.Message)
-		if respErr.Code == "rate_limit_exceeded" {
-			m.metrics.RecordCallDuration(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeUnavailable)
-			ue := &UnavailableError{
-				Provider:      string(GenAISystemOpenAI),
-				Model:         m.model,
-				StatusCode:    0,
-				Attempts:      attempts,
-				PartialOutput: streamingEmitted,
-				PartialUsage:  partialUsage,
-				Cause:         err,
-			}
-			if streamingEmitted {
-				return TurnOutput{}, errors.Join(ue, ErrStreamingPartialOutput)
-			}
-			return TurnOutput{}, ue
-		}
 		m.metrics.RecordCallDuration(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeInternal)
 		return TurnOutput{}, err
 	}

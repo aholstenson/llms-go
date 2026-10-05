@@ -32,8 +32,8 @@ var ErrStructuredStreamParse = errors.New("structured stream parse failed")
 //   - Provider: the GenAI system (e.g. "openai", "anthropic"), or "" if
 //     not stamped.
 //   - Model: the model ID requested, or "" if not stamped.
-//   - StatusCode: HTTP status when known, 0 otherwise (e.g. OpenAI in-band
-//     rate_limit_exceeded events).
+//   - StatusCode: HTTP status when known, 0 otherwise (e.g. an overload or
+//     rate limit that Anthropic or OpenAI sent inside an open stream).
 //   - RetryAfter: the server's Retry-After hint (after RetryAfterCap is
 //     applied), or 0 if no hint was provided. This is the raw hint, not
 //     what the SDK actually slept (jitter/cap may differ); outer-loop

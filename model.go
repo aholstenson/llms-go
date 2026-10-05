@@ -401,12 +401,14 @@ func WithParentExecution(parent ExecutionContext) GenerateOption {
 // The retry loop is owned by llms-go for every provider, so WithMaxRetries,
 // WithRetryBackoff and WithRetryNotify behave the same everywhere.
 //
-// A stream is never retried after its first event: mid-stream failures
-// surface to the caller with ErrStreamingPartialOutput. A streaming request
-// is retried when it fails before its first event, and a non-streaming
-// request is retried as a whole. Anthropic and OpenAI stream every
-// generation; Google and OpenRouter stream only when a streaming callback
-// is set.
+// A streaming request is retried as a whole while no event has reached a
+// streaming callback. This includes a rate limit or an overload that the
+// provider sends inside a stream that opened with status 200. After an
+// event reached a callback, the stream is never retried: a failure
+// surfaces to the caller with ErrStreamingPartialOutput. A non-streaming
+// request is retried as a whole. Anthropic and OpenAI stream
+// every generation; Google and OpenRouter stream only when a streaming
+// callback is set.
 func WithMaxRetries(n int) GenerateOption {
 	return func(opts *generateContentOptions) error {
 		if n < 0 {

@@ -243,7 +243,8 @@ A stream is never retried after its first event reaches your streaming
 callbacks. Such a failure is reported with the `ErrStreamingPartialOutput`
 sentinel instead, so you never replay tokens you have already received. Up to
 that point the whole model call — opening the request and reading the response
-— is retried as one attempt.
+— is retried as one attempt. This includes a rate limit or an overload that the
+provider sends inside a stream that already opened.
 
 ## Stalls
 

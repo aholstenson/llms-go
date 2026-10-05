@@ -338,4 +338,114 @@ var _ = Describe("Anthropic retries", func() {
 		Expect(err).To(HaveOccurred())
 		Expect(requests).To(Equal(int32(1)))
 	})
+
+	Context("errors sent inside an open stream", func() {
+		const start = "event: message_start\n" +
+			"data: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_1\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"m\",\"content\":[],\"stop_reason\":null,\"usage\":{\"input_tokens\":5,\"output_tokens\":1}}}\n\n"
+		const text = "event: content_block_start\n" +
+			"data: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n" +
+			"event: content_block_delta\n" +
+			"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"hi\"}}\n\n"
+		const overloaded = "event: error\n" +
+			"data: {\"type\":\"error\",\"error\":{\"type\":\"overloaded_error\",\"message\":\"Overloaded\"}}\n\n"
+
+		fastBackoff := WithRetryBackoff(BackoffFunc(func(int, time.Duration, bool) time.Duration {
+			return time.Millisecond
+		}))
+
+		// sendFirst sends failure for the first n requests, and a full
+		// answer after that.
+		sendFirst := func(requests *int32, n int32, failure string) http.HandlerFunc {
+			return func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "text/event-stream")
+				w.WriteHeader(http.StatusOK)
+				if atomic.AddInt32(requests, 1) <= n {
+					writeSSE(w, failure)
+					return
+				}
+				writeSSE(w, anthropicSuccessSSE)
+			}
+		}
+
+		It("retries an overload error that comes before any output", func() {
+			var requests int32
+			m := newModel(sendFirst(&requests, 1, start+overloaded))
+
+			var notices []RetryNotice
+			result, err := m.GenerateContent(context.Background(),
+				WithMessages(NewMessage(RoleUser, NewTextPart("hi"))),
+				fastBackoff,
+				WithRetryNotify(func(_ context.Context, n RetryNotice) {
+					notices = append(notices, n)
+				}),
+			)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(TextResult{Text: "hi"}))
+			Expect(requests).To(Equal(int32(2)))
+			Expect(notices).To(HaveLen(1))
+			Expect(notices[0].StatusCode).To(BeZero())
+			Expect(notices[0].Err).To(MatchError(ContainSubstring("overloaded_error")))
+		})
+
+		It("reports the attempts made when the overload continues", func() {
+			var requests int32
+			m := newModel(sendFirst(&requests, 100, start+overloaded))
+
+			_, err := m.GenerateContent(context.Background(),
+				WithMessages(NewMessage(RoleUser, NewTextPart("hi"))),
+				WithMaxRetries(1),
+				fastBackoff,
+			)
+			Expect(requests).To(Equal(int32(2)))
+
+			var ue *UnavailableError
+			Expect(errors.As(err, &ue)).To(BeTrue())
+			Expect(ue.Attempts).To(Equal(2))
+			Expect(ue.StatusCode).To(BeZero())
+			Expect(ue.PartialOutput).To(BeFalse())
+		})
+
+		It("does not retry an overload error that comes after output", func() {
+			var requests int32
+			m := newModel(sendFirst(&requests, 100, start+text+overloaded))
+
+			var streamed string
+			_, err := m.GenerateContent(context.Background(),
+				WithMessages(NewMessage(RoleUser, NewTextPart("hi"))),
+				WithStreamingFunc(func(_ context.Context, evt StreamingEvent) error {
+					if chunk, ok := evt.(StreamingEventTextChunk); ok {
+						streamed += chunk.Text
+					}
+					return nil
+				}),
+				fastBackoff,
+			)
+			Expect(requests).To(Equal(int32(1)))
+			Expect(streamed).To(Equal("hi"))
+			Expect(errors.Is(err, ErrStreamingPartialOutput)).To(BeTrue())
+
+			var ue *UnavailableError
+			Expect(errors.As(err, &ue)).To(BeTrue())
+			Expect(ue.Attempts).To(Equal(1))
+			Expect(ue.PartialOutput).To(BeTrue())
+			Expect(ue.PartialUsage).NotTo(BeNil())
+			Expect(ue.PartialUsage.InputTokens).To(Equal(int64(5)))
+		})
+
+		It("does not retry other errors", func() {
+			var requests int32
+			m := newModel(sendFirst(&requests, 100, start+
+				"event: error\ndata: {\"type\":\"error\",\"error\":{\"type\":\"api_error\",\"message\":\"boom\"}}\n\n"))
+
+			_, err := m.GenerateContent(context.Background(),
+				WithMessages(NewMessage(RoleUser, NewTextPart("hi"))),
+				fastBackoff,
+			)
+			Expect(err).To(MatchError(ContainSubstring("api_error")))
+			Expect(requests).To(Equal(int32(1)))
+
+			var ue *UnavailableError
+			Expect(errors.As(err, &ue)).To(BeFalse())
+		})
+	})
 })
