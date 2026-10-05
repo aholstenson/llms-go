@@ -402,9 +402,11 @@ func WithParentExecution(parent ExecutionContext) GenerateOption {
 // WithRetryBackoff and WithRetryNotify behave the same everywhere.
 //
 // A stream is never retried after its first event: mid-stream failures
-// surface to the caller with ErrStreamingPartialOutput. Anthropic and
-// OpenAI stream every generation and retry a failure to open the stream;
-// Google and OpenRouter retry their non-streaming requests.
+// surface to the caller with ErrStreamingPartialOutput. A streaming request
+// is retried when it fails before its first event, and a non-streaming
+// request is retried as a whole. Anthropic and OpenAI stream every
+// generation; Google and OpenRouter stream only when a streaming callback
+// is set.
 func WithMaxRetries(n int) GenerateOption {
 	return func(opts *generateContentOptions) error {
 		if n < 0 {
