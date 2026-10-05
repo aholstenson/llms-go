@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.10.1](https://github.com/aholstenson/llms-go/compare/v0.10.0...v0.10.1) (2026-10-05)
+
+
+### Bug Fixes
+
+* Report a failed generation for OpenRouter instead of returning a cut-off answer ([2aacacd](https://github.com/aholstenson/llms-go/commit/2aacacd4e1e06ae7fda93669033fa46bbe8fae1a))
+* Retry OpenAI and Anthropic overloads that arrive inside an open stream ([a6bbe3a](https://github.com/aholstenson/llms-go/commit/a6bbe3aacb0a7d571daa99a037502ea4392070ed))
+
 ## [0.10.0](https://github.com/aholstenson/llms-go/compare/v0.9.0...v0.10.0) (2026-09-29)
 
 
