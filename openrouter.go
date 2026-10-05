@@ -559,6 +559,9 @@ func (t *openrouterTurn) nextNonStreaming(ctx context.Context, start time.Time, 
 	}
 
 	choice := response.Choices[0]
+	if choice.FinishReason == openrouterFinishReasonError {
+		return t.reportError(ctx, openrouterFinishError(choice.NativeFinishReason), start, collector, false, false, m.extractUsage(response.Usage), 1)
+	}
 	message := choice.Message
 
 	// Stash the full assistant message so Observe can replay tool_calls and
@@ -644,7 +647,10 @@ type openrouterStreamResult struct {
 	reasoning        string
 	reasoningDetails []openrouter.ChatCompletionReasoningDetails
 	finishReason     openrouter.FinishReason
-	usage            *openrouter.Usage
+	// nativeFinishReason is the finish reason of the upstream provider, if
+	// any.
+	nativeFinishReason string
+	usage              *openrouter.Usage
 	// handling is true when a streaming callback failed, so the rest of the
 	// stream was ignored.
 	handling bool
@@ -776,6 +782,7 @@ func (t *openrouterTurn) streamAttempt(
 
 		if choice.FinishReason != "" {
 			out.finishReason = choice.FinishReason
+			out.nativeFinishReason = choice.NativeFinishReason
 		}
 
 		if delta.Content != "" && !out.handling {
@@ -912,6 +919,13 @@ func (t *openrouterTurn) nextStreaming(ctx context.Context, start time.Time, col
 		return TurnOutput{}, fmt.Errorf("stream handling failed for OpenRouter (model %s)", m.model)
 	}
 	if err != nil {
+		return t.reportError(ctx, err, start, collector, true, streamingEmitted, m.extractUsage(result.usage), attempts)
+	}
+	if result.finishReason == openrouterFinishReasonError {
+		err := openrouterFinishError(result.nativeFinishReason)
+		if streamingEmitted {
+			err = errors.Join(err, ErrStreamingPartialOutput)
+		}
 		return t.reportError(ctx, err, start, collector, true, streamingEmitted, m.extractUsage(result.usage), attempts)
 	}
 
@@ -1116,6 +1130,22 @@ func extractOpenRouterThinking(msg *openrouter.ChatCompletionMessage) []Thinking
 		out = append(out, ThinkingBlock{Text: *msg.ReasoningContent})
 	}
 	return out
+}
+
+// openrouterFinishReasonError is the finish_reason that OpenRouter sends
+// when generation failed after the response started.
+const openrouterFinishReasonError openrouter.FinishReason = "error"
+
+// openrouterFinishError is the error for a response that OpenRouter ended
+// with finish_reason "error". go-openrouter does not keep the error body
+// that comes with it, so the cause is not known. The call is not retried,
+// because the error can be an overload or a permanent failure.
+// nativeReason is the finish reason of the upstream provider, if any.
+func openrouterFinishError(nativeReason string) error {
+	if nativeReason != "" {
+		return fmt.Errorf("response ended with finish_reason \"error\" (native finish reason %q)", nativeReason)
+	}
+	return errors.New(`response ended with finish_reason "error"`)
 }
 
 func openrouterStopReason(reason openrouter.FinishReason, hasToolCalls bool) StopReason {

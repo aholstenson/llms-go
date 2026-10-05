@@ -109,4 +109,73 @@ var _ = Describe("OpenRouter streaming retries", func() {
 		Expect(ue.PartialOutput).To(BeFalse())
 		Expect(errors.Is(err, ErrStreamingPartialOutput)).To(BeFalse())
 	})
+
+	Context("a response that ends with finish_reason error", func() {
+		// errorChunk is the chunk that OpenRouter sends when generation
+		// fails after the response started.
+		const errorChunk = "data: {\"id\":\"gen_1\",\"model\":\"m\",\"error\":{\"code\":502,\"message\":\"Provider disconnected\"}," +
+			"\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\"},\"finish_reason\":\"error\",\"native_finish_reason\":\"error\"}]}\n\n" +
+			"data: [DONE]\n\n"
+		const textChunk = "data: {\"id\":\"gen_1\",\"model\":\"m\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"hi\"}}]}\n\n"
+
+		streamHandler := func(requests *int32, body string) http.HandlerFunc {
+			return func(w http.ResponseWriter, r *http.Request) {
+				atomic.AddInt32(requests, 1)
+				w.Header().Set("Content-Type", "text/event-stream")
+				w.WriteHeader(http.StatusOK)
+				writeSSE(w, body)
+			}
+		}
+
+		It("fails a stream instead of returning a cut-off answer", func() {
+			var requests int32
+			m := newModel(streamHandler(&requests, textChunk+errorChunk))
+
+			var streamed string
+			_, err := m.GenerateContent(context.Background(),
+				WithMessages(NewMessage(RoleUser, NewTextPart("hi"))),
+				streamTo(&streamed),
+				fastBackoff,
+			)
+			Expect(err).To(MatchError(ContainSubstring(`finish_reason "error"`)))
+			Expect(streamed).To(Equal("hi"))
+			Expect(errors.Is(err, ErrStreamingPartialOutput)).To(BeTrue())
+			Expect(requests).To(Equal(int32(1)))
+
+			var ue *UnavailableError
+			Expect(errors.As(err, &ue)).To(BeFalse())
+		})
+
+		It("fails a stream that sent no output", func() {
+			var requests int32
+			m := newModel(streamHandler(&requests, errorChunk))
+
+			var streamed string
+			_, err := m.GenerateContent(context.Background(),
+				WithMessages(NewMessage(RoleUser, NewTextPart("hi"))),
+				streamTo(&streamed),
+				fastBackoff,
+			)
+			Expect(err).To(MatchError(ContainSubstring(`finish_reason "error"`)))
+			Expect(errors.Is(err, ErrStreamingPartialOutput)).To(BeFalse())
+			Expect(requests).To(Equal(int32(1)))
+		})
+
+		It("fails a non-streaming response", func() {
+			var requests int32
+			m := newModel(func(w http.ResponseWriter, r *http.Request) {
+				atomic.AddInt32(&requests, 1)
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"id":"gen_1","model":"m","choices":[{"index":0,` +
+					`"message":{"role":"assistant","content":""},"finish_reason":"error","native_finish_reason":"overloaded"}]}`))
+			})
+
+			_, err := m.GenerateContent(context.Background(),
+				WithMessages(NewMessage(RoleUser, NewTextPart("hi"))),
+				fastBackoff,
+			)
+			Expect(err).To(MatchError(ContainSubstring(`finish_reason "error" (native finish reason "overloaded")`)))
+			Expect(requests).To(Equal(int32(1)))
+		})
+	})
 })
