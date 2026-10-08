@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.0](https://github.com/aholstenson/llms-go/compare/v0.10.1...v0.11.0) (2026-10-08)
+
+
+### Features
+
+* New Gemini models use thinking level and no temperature ([58cc9ff](https://github.com/aholstenson/llms-go/commit/58cc9ff298022e4c4eac766f4cda2969f920ea4e))
+
 ## [0.10.1](https://github.com/aholstenson/llms-go/compare/v0.10.0...v0.10.1) (2026-10-05)
 
 
