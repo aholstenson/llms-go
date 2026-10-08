@@ -62,7 +62,12 @@ func anthropicTurnFor(info ModelInfo, opts ...GenerateOption) *anthropicTurn {
 
 func googleTurnFor(info ModelInfo, opts ...GenerateOption) *googleTurn {
 	GinkgoHelper()
-	m := &googleModel{logger: discardLogger(), model: "m", statsModel: "google/m", info: fixedModelInfo(info)}
+	return googleNamedTurnFor("m", info, opts...)
+}
+
+func googleNamedTurnFor(model string, info ModelInfo, opts ...GenerateOption) *googleTurn {
+	GinkgoHelper()
+	m := &googleModel{logger: discardLogger(), model: model, statsModel: "google/" + model, info: fixedModelInfo(info)}
 	base := []GenerateOption{WithMessages(NewMessage(RoleUser, NewTextPart("hi")))}
 	s, err := m.newSession(context.Background(), append(base, opts...)...)
 	Expect(err).NotTo(HaveOccurred())
@@ -414,6 +419,33 @@ var _ = Describe("Google reasoning request", func() {
 		Expect(turn.config.ThinkingConfig).NotTo(BeNil())
 		Expect(turn.config.ThinkingConfig.ThinkingBudget).NotTo(BeNil())
 		Expect(*turn.config.ThinkingConfig.ThinkingBudget).To(Equal(int32(4096)))
+	})
+
+	It("sends a thinking level, not a budget, to unknown models", func() {
+		turn := googleTurnFor(ModelInfo{}, WithReasoningEffort(EffortHigh))
+		Expect(turn.config.ThinkingConfig).NotTo(BeNil())
+		Expect(turn.config.ThinkingConfig.ThinkingLevel).To(Equal(genai.ThinkingLevelHigh))
+		Expect(turn.config.ThinkingConfig.ThinkingBudget).To(BeNil())
+	})
+
+	It("ignores an explicit budget on unknown models", func() {
+		turn := googleTurnFor(ModelInfo{}, WithMaxThinkingTokens(4096))
+		Expect(turn.config.ThinkingConfig).NotTo(BeNil())
+		Expect(turn.config.ThinkingConfig.ThinkingBudget).To(BeNil())
+	})
+
+	It("sends a budget to unknown Gemini 2 models", func() {
+		turn := googleNamedTurnFor("gemini-2.5-flash-exp", ModelInfo{}, WithReasoningEffort(EffortHigh))
+		Expect(turn.config.ThinkingConfig).NotTo(BeNil())
+		Expect(turn.config.ThinkingConfig.ThinkingBudget).NotTo(BeNil())
+		Expect(turn.config.ThinkingConfig.ThinkingLevel).To(BeEmpty())
+	})
+
+	It("sends a thinking level to known Gemini 3 models without listed controls", func() {
+		turn := googleNamedTurnFor("gemini-3.8-flash", reasoningInfo(Capabilities{}), WithReasoningEffort(EffortLow))
+		Expect(turn.config.ThinkingConfig).NotTo(BeNil())
+		Expect(turn.config.ThinkingConfig.ThinkingLevel).To(Equal(genai.ThinkingLevelLow))
+		Expect(turn.config.ThinkingConfig.ThinkingBudget).To(BeNil())
 	})
 })
 

@@ -130,6 +130,33 @@ var _ = Describe("Google", func() {
 		})
 	})
 
+	Context("temperature", func() {
+		known := ModelInfo{Caps: Capabilities{Temperature: true}}
+
+		DescribeTable("sends a custom temperature only to models that accept one",
+			func(model string, info ModelInfo, sent bool) {
+				turn := googleNamedTurnFor(model, info, WithTemperature(0.3))
+				if sent {
+					Expect(turn.config.Temperature).NotTo(BeNil())
+					Expect(*turn.config.Temperature).To(Equal(float32(0.3)))
+				} else {
+					Expect(turn.config.Temperature).To(BeNil())
+				}
+			},
+			Entry("Gemini 2.5", "gemini-2.5-pro", known, true),
+			Entry("Gemini 3.5", "gemini-3.5-flash", known, true),
+			Entry("Gemini 3 without a minor version", "gemini-3-pro-preview", known, true),
+			Entry("Gemini 3.6", "gemini-3.6-flash", known, false),
+			Entry("Gemini 3.10", "gemini-3.10-flash", known, false),
+			Entry("Gemini 4", "gemini-4-flash", ModelInfo{}, false),
+			Entry("a name with a models/ prefix", "models/gemini-3.6-flash", known, false),
+			Entry("an alias", "gemini-flash-latest", known, false),
+			Entry("an unknown model", "m", ModelInfo{}, false),
+			Entry("a known model without a Gemini version", "gemma-4-31b-it", known, true),
+			Entry("a model without temperature support", "gemini-2.5-pro", ModelInfo{Caps: Capabilities{ToolCall: true}}, false),
+		)
+	})
+
 	Context("cost accounting", func() {
 		It("splits Gemini usage into disjoint counters that price correctly", func() {
 			ctx := context.Background()

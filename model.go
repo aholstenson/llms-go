@@ -341,7 +341,9 @@ func WithMaxThinkingTokens(maxThinkingTokens int) GenerateOption {
 }
 
 // WithTemperature sets the temperature of the LLM. A higher temperature will
-// result in more creative and varied responses.
+// result in more creative and varied responses. Models that use fixed sampling
+// values (for example Gemini 3.6 and later) do not get the temperature, and a
+// warning is logged.
 func WithTemperature(temperature float64) GenerateOption {
 	return func(opts *generateContentOptions) error {
 		opts.Temperature = temperature

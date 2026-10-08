@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -150,17 +152,21 @@ func (m *googleModel) newSession(ctx context.Context, options ...GenerateOption)
 	}
 
 	if opts.Temperature != 0 && info.allowsTemperature() {
-		t := float32(opts.Temperature)
-		config.Temperature = &t
+		if googleFixedSampling(m.model, info) {
+			m.logger.Warn("Model does not accept a custom temperature; using the model default")
+		} else {
+			t := float32(opts.Temperature)
+			config.Temperature = &t
+		}
 	}
 
 	maxOutput := info.resolveMaxOutputTokens(opts.MaxOutputTokens, 0)
 
 	// Resolve reasoning. Gemini 3 and later take a thinking level (the
-	// model's effort tiers); Gemini 2.5 takes a thinking budget. Unknown
-	// models get a budget, which both accept. Only budget models accept an
+	// model's effort tiers); Gemini 2.5 takes a thinking budget. Newer
+	// Gemini models reject a thinking budget. Only budget models accept an
 	// explicit WithMaxThinkingTokens budget.
-	levels := len(info.Caps.ReasoningEfforts) > 0
+	levels := googleTakesThinkingLevel(m.model, info)
 	switch route := resolveReasoningRoute(opts, info, !levels, m.logger); route.Kind {
 	case reasoningKindBudget:
 		thinkingBudget := int32(route.Budget) //nolint:gosec
@@ -991,6 +997,58 @@ func (t *googleTurn) Next(ctx context.Context) (TurnOutput, error) {
 		StopReason: googleStopReason(finishReason, len(functionCalls) > 0),
 		Usage:      usage,
 	}, nil
+}
+
+// googleGeminiVersionPattern matches the version in a Gemini model name, such
+// as "gemini-2.5-pro", "gemini-4-flash" or "models/gemini-3.6-flash".
+var googleGeminiVersionPattern = regexp.MustCompile(`(?:^|/)gemini-(\d+)(?:\.(\d+))?(?:-|$)`)
+
+// googleGeminiVersion returns the major and minor version in a Gemini model
+// name. ok is false when the name has no version, for example an alias such as
+// "gemini-flash-latest" or a model that is not Gemini.
+func googleGeminiVersion(model string) (major, minor int, ok bool) {
+	match := googleGeminiVersionPattern.FindStringSubmatch(model)
+	if match == nil {
+		return 0, 0, false
+	}
+	major, _ = strconv.Atoi(match[1])
+	if match[2] != "" {
+		minor, _ = strconv.Atoi(match[2])
+	}
+	return major, minor, true
+}
+
+// googleTakesThinkingLevel reports whether the model takes a thinking level
+// instead of a thinking budget. Listed effort tiers or a listed budget range
+// decide. Otherwise the model name decides: Gemini 3 and later take a level.
+// Unknown models without a version in the name take a level, because newer
+// Gemini models reject a thinking budget.
+func googleTakesThinkingLevel(model string, info ModelInfo) bool {
+	if len(info.Caps.ReasoningEfforts) > 0 {
+		return true
+	}
+	if info.Caps.ReasoningBudget != nil {
+		return false
+	}
+	if major, _, ok := googleGeminiVersion(model); ok {
+		return major >= 3
+	}
+	return info.isUnknown()
+}
+
+// googleFixedSampling reports whether the model uses fixed sampling values and
+// must not get temperature, top_p or top_k. Gemini 3.6 and later ignore custom
+// sampling values, and newer models reject them. Aliases such as
+// "gemini-flash-latest" follow the newest models. Unknown models are treated
+// as new models.
+func googleFixedSampling(model string, info ModelInfo) bool {
+	if major, minor, ok := googleGeminiVersion(model); ok {
+		return major > 3 || (major == 3 && minor >= 6)
+	}
+	if strings.Contains(model, "gemini-") {
+		return true
+	}
+	return info.isUnknown()
 }
 
 // googleThinkingLevel maps a portable Effort to the Gemini thinking-level enum.
