@@ -43,6 +43,9 @@ const (
 	GenAIErrorTypeToolCall         GenAIErrorType = "tool_call"
 	GenAIErrorTypeEmptyResponse    GenAIErrorType = "empty_response"
 	GenAIErrorTypeUnavailable      GenAIErrorType = "unavailable"
+	// GenAIErrorTypeContentPolicy is a request or a response that a
+	// provider safety system blocked. See ContentPolicyError.
+	GenAIErrorTypeContentPolicy GenAIErrorType = "content_policy"
 )
 
 // Metrics provides standardized GenAI metrics for the LLM implementations.

@@ -217,9 +217,10 @@ func NewSession(ctx context.Context, m Model, options ...GenerateOption) (*Sessi
 // error, context cancellation); step-limit termination is reported via
 // done=true with Result() returning a *MaxStepsError.
 //
-// An error with done=false is a transient model failure the session survived:
-// the turn can be attempted again by calling Step once more (see
-// Session.Retryable and IsRetryable).
+// An error with done=false is a model failure the session survived: the
+// turn can be attempted again by calling Step once more. This is a transient
+// failure (see Session.Retryable and IsRetryable) or a content policy block
+// (see IsContentPolicy).
 func (s *Session) Step(ctx context.Context) (StepInfo, bool, error) {
 	plan, done, err := s.StepPlan(ctx)
 	if err != nil {
@@ -293,6 +294,21 @@ func (s *Session) StepPlan(ctx context.Context) (PlanInfo, bool, error) {
 			s.tracker.DecrementStep()
 			s.lastErr = err
 			s.retryable = true
+			return PlanInfo{Step: s.step, Exec: s.tracker}, false, err
+		}
+		if IsContentPolicy(err) {
+			// A safety system blocked the call. As above, the turn left no
+			// trace in the history, so the session stays usable. Another
+			// attempt is not expected to clear the block, so the session does
+			// not report it as retryable: the caller decides whether to try
+			// again, stop, or continue with a different model. This is also
+			// true when output already reached the caller, because the
+			// history is still unchanged; the error then also wraps
+			// ErrStreamingPartialOutput.
+			s.step--
+			s.tracker.DecrementStep()
+			s.lastErr = err
+			s.retryable = false
 			return PlanInfo{Step: s.step, Exec: s.tracker}, false, err
 		}
 		s.fail(err)
@@ -505,6 +521,9 @@ func toolOutcomeMessage(outcomes []ToolOutcome) *Message {
 //
 // A retried turn starts a fresh model call, so a caller watching the stream
 // sees another StreamingEventMessageStart for it.
+//
+// It is false after a content policy block, although the session stays
+// usable after one too. See IsContentPolicy.
 func (s *Session) Retryable() bool {
 	return s.retryable
 }

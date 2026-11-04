@@ -311,6 +311,57 @@ for {
 reports the same thing. A retried turn does not consume step budget, and emits
 a fresh `StreamingEventMessageStart`.
 
+### Content policy blocks
+
+A provider safety system can block a model call. The library reports this as
+a `*ContentPolicyError` for every provider:
+
+| Provider | Blocks |
+| --- | --- |
+| OpenAI | Error codes `cyber_policy`, `invalid_prompt`, `content_policy_violation`, `content_filter`, and a response that is incomplete because of `content_filter` |
+| Anthropic | Stop reason `refusal` |
+| Google | A blocked prompt (`promptFeedback.blockReason`), and the finish reasons `SAFETY`, `PROHIBITED_CONTENT`, `BLOCKLIST`, `SPII`, `IMAGE_SAFETY`, `IMAGE_PROHIBITED_CONTENT` |
+| OpenRouter | Finish reason `content_filter`, finish reason `error` with a policy reason from the upstream provider, moderation errors (status 403), and policy errors from the upstream provider |
+
+A refusal that the model writes itself, such as an OpenAI refusal content
+part, is not a block: the turn completes, and `Session.Result` returns a
+`*RefusalError`.
+
+The library does not retry a `*ContentPolicyError` automatically: the
+classifier is not deterministic, but it can also block the same transcript
+each time. The session stays usable
+(`done == false`), so you decide what to do:
+
+```go
+policyBlocks := 0
+for {
+    info, done, err := s.Step(ctx)
+    if err != nil {
+        if llms.IsRetryable(err) {
+            continue
+        }
+        if llms.IsContentPolicy(err) && policyBlocks < 2 {
+            policyBlocks++
+            log.Printf("step %d blocked by content policy, trying again: %v", info.Step, err)
+            continue
+        }
+        return err
+    }
+    if done {
+        break
+    }
+}
+```
+
+`Session.Retryable` is false after a block, because the failure is not
+transient. The session stays usable also when output already reached your
+streaming callback. Then the error also wraps `ErrStreamingPartialOutput`, and
+another attempt streams the turn again from the start.
+
+A block on a long agentic run is often caused by tool output in the
+transcript, not by the prompt. Log the latest tool results when you get this
+error to find the cause.
+
 ## Examples
 
 Runnable programs live in [`examples/`](./examples):

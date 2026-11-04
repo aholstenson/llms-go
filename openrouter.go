@@ -559,6 +559,9 @@ func (t *openrouterTurn) nextNonStreaming(ctx context.Context, start time.Time, 
 	}
 
 	choice := response.Choices[0]
+	if pe := openrouterFinishPolicy(choice.FinishReason, choice.NativeFinishReason); pe != nil {
+		return t.reportError(ctx, pe, start, collector, false, false, m.extractUsage(response.Usage), 1)
+	}
 	if choice.FinishReason == openrouterFinishReasonError {
 		return t.reportError(ctx, openrouterFinishError(choice.NativeFinishReason), start, collector, false, false, m.extractUsage(response.Usage), 1)
 	}
@@ -707,15 +710,15 @@ func (t *openrouterTurn) runStream(
 	result, err := retryLoop(ctx, t.opts, string(GenAISystemOpenRouter), m.model, classify,
 		func(ctx context.Context) (openrouterStreamResult, error) {
 			attempts++
-			if attempts > 1 {
-				// A fresh attempt replays the whole response, so structured
-				// output state from the abandoned one must not linger. This is
-				// safe precisely because no event escaped.
-				if t.jsParser != nil {
-					t.jsParser.Reset()
-				}
-				t.structuredContentBuilder.Reset()
+			// Each attempt receives the whole response from the start, so
+			// structured output state from an earlier attempt must not
+			// linger. This includes an attempt from an earlier call to Next
+			// that failed after output: the Session lets the caller try a
+			// turn again after a content policy block.
+			if t.jsParser != nil {
+				t.jsParser.Reset()
 			}
+			t.structuredContentBuilder.Reset()
 			partial = openrouterStreamResult{}
 
 			res, streamErr := t.streamAttempt(ctx, params, start, hasRecordedFirstToken, streamingEmitted)
@@ -921,6 +924,9 @@ func (t *openrouterTurn) nextStreaming(ctx context.Context, start time.Time, col
 	if err != nil {
 		return t.reportError(ctx, err, start, collector, true, streamingEmitted, m.extractUsage(result.usage), attempts)
 	}
+	if pe := openrouterFinishPolicy(result.finishReason, result.nativeFinishReason); pe != nil {
+		return t.reportError(ctx, pe, start, collector, true, streamingEmitted, m.extractUsage(result.usage), attempts)
+	}
 	if result.finishReason == openrouterFinishReasonError {
 		err := openrouterFinishError(result.nativeFinishReason)
 		if streamingEmitted {
@@ -1047,6 +1053,18 @@ func (t *openrouterTurn) reportError(ctx context.Context, err error, start time.
 		)
 	}
 
+	// A content policy block: from a finish reason, from OpenRouter
+	// moderation, or from the upstream provider.
+	pe := openrouterContentPolicy(err)
+	if pe != nil {
+		pe.Provider = string(GenAISystemOpenRouter)
+		pe.Model = m.model
+		pe.PartialOutput = partialEmitted
+		pe.PartialUsage = partialUsage
+		m.metrics.RecordCallDuration(ctx, GenAISystemOpenRouter, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeContentPolicy)
+		return TurnOutput{}, contentPolicyFailure(pe)
+	}
+
 	// retryLoop already wrapped the errors it kept retrying in
 	// UnavailableError, with the exact attempt count on them; just stamp
 	// PartialOutput and re-attach the streaming sentinel where applicable.
@@ -1148,6 +1166,94 @@ func openrouterFinishError(nativeReason string) error {
 	return errors.New(`response ended with finish_reason "error"`)
 }
 
+// openrouterPolicyNativeReason reports whether a finish reason of an
+// upstream provider means that a safety system blocked the response.
+func openrouterPolicyNativeReason(reason string) bool {
+	switch reason {
+	case "content_filter", "refusal", "cyber_policy",
+		"SAFETY", "PROHIBITED_CONTENT", "BLOCKLIST", "SPII", "IMAGE_SAFETY", "IMAGE_PROHIBITED_CONTENT":
+		return true
+	}
+	return false
+}
+
+// openrouterFinishPolicy returns a ContentPolicyError when the finish reason
+// shows that a safety system blocked the response, or nil. Provider, model,
+// partial output and usage are set by reportError.
+func openrouterFinishPolicy(reason openrouter.FinishReason, nativeReason string) *ContentPolicyError {
+	if reason != openrouter.FinishReasonContentFilter &&
+		(reason != openrouterFinishReasonError || !openrouterPolicyNativeReason(nativeReason)) {
+		return nil
+	}
+	code := nativeReason
+	if code == "" {
+		code = string(reason)
+	}
+	return &ContentPolicyError{Code: code, Message: "the response was stopped by a content filter"}
+}
+
+// openrouterContentPolicy returns the ContentPolicyError in err, or makes one
+// from an OpenRouter API error that is a content policy block, or returns
+// nil. Two API errors are blocks:
+//   - OpenRouter moderation: status 403 with the metadata "reasons" or
+//     "flagged_input".
+//   - An upstream provider error whose raw body has a policy code, for
+//     example the OpenAI "cyber_policy" code.
+func openrouterContentPolicy(err error) *ContentPolicyError {
+	var pe *ContentPolicyError
+	if errors.As(err, &pe) {
+		return pe
+	}
+	var apiErr *openrouter.APIError
+	if !errors.As(err, &apiErr) || apiErr.Metadata == nil {
+		return nil
+	}
+	md := *apiErr.Metadata
+	if apiErr.HTTPStatusCode == http.StatusForbidden {
+		if _, ok := md["reasons"]; ok {
+			return &ContentPolicyError{StatusCode: apiErr.HTTPStatusCode, Code: "moderation", Message: apiErr.Message, Cause: err}
+		}
+		if _, ok := md["flagged_input"]; ok {
+			return &ContentPolicyError{StatusCode: apiErr.HTTPStatusCode, Code: "moderation", Message: apiErr.Message, Cause: err}
+		}
+	}
+	if raw, ok := md["raw"].(string); ok {
+		if code, message, ok := upstreamPolicyCode(raw); ok {
+			return &ContentPolicyError{StatusCode: apiErr.HTTPStatusCode, Code: code, Message: message, Cause: err}
+		}
+	}
+	return nil
+}
+
+// upstreamPolicyCode reads the raw error body of an upstream provider and
+// reports whether its error code is a content policy code. It accepts the
+// body with and without an "error" wrapper object.
+func upstreamPolicyCode(raw string) (code, message string, ok bool) {
+	type body struct {
+		Code    any    `json:"code"`
+		Message string `json:"message"`
+	}
+	var wrapped struct {
+		Error *body `json:"error"`
+		body
+	}
+	if json.Unmarshal([]byte(raw), &wrapped) != nil {
+		return "", "", false
+	}
+	b := wrapped.body
+	if wrapped.Error != nil {
+		b = *wrapped.Error
+	}
+	c, isString := b.Code.(string)
+	if !isString || !openaiPolicyCode(c) {
+		return "", "", false
+	}
+	return c, b.Message, true
+}
+
+// openrouterStopReason maps an OpenRouter finish reason to a StopReason. The
+// finish reason "content_filter" does not come here: Next reports it as a
+// ContentPolicyError.
 func openrouterStopReason(reason openrouter.FinishReason, hasToolCalls bool) StopReason {
 	if hasToolCalls {
 		return StopReasonToolUse
@@ -1157,8 +1263,6 @@ func openrouterStopReason(reason openrouter.FinishReason, hasToolCalls bool) Sto
 		return StopReasonToolUse
 	case openrouter.FinishReasonLength:
 		return StopReasonMaxTokens
-	case openrouter.FinishReasonContentFilter:
-		return StopReasonRefusal
 	default:
 		return StopReasonEndTurn
 	}

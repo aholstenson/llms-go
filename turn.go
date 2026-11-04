@@ -13,7 +13,11 @@ const (
 	StopReasonEndTurn   StopReason = "end_turn"
 	StopReasonToolUse   StopReason = "tool_use"
 	StopReasonMaxTokens StopReason = "max_tokens"
-	StopReasonRefusal   StopReason = "refusal"
+	// StopReasonRefusal means that the model itself wrote a refusal, for
+	// example an OpenAI refusal content part. A provider safety system that
+	// blocks the call does not give this stop reason: the turn fails with a
+	// *ContentPolicyError.
+	StopReasonRefusal StopReason = "refusal"
 	// StopReasonMaxSteps is loop-level: it is set by Session when the
 	// configured step budget is exhausted, never by a Turn.
 	StopReasonMaxSteps StopReason = "max_steps"
@@ -216,8 +220,9 @@ type MaxTokensError struct {
 func (e *MaxTokensError) Error() string { return "max tokens reached" }
 
 // RefusalError is returned by GenerateContent / Session.Result when the model
-// declined to produce content. errors.As recovers any partial trajectory the
-// model emitted before refusing.
+// itself wrote a refusal (see StopReasonRefusal). errors.As recovers any
+// partial trajectory the model emitted before refusing. A provider safety
+// system that blocks the call gives a *ContentPolicyError instead.
 type RefusalError struct {
 	Result *LoopResult
 }

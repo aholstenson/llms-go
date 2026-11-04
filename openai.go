@@ -67,17 +67,66 @@ func openaiUnavailableCode(code string) bool {
 	return code == "rate_limit_exceeded" || code == "server_is_overloaded"
 }
 
+// openaiPolicyCode reports whether an OpenAI error code means that a safety
+// system blocked the request or the response.
+func openaiPolicyCode(code string) bool {
+	switch code {
+	case "cyber_policy", "invalid_prompt", "content_policy_violation", "content_filter":
+		return true
+	}
+	return false
+}
+
+// openaiContentPolicy reports whether err is a content policy block from
+// OpenAI. It finds the block in an HTTP error and in an error that OpenAI
+// sent inside an open stream. status is 0 for an error inside a stream.
+func openaiContentPolicy(err error) (status int, code, message string, ok bool) {
+	var oe *openai.Error
+	if errors.As(err, &oe) {
+		return oe.StatusCode, oe.Code, oe.Message, openaiPolicyCode(oe.Code)
+	}
+	var se *openaiStreamError
+	if errors.As(err, &se) {
+		return 0, se.Code, se.Message, openaiPolicyCode(se.Code)
+	}
+	return 0, "", "", false
+}
+
 // openaiStreamErrorPrefix starts the text of the error that the SDK makes
 // when an event in the stream has an "error" field.
 const openaiStreamErrorPrefix = "received error while streaming: "
 
+// openaiStreamDecodeError is a stream event that the SDK could not decode
+// because its data is empty or is not complete JSON. The SDK sends every
+// SSE frame that ends in a blank line to the JSON decoder, also a frame
+// that has no "data:" line, such as a keep-alive comment. The fault is in
+// the transport and not in the request, so another attempt can succeed.
+type openaiStreamDecodeError struct {
+	err error
+}
+
+func (e *openaiStreamDecodeError) Error() string {
+	return "could not decode stream event: " + e.err.Error()
+}
+
+func (e *openaiStreamDecodeError) Unwrap() error {
+	return e.err
+}
+
 // asOpenAIStreamError changes an SDK stream error into an
 // *openaiStreamError when the SDK made it from an "error" field in the
 // stream. The SDK keeps only the JSON text of that field, so it is parsed
-// here. Other errors are returned unchanged.
+// here. It changes a JSON syntax error into an *openaiStreamDecodeError.
+// Other errors are returned unchanged.
 func asOpenAIStreamError(err error) error {
 	if err == nil {
 		return nil
+	}
+	// Only a syntax error is a damaged event. A type error means that the
+	// event does not match the SDK types, and it would occur again.
+	var syntaxErr *json.SyntaxError
+	if errors.As(err, &syntaxErr) {
+		return &openaiStreamDecodeError{err: err}
 	}
 	body, ok := strings.CutPrefix(err.Error(), openaiStreamErrorPrefix)
 	if !ok {
@@ -95,8 +144,8 @@ func asOpenAIStreamError(err error) error {
 }
 
 // openaiUnavailable reports whether err means that OpenAI is rate limited or
-// overloaded. status is the HTTP status, or 0 when the error came inside an
-// open stream.
+// overloaded, or that it sent a stream event that could not be decoded.
+// status is the HTTP status, or 0 when the error came inside an open stream.
 func openaiUnavailable(err error) (status int, ok bool) {
 	var oe *openai.Error
 	if errors.As(err, &oe) {
@@ -105,6 +154,10 @@ func openaiUnavailable(err error) (status int, ok bool) {
 	var se *openaiStreamError
 	if errors.As(err, &se) {
 		return 0, se.unavailable()
+	}
+	var de *openaiStreamDecodeError
+	if errors.As(err, &de) {
+		return 0, true
 	}
 	return 0, false
 }
@@ -591,7 +644,7 @@ type openaiStreamResult struct {
 // server accepted the request as before it, and a stream that dies before its
 // first event is as safe to replay as one that never opened. This includes a
 // rate limit or an overload that OpenAI sends inside a stream that opened with
-// status 200.
+// status 200, and a stream event that the SDK could not decode.
 //
 // The moment an event reaches a streaming callback the attempt becomes final:
 // retrying would replay tokens the user has already seen. It returns how many
@@ -631,15 +684,15 @@ func (t *openaiTurn) runStream(
 	result, err := retryLoop(ctx, t.opts, string(GenAISystemOpenAI), m.model, classify,
 		func(ctx context.Context) (openaiStreamResult, error) {
 			attempts++
-			if attempts > 1 {
-				// A fresh attempt replays the whole response, so structured
-				// output state from the abandoned one must not linger. This is
-				// safe precisely because no event escaped.
-				if t.jsParser != nil {
-					t.jsParser.Reset()
-				}
-				t.structuredContentBuilder.Reset()
+			// Each attempt receives the whole response from the start, so
+			// structured output state from an earlier attempt must not
+			// linger. This includes an attempt from an earlier call to Next
+			// that failed after output: the Session lets the caller try a
+			// turn again after a content policy block.
+			if t.jsParser != nil {
+				t.jsParser.Reset()
 			}
+			t.structuredContentBuilder.Reset()
 			partial = openaiStreamResult{}
 
 			// llms-go owns the retry loop so WithRetryBackoff and
@@ -685,9 +738,11 @@ func (t *openaiTurn) drainStream(
 
 	var out openaiStreamResult
 	var structuredStreamErr error
-	// unavailableErr is a rate limit or an overload that OpenAI sent inside
-	// the stream. Unlike other error events, another attempt can succeed.
-	var unavailableErr error
+	// inBandErr is a rate limit, an overload or a content policy block that
+	// OpenAI sent inside the stream. Unlike other error events, it is
+	// reported with its code: another attempt can succeed after a rate limit
+	// or an overload, and the caller decides what to do after a block.
+	var inBandErr error
 
 events:
 	for stream.Next() {
@@ -751,8 +806,8 @@ events:
 			out.response = &r
 
 		case responses.ResponseErrorEvent:
-			if se := (&openaiStreamError{Code: ev.Code, Message: ev.Message}); se.unavailable() {
-				unavailableErr = se
+			if se := (&openaiStreamError{Code: ev.Code, Message: ev.Message}); se.unavailable() || openaiPolicyCode(ev.Code) {
+				inBandErr = se
 				break events
 			}
 			m.logger.Error("OpenAI stream error",
@@ -784,13 +839,23 @@ events:
 	if err := asOpenAIStreamError(stream.Err()); err != nil {
 		return out, err
 	}
-	if unavailableErr != nil {
-		return out, unavailableErr
+	if inBandErr != nil {
+		return out, inBandErr
 	}
 	// A response that failed with a rate limit or an overload can succeed on
 	// another attempt, so it is a transport error and not the turn's answer.
-	if r := out.response; r != nil && r.Status == responses.ResponseStatusFailed && openaiUnavailableCode(string(r.Error.Code)) {
-		return out, &openaiStreamError{Code: string(r.Error.Code), Message: r.Error.Message}
+	// A response that a content policy blocked goes the same way, so that it
+	// is reported with its code. This includes a response that a content
+	// filter stopped before it was complete.
+	if r := out.response; r != nil {
+		if r.Status == responses.ResponseStatusFailed {
+			if code := string(r.Error.Code); openaiUnavailableCode(code) || openaiPolicyCode(code) {
+				return out, &openaiStreamError{Code: code, Message: r.Error.Message}
+			}
+		}
+		if r.Status == responses.ResponseStatusIncomplete && r.IncompleteDetails.Reason == "content_filter" {
+			return out, &openaiStreamError{Code: "content_filter", Message: "the response was stopped by a content filter"}
+		}
 	}
 	return out, nil
 }
@@ -900,6 +965,20 @@ func (t *openaiTurn) Next(ctx context.Context) (TurnOutput, error) {
 			return TurnOutput{}, ue
 		}
 
+		if status, code, message, ok := openaiContentPolicy(err); ok {
+			m.metrics.RecordCallDuration(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeContentPolicy)
+			return TurnOutput{}, contentPolicyFailure(&ContentPolicyError{
+				Provider:      string(GenAISystemOpenAI),
+				Model:         m.model,
+				StatusCode:    status,
+				Code:          code,
+				Message:       message,
+				PartialOutput: streamingEmitted,
+				PartialUsage:  partialUsage,
+				Cause:         err,
+			})
+		}
+
 		m.metrics.RecordCallDuration(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeInternal)
 		return TurnOutput{}, fmt.Errorf("got error from OpenAI (model %s) while streaming: %w", m.model, err)
 	}
@@ -956,8 +1035,9 @@ func (t *openaiTurn) Next(ctx context.Context) (TurnOutput, error) {
 		}
 
 		respErr := finalResponse.Error
-		// A failure with a rate limit or an overload does not come here:
-		// drainStream reports it as a transport error, so it is retried.
+		// A failure with a rate limit, an overload or a content policy block
+		// does not come here: drainStream reports it as a transport error,
+		// so it is retried or reported as a ContentPolicyError.
 		err := fmt.Errorf("OpenAI response failed (model %s): %s: %s", m.model, respErr.Code, respErr.Message)
 		m.metrics.RecordCallDuration(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeInternal)
 		return TurnOutput{}, err
@@ -1098,11 +1178,10 @@ func openaiStopReason(r *responses.Response, hasToolCalls, hasRefusal bool) Stop
 	if hasRefusal {
 		return StopReasonRefusal
 	}
-	switch r.IncompleteDetails.Reason {
-	case "max_output_tokens":
+	// An incomplete response with the reason "content_filter" does not come
+	// here: drainStream reports it as a ContentPolicyError.
+	if r.IncompleteDetails.Reason == "max_output_tokens" {
 		return StopReasonMaxTokens
-	case "content_filter":
-		return StopReasonRefusal
 	}
 	return StopReasonEndTurn
 }

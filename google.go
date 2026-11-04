@@ -366,6 +366,9 @@ func (m *googleModel) handleStreaming(
 				if finishReason != "" && finishReason != genai.FinishReasonUnspecified {
 					lastResponse.Candidates[0].FinishReason = finishReason
 				}
+				if msg := resp.Candidates[0].FinishMessage; msg != "" {
+					lastResponse.Candidates[0].FinishMessage = msg
+				}
 			}
 
 			// Merge usage metadata
@@ -759,15 +762,15 @@ func (m *googleModel) runStream(
 	response, err := retryLoop(ctx, t.opts, string(GenAISystemGoogle), m.model, classify,
 		func(ctx context.Context) (*genai.GenerateContentResponse, error) {
 			attempts++
-			if attempts > 1 {
-				// A fresh attempt replays the whole response, so structured
-				// output state from the abandoned one must not linger. This is
-				// safe precisely because no event escaped.
-				if t.jsParser != nil {
-					t.jsParser.Reset()
-				}
-				t.structuredContentBuilder.Reset()
+			// Each attempt receives the whole response from the start, so
+			// structured output state from an earlier attempt must not
+			// linger. This includes an attempt from an earlier call to Next
+			// that failed after output: the Session lets the caller try a
+			// turn again after a content policy block.
+			if t.jsParser != nil {
+				t.jsParser.Reset()
 			}
+			t.structuredContentBuilder.Reset()
 			partial = nil
 
 			resp, err := m.handleStreaming(ctx, t.config, t.messages, t.opts.StreamingFunc, t.opts.StructuredStreamingFunc, t.jsParser, &t.structuredContentBuilder, start, hasRecordedFirstToken, streamingEmitted)
@@ -844,6 +847,16 @@ func (t *googleTurn) Next(ctx context.Context) (TurnOutput, error) {
 		})
 	}
 
+	if err == nil {
+		// A safety filter blocked the prompt or stopped the response. The
+		// turn is not usable, so it is reported as a failure, with the usage
+		// of the response. Without this check a blocked prompt gives an
+		// empty answer, because the response has no candidates.
+		if code, message, blocked := googleContentPolicy(response); blocked {
+			err = &googleBlockError{code: code, message: message}
+		}
+	}
+
 	if err != nil {
 		if metrics := GetMetrics(ctx); metrics != nil {
 			metrics.RecordFailure(m.statsModel, collector)
@@ -881,6 +894,19 @@ func (t *googleTurn) Next(ctx context.Context) (TurnOutput, error) {
 				return TurnOutput{}, errors.Join(ue, ErrStreamingPartialOutput)
 			}
 			return TurnOutput{}, ue
+		}
+
+		var be *googleBlockError
+		if errors.As(err, &be) {
+			m.metrics.RecordCallDuration(ctx, GenAISystemGoogle, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeContentPolicy)
+			return TurnOutput{}, contentPolicyFailure(&ContentPolicyError{
+				Provider:      string(GenAISystemGoogle),
+				Model:         m.model,
+				Code:          be.code,
+				Message:       be.message,
+				PartialOutput: streamingEmitted,
+				PartialUsage:  partialUsage,
+			})
 		}
 
 		// A transient failure the retry loop declined to retry, because
@@ -1069,6 +1095,46 @@ func googleThinkingLevel(e Effort) genai.ThinkingLevel {
 	}
 }
 
+// googleBlockError is a prompt or a response that a Google safety filter
+// blocked. Next reports it as a ContentPolicyError.
+type googleBlockError struct {
+	code    string
+	message string
+}
+
+func (e *googleBlockError) Error() string {
+	return "blocked by Google safety filter: " + e.code
+}
+
+// googleContentPolicy reports whether a safety filter blocked the prompt or
+// stopped the response. code is the block reason or the finish reason, and
+// message is the explanation from Google, if any.
+func googleContentPolicy(r *genai.GenerateContentResponse) (code, message string, blocked bool) {
+	if r == nil {
+		return "", "", false
+	}
+	if pf := r.PromptFeedback; pf != nil && pf.BlockReason != "" && pf.BlockReason != genai.BlockedReasonUnspecified {
+		return string(pf.BlockReason), pf.BlockReasonMessage, true
+	}
+	if len(r.Candidates) == 0 || r.Candidates[0] == nil {
+		return "", "", false
+	}
+	c := r.Candidates[0]
+	switch c.FinishReason {
+	case genai.FinishReasonSafety,
+		genai.FinishReasonProhibitedContent,
+		genai.FinishReasonBlocklist,
+		genai.FinishReasonSPII,
+		genai.FinishReasonImageSafety,
+		genai.FinishReasonImageProhibitedContent:
+		return string(c.FinishReason), c.FinishMessage, true
+	}
+	return "", "", false
+}
+
+// googleStopReason maps a Google finish reason to a StopReason. The finish
+// reasons of a safety filter do not come here: Next reports them as a
+// ContentPolicyError.
 func googleStopReason(reason genai.FinishReason, hasToolCalls bool) StopReason {
 	if hasToolCalls {
 		return StopReasonToolUse
@@ -1076,8 +1142,6 @@ func googleStopReason(reason genai.FinishReason, hasToolCalls bool) StopReason {
 	switch reason {
 	case genai.FinishReasonMaxTokens:
 		return StopReasonMaxTokens
-	case genai.FinishReasonSafety, genai.FinishReasonProhibitedContent, genai.FinishReasonBlocklist:
-		return StopReasonRefusal
 	default:
 		return StopReasonEndTurn
 	}

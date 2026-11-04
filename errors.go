@@ -92,9 +92,98 @@ func (e *UnavailableError) Unwrap() error {
 	return e.Cause
 }
 
+// ContentPolicyError is returned when a provider safety system blocks a
+// model call, for example the OpenAI "cyber_policy" error. The provider
+// rejects the call as a whole, so the model produces no turn. This is
+// different from a RefusalError, where the model itself answers with a
+// refusal and the turn completes.
+//
+// The classifiers that make these decisions are not deterministic. A call
+// that is blocked can pass when it is sent again, but it can also fail the
+// same way each time. Thus the library does not retry it automatically.
+// The caller decides what to do. A Session stays usable after this error
+// (Step returns done == false), so the caller can:
+//   - call Step again a limited number of times,
+//   - stop and keep the transcript for analysis,
+//   - continue the work with a different model.
+//
+// Use errors.As or IsContentPolicy to find it in a wrapped error chain.
+//
+// Fields:
+//   - Provider: the GenAI system (e.g. "openai").
+//   - Model: the model ID requested.
+//   - StatusCode: HTTP status when known, 0 when the provider sent the
+//     error inside an open stream.
+//   - Code: the provider's error code, e.g. "cyber_policy".
+//   - Message: the provider's error message.
+//   - PartialOutput: true when at least one content event was dispatched
+//     to StreamingFunc before the call was blocked. Another attempt sends
+//     that output again.
+//   - PartialUsage: usage reported before the call was blocked, if any.
+type ContentPolicyError struct {
+	Provider      string
+	Model         string
+	StatusCode    int
+	Code          string
+	Message       string
+	PartialOutput bool
+	PartialUsage  *TurnUsage
+	Cause         error
+}
+
+func (e *ContentPolicyError) Error() string {
+	b := []byte("blocked by content policy")
+	if e.Provider != "" || e.Model != "" {
+		b = append(b, " ("...)
+		if e.Provider != "" {
+			b = append(b, e.Provider...)
+			if e.Model != "" {
+				b = append(b, '/')
+			}
+		}
+		b = append(b, e.Model...)
+		b = append(b, ')')
+	}
+	if e.StatusCode != 0 {
+		b = append(b, fmt.Sprintf(" (status %d)", e.StatusCode)...)
+	}
+	if e.Code != "" {
+		b = append(b, ": "...)
+		b = append(b, e.Code...)
+	}
+	if e.Message != "" {
+		b = append(b, ": "...)
+		b = append(b, e.Message...)
+	}
+	return string(b)
+}
+
+func (e *ContentPolicyError) Unwrap() error {
+	return e.Cause
+}
+
+// contentPolicyFailure returns pe as the error of a turn. When output
+// already reached the caller, it also wraps ErrStreamingPartialOutput, as
+// the other turn errors do.
+func contentPolicyFailure(pe *ContentPolicyError) error {
+	if pe.PartialOutput {
+		return errors.Join(pe, ErrStreamingPartialOutput)
+	}
+	return pe
+}
+
+// IsContentPolicy reports whether err contains a *ContentPolicyError: a
+// provider safety system blocked the model call. See ContentPolicyError for
+// the ways to recover.
+func IsContentPolicy(err error) bool {
+	var pe *ContentPolicyError
+	return errors.As(err, &pe)
+}
+
 // IsRetryable reports whether a failed model call can be attempted again
 // against the same conversation. It is true for a transient provider failure —
-// a rate limit, an overload, or a stall (see WithStallTimeout) — that the
+// a rate limit, an overload, a stream event that could not be decoded, or a
+// stall (see WithStallTimeout) — that the
 // library's own retries could not clear, and false once any of the turn's
 // output has reached a streaming callback, because a fresh attempt would
 // replay tokens the user has already seen.
@@ -112,6 +201,10 @@ func (e *UnavailableError) Unwrap() error {
 //	}
 //
 // A Session tracks this for its own last failure; see Session.Retryable.
+//
+// A *ContentPolicyError is not retryable in this sense: the failure is not
+// transient. The Session stays usable after it, but the caller must decide
+// whether to try again. See IsContentPolicy.
 func IsRetryable(err error) bool {
 	if err == nil {
 		return false

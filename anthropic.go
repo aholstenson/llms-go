@@ -404,16 +404,15 @@ func (m *anthropicModel) runStream(
 	message, err := retryLoop(ctx, t.opts, string(GenAISystemAnthropic), m.model, classify,
 		func(ctx context.Context) (*anthropic.BetaMessage, error) {
 			attempts++
-			if attempts > 1 {
-				// A fresh attempt replays the whole response, so structured
-				// output state from the abandoned one must not linger. This is
-				// safe precisely because no event escaped: the parser fed no
-				// events to the caller before it stopped.
-				if t.jsParser != nil {
-					t.jsParser.Reset()
-				}
-				t.structuredContentBuilder.Reset()
+			// Each attempt receives the whole response from the start, so
+			// structured output state from an earlier attempt must not
+			// linger. This includes an attempt from an earlier call to Next
+			// that failed after output: the Session lets the caller try a
+			// turn again after a content policy block.
+			if t.jsParser != nil {
+				t.jsParser.Reset()
 			}
+			t.structuredContentBuilder.Reset()
 			partial = nil
 
 			stream := m.client.Beta.Messages.NewStreaming(ctx, t.params, reqOpts...)
@@ -1031,6 +1030,12 @@ func (t *anthropicTurn) Next(ctx context.Context) (TurnOutput, error) {
 	// Anthropic's API rejects non-streaming requests for any generation that
 	// may exceed 10 minutes so we run in streaming mode for all requests.
 	response, attempts, err := m.runStream(withLiveness(ctx, m.model, t.opts), t, &streamingEmitted)
+	if err == nil && response.StopReason == anthropic.BetaStopReasonRefusal {
+		// The streaming classifier stopped the response. The turn is not
+		// usable, so it is reported as a failure, with the usage of the
+		// response.
+		err = errAnthropicRefusal
+	}
 	if err != nil {
 		if metrics := GetMetrics(ctx); metrics != nil {
 			metrics.RecordFailure(m.statsModel, collector)
@@ -1098,6 +1103,18 @@ func (t *anthropicTurn) Next(ctx context.Context) (TurnOutput, error) {
 				return TurnOutput{}, errors.Join(ue, ErrStreamingPartialOutput)
 			}
 			return TurnOutput{}, ue
+		}
+
+		if errors.Is(err, errAnthropicRefusal) {
+			m.metrics.RecordCallDuration(ctx, GenAISystemAnthropic, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeContentPolicy)
+			return TurnOutput{}, contentPolicyFailure(&ContentPolicyError{
+				Provider:      string(GenAISystemAnthropic),
+				Model:         m.model,
+				Code:          string(anthropic.BetaStopReasonRefusal),
+				Message:       "the response was stopped by a safety classifier",
+				PartialOutput: streamingEmitted,
+				PartialUsage:  partialUsage,
+			})
 		}
 
 		m.metrics.RecordCallDuration(ctx, GenAISystemAnthropic, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeInternal)
@@ -1228,6 +1245,13 @@ func anthropicOutputEffort(e Effort) anthropic.BetaOutputConfigEffort {
 	}
 }
 
+// errAnthropicRefusal marks a response that stopped with the stop reason
+// "refusal". Next reports it as a ContentPolicyError.
+var errAnthropicRefusal = errors.New("anthropic response stopped with refusal")
+
+// anthropicStopReason maps an Anthropic stop reason to a StopReason. The
+// stop reason "refusal" does not come here: Next reports it as a
+// ContentPolicyError.
 func anthropicStopReason(reason string, hasToolCalls bool) StopReason {
 	if hasToolCalls {
 		return StopReasonToolUse
@@ -1237,8 +1261,6 @@ func anthropicStopReason(reason string, hasToolCalls bool) StopReason {
 		return StopReasonToolUse
 	case "max_tokens":
 		return StopReasonMaxTokens
-	case "refusal":
-		return StopReasonRefusal
 	default:
 		return StopReasonEndTurn
 	}

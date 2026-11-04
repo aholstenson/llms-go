@@ -218,16 +218,104 @@ var _ = Describe("OpenAI retries", func() {
 			Expect(ue.PartialOutput).To(BeTrue())
 		})
 
+		Context("events that cannot be decoded", func() {
+			// keepAlive is a frame with no "data:" line. The SDK decodes its
+			// empty data as JSON and fails with "unexpected end of JSON input".
+			const keepAlive = ": keep-alive\n\n"
+			// truncated is an event with data that is not complete JSON.
+			const truncated = "event: response.output_text.delta\n" +
+				"data: {\"type\":\"response.output_text.delta\",\"del\n\n"
+
+			It("retries an empty frame that comes before any output", func() {
+				var requests int32
+				m := newModel(sendFirst(&requests, 1, created+keepAlive))
+
+				var notices []RetryNotice
+				result, err := m.GenerateContent(context.Background(),
+					WithMessages(NewMessage(RoleUser, NewTextPart("hi"))),
+					fastBackoff,
+					WithRetryNotify(func(_ context.Context, n RetryNotice) {
+						notices = append(notices, n)
+					}),
+				)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(result).To(Equal(TextResult{Text: "hi"}))
+				Expect(requests).To(Equal(int32(2)))
+				Expect(notices).To(HaveLen(1))
+				Expect(notices[0].StatusCode).To(BeZero())
+				Expect(notices[0].Err).To(MatchError(ContainSubstring("unexpected end of JSON input")))
+			})
+
+			It("retries an event with incomplete JSON that comes before any output", func() {
+				var requests int32
+				m := newModel(sendFirst(&requests, 1, created+truncated))
+
+				result, err := m.GenerateContent(context.Background(),
+					WithMessages(NewMessage(RoleUser, NewTextPart("hi"))),
+					fastBackoff,
+				)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(result).To(Equal(TextResult{Text: "hi"}))
+				Expect(requests).To(Equal(int32(2)))
+			})
+
+			It("reports a retryable error when the damaged events continue", func() {
+				var requests int32
+				m := newModel(sendFirst(&requests, 100, created+keepAlive))
+
+				_, err := m.GenerateContent(context.Background(),
+					WithMessages(NewMessage(RoleUser, NewTextPart("hi"))),
+					WithMaxRetries(1),
+					fastBackoff,
+				)
+				Expect(requests).To(Equal(int32(2)))
+				Expect(IsRetryable(err)).To(BeTrue())
+
+				var ue *UnavailableError
+				Expect(errors.As(err, &ue)).To(BeTrue())
+				Expect(ue.Attempts).To(Equal(2))
+				Expect(ue.StatusCode).To(BeZero())
+				Expect(ue.PartialOutput).To(BeFalse())
+				Expect(err).To(MatchError(ContainSubstring("unexpected end of JSON input")))
+			})
+
+			It("does not retry a damaged event that comes after output", func() {
+				var requests int32
+				m := newModel(sendFirst(&requests, 100, created+delta+keepAlive))
+
+				var streamed string
+				_, err := m.GenerateContent(context.Background(),
+					WithMessages(NewMessage(RoleUser, NewTextPart("hi"))),
+					WithStreamingFunc(func(_ context.Context, evt StreamingEvent) error {
+						if chunk, ok := evt.(StreamingEventTextChunk); ok {
+							streamed += chunk.Text
+						}
+						return nil
+					}),
+					fastBackoff,
+				)
+				Expect(requests).To(Equal(int32(1)))
+				Expect(streamed).To(Equal("hi"))
+				Expect(errors.Is(err, ErrStreamingPartialOutput)).To(BeTrue())
+				Expect(IsRetryable(err)).To(BeFalse())
+
+				var ue *UnavailableError
+				Expect(errors.As(err, &ue)).To(BeTrue())
+				Expect(ue.Attempts).To(Equal(1))
+				Expect(ue.PartialOutput).To(BeTrue())
+			})
+		})
+
 		It("does not retry other errors", func() {
 			var requests int32
 			m := newModel(sendFirst(&requests, 100, created+
-				"data: {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"invalid_prompt\",\"message\":\"bad\",\"param\":null}}\n\n"))
+				"data: {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"unsupported_parameter\",\"message\":\"bad\",\"param\":null}}\n\n"))
 
 			_, err := m.GenerateContent(context.Background(),
 				WithMessages(NewMessage(RoleUser, NewTextPart("hi"))),
 				fastBackoff,
 			)
-			Expect(err).To(MatchError(ContainSubstring("invalid_prompt")))
+			Expect(err).To(MatchError(ContainSubstring("unsupported_parameter")))
 			Expect(requests).To(Equal(int32(1)))
 
 			var ue *UnavailableError
