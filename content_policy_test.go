@@ -11,8 +11,8 @@ import (
 	anthropicoption "github.com/anthropics/anthropic-sdk-go/option"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/openai/openai-go/v2"
-	"github.com/openai/openai-go/v2/option"
+	"github.com/openai/openai-go/v3"
+	"github.com/openai/openai-go/v3/option"
 	"github.com/revrost/go-openrouter"
 	"google.golang.org/genai"
 )

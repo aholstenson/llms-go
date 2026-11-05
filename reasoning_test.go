@@ -10,7 +10,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/anthropics/anthropic-sdk-go"
-	"github.com/openai/openai-go/v2/shared"
+	"github.com/openai/openai-go/v3/shared"
 	"google.golang.org/genai"
 )
 

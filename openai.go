@@ -14,11 +14,11 @@ import (
 
 	"github.com/aholstenson/llms-go/jsonstream"
 	"github.com/invopop/jsonschema"
-	"github.com/openai/openai-go/v2"
-	"github.com/openai/openai-go/v2/option"
-	"github.com/openai/openai-go/v2/packages/ssestream"
-	"github.com/openai/openai-go/v2/responses"
-	"github.com/openai/openai-go/v2/shared"
+	"github.com/openai/openai-go/v3"
+	"github.com/openai/openai-go/v3/option"
+	"github.com/openai/openai-go/v3/packages/ssestream"
+	"github.com/openai/openai-go/v3/responses"
+	"github.com/openai/openai-go/v3/shared"
 )
 
 // openaiResponseFromError pulls the *http.Response out of an OpenAI SDK
@@ -92,15 +92,11 @@ func openaiContentPolicy(err error) (status int, code, message string, ok bool) 
 	return 0, "", "", false
 }
 
-// openaiStreamErrorPrefix starts the text of the error that the SDK makes
-// when an event in the stream has an "error" field.
-const openaiStreamErrorPrefix = "received error while streaming: "
-
 // openaiStreamDecodeError is a stream event that the SDK could not decode
-// because its data is empty or is not complete JSON. The SDK sends every
-// SSE frame that ends in a blank line to the JSON decoder, also a frame
-// that has no "data:" line, such as a keep-alive comment. The fault is in
-// the transport and not in the request, so another attempt can succeed.
+// because its data is not complete JSON, for example when a connection
+// cuts an event. The fault is in the transport and not in the request, so
+// another attempt can succeed. A frame with no "data:" line, such as a
+// keep-alive comment, does not cause this error: the SDK skips it.
 type openaiStreamDecodeError struct {
 	err error
 }
@@ -115,9 +111,9 @@ func (e *openaiStreamDecodeError) Unwrap() error {
 
 // asOpenAIStreamError changes an SDK stream error into an
 // *openaiStreamError when the SDK made it from an "error" field in the
-// stream. The SDK keeps only the JSON text of that field, so it is parsed
-// here. It changes a JSON syntax error into an *openaiStreamDecodeError.
-// Other errors are returned unchanged.
+// stream. The SDK keeps the event that had the field, so the code and the
+// message are read from it. It changes a JSON syntax error into an
+// *openaiStreamDecodeError. Other errors are returned unchanged.
 func asOpenAIStreamError(err error) error {
 	if err == nil {
 		return nil
@@ -128,19 +124,22 @@ func asOpenAIStreamError(err error) error {
 	if errors.As(err, &syntaxErr) {
 		return &openaiStreamDecodeError{err: err}
 	}
-	body, ok := strings.CutPrefix(err.Error(), openaiStreamErrorPrefix)
-	if !ok {
+	var streamErr *ssestream.StreamError
+	if !errors.As(err, &streamErr) {
 		return err
 	}
-	var fields struct {
-		Type    string `json:"type"`
-		Code    string `json:"code"`
-		Message string `json:"message"`
+	var event struct {
+		Error struct {
+			Type    string `json:"type"`
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		} `json:"error"`
 	}
-	if json.Unmarshal([]byte(body), &fields) != nil {
+	if json.Unmarshal(streamErr.Event.Data, &event) != nil {
 		return err
 	}
-	return &openaiStreamError{Type: fields.Type, Code: fields.Code, Message: fields.Message, err: err}
+	f := event.Error
+	return &openaiStreamError{Type: f.Type, Code: f.Code, Message: f.Message, err: err}
 }
 
 // openaiUnavailable reports whether err means that OpenAI is rate limited or
@@ -369,39 +368,22 @@ func (m *openaiModel) convertMessages(messages []*Message) (responses.ResponseIn
 			// Tool-result messages map to standalone function_call_output
 			// items in the Responses input, one per result.
 			if _, isToolResult := msg.Parts[0].(*ToolResultPart); isToolResult {
-				var trailing []MessagePart
 				for _, part := range msg.Parts {
 					trp, ok := part.(*ToolResultPart)
 					if !ok {
 						return nil, fmt.Errorf("cannot mix tool-result and %T parts for OpenAI", part)
 					}
-					text := trp.Text
+					var item responses.ResponseInputItemUnionParam
+					var err error
 					if trp.Error != "" {
-						text = trp.Error
+						item, err = openaiFunctionCallOutput(trp.ID, trp.Error, nil)
+					} else {
+						item, err = openaiFunctionCallOutput(trp.ID, trp.Text, trp.Attachments)
 					}
-					result = append(result, responses.ResponseInputItemUnionParam{
-						OfFunctionCallOutput: &responses.ResponseInputItemFunctionCallOutputParam{
-							CallID: trp.ID,
-							Output: text,
-						},
-					})
-					if trp.Error == "" {
-						trailing = appendToolAttachment(trailing, trp.Name, trp.ID, trp.Attachments)
-					}
-				}
-				// The Responses tool-result item is text-only, so deliver any
-				// rich attachments as a trailing, labeled user message.
-				if len(trailing) > 0 {
-					content, err := convertUserParts(trailing)
 					if err != nil {
 						return nil, err
 					}
-					result = append(result, responses.ResponseInputItemUnionParam{
-						OfInputMessage: &responses.ResponseInputItemMessageParam{
-							Role:    "user",
-							Content: content,
-						},
-					})
+					result = append(result, item)
 				}
 				continue
 			}
@@ -510,6 +492,76 @@ func convertUserParts(parts []MessagePart) (responses.ResponseInputMessageConten
 	return out, nil
 }
 
+// openaiFunctionCallOutput builds the function_call_output item for one tool
+// result. A result without attachments is sent as a plain string. A result
+// with attachments is sent as a list of content items: the text first, then
+// each attachment. The attachments stay in the tool result, so the model
+// connects them to the call that made them.
+func openaiFunctionCallOutput(callID, text string, attachments []MessagePart) (responses.ResponseInputItemUnionParam, error) {
+	var output responses.ResponseInputItemFunctionCallOutputOutputUnionParam
+	if len(attachments) == 0 {
+		output.OfString = openai.String(text)
+	} else {
+		items := make(responses.ResponseFunctionCallOutputItemListParam, 0, len(attachments)+1)
+		if text != "" {
+			items = append(items, responses.ResponseFunctionCallOutputItemUnionParam{
+				OfInputText: &responses.ResponseInputTextContentParam{Text: text},
+			})
+		}
+		for _, part := range attachments {
+			item, err := openaiFunctionCallOutputItem(part)
+			if err != nil {
+				return responses.ResponseInputItemUnionParam{}, err
+			}
+			items = append(items, item)
+		}
+		output.OfResponseFunctionCallOutputItemArray = items
+	}
+	return responses.ResponseInputItemUnionParam{
+		OfFunctionCallOutput: &responses.ResponseInputItemFunctionCallOutputParam{
+			CallID: openai.String(callID),
+			Output: output,
+		},
+	}, nil
+}
+
+// openaiFunctionCallOutputItem converts one tool-result attachment to a
+// content item of a function_call_output. Images become input_image items.
+// Other binary data becomes an input_file item.
+func openaiFunctionCallOutputItem(part MessagePart) (responses.ResponseFunctionCallOutputItemUnionParam, error) {
+	switch content := part.(type) {
+	case *TextPart:
+		return responses.ResponseFunctionCallOutputItemUnionParam{
+			OfInputText: &responses.ResponseInputTextContentParam{Text: content.Text},
+		}, nil
+	case *ImagePart:
+		return responses.ResponseFunctionCallOutputItemUnionParam{
+			OfInputImage: &responses.ResponseInputImageContentParam{
+				ImageURL: openai.String(content.URL),
+				Detail:   responses.ResponseInputImageContentDetailAuto,
+			},
+		}, nil
+	case *BinaryPart:
+		dataURL := fmt.Sprintf("data:%s;base64,%s", content.MediaType, base64.StdEncoding.EncodeToString(content.Data))
+		if strings.HasPrefix(content.MediaType, "image/") {
+			return responses.ResponseFunctionCallOutputItemUnionParam{
+				OfInputImage: &responses.ResponseInputImageContentParam{
+					ImageURL: openai.String(dataURL),
+					Detail:   responses.ResponseInputImageContentDetailAuto,
+				},
+			}, nil
+		}
+		return responses.ResponseFunctionCallOutputItemUnionParam{
+			OfInputFile: &responses.ResponseInputFileContentParam{
+				FileData: openai.String(dataURL),
+				Filename: openai.String(filenameForMediaType(content.MediaType)),
+			},
+		}, nil
+	default:
+		return responses.ResponseFunctionCallOutputItemUnionParam{}, fmt.Errorf("unsupported tool-result attachment type for OpenAI: %T", part)
+	}
+}
+
 func (m *openaiModel) convertTools(tools []ToolDef) ([]responses.ToolUnionParam, map[string]ToolDef, error) {
 	if len(tools) == 0 {
 		return nil, make(map[string]ToolDef), nil
@@ -590,35 +642,18 @@ func (t *openaiTurn) Observe(ctx context.Context, _ TurnOutput, outcomes []ToolO
 // ObserveToolResults appends only the tool-result items, used when the
 // assistant turn is already in native history (reconstructed turn).
 func (t *openaiTurn) ObserveToolResults(_ context.Context, _ []ToolCall, outcomes []ToolOutcome) error {
-	var trailing []MessagePart
 	for _, o := range outcomes {
-		text := o.Text
+		var item responses.ResponseInputItemUnionParam
+		var err error
 		if o.Error != nil {
-			text = o.ModelError()
+			item, err = openaiFunctionCallOutput(o.ID, o.ModelError(), nil)
+		} else {
+			item, err = openaiFunctionCallOutput(o.ID, o.Text, o.Attachments)
 		}
-		t.inputItems = append(t.inputItems, responses.ResponseInputItemUnionParam{
-			OfFunctionCallOutput: &responses.ResponseInputItemFunctionCallOutputParam{
-				CallID: o.ID,
-				Output: text,
-			},
-		})
-		if o.Error == nil {
-			trailing = appendToolAttachment(trailing, o.Name, o.ID, o.Attachments)
-		}
-	}
-	// The Responses tool-result item is text-only, so deliver any rich
-	// attachments as a trailing, labeled user message.
-	if len(trailing) > 0 {
-		content, err := convertUserParts(trailing)
 		if err != nil {
 			return err
 		}
-		t.inputItems = append(t.inputItems, responses.ResponseInputItemUnionParam{
-			OfInputMessage: &responses.ResponseInputItemMessageParam{
-				Role:    "user",
-				Content: content,
-			},
-		})
+		t.inputItems = append(t.inputItems, item)
 	}
 	return nil
 }

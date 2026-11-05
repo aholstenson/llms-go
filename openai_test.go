@@ -10,8 +10,8 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/openai/openai-go/v2"
-	"github.com/openai/openai-go/v2/option"
+	"github.com/openai/openai-go/v3"
+	"github.com/openai/openai-go/v3/option"
 )
 
 var _ = Describe("OpenAI retries", func() {
@@ -218,33 +218,64 @@ var _ = Describe("OpenAI retries", func() {
 			Expect(ue.PartialOutput).To(BeTrue())
 		})
 
-		Context("events that cannot be decoded", func() {
-			// keepAlive is a frame with no "data:" line. The SDK decodes its
-			// empty data as JSON and fails with "unexpected end of JSON input".
+		Context("keep-alive frames", func() {
+			// keepAlive is an SSE comment frame with no "data:" line. A server
+			// sends it while the model is quiet, for example during a long
+			// reasoning phase.
 			const keepAlive = ": keep-alive\n\n"
-			// truncated is an event with data that is not complete JSON.
-			const truncated = "event: response.output_text.delta\n" +
-				"data: {\"type\":\"response.output_text.delta\",\"del\n\n"
 
-			It("retries an empty frame that comes before any output", func() {
+			It("reads past a keep-alive that comes before any output", func() {
 				var requests int32
-				m := newModel(sendFirst(&requests, 1, created+keepAlive))
+				m := newModel(func(w http.ResponseWriter, r *http.Request) {
+					atomic.AddInt32(&requests, 1)
+					w.Header().Set("Content-Type", "text/event-stream")
+					w.WriteHeader(http.StatusOK)
+					writeSSE(w, created+keepAlive+keepAlive+openaiSuccessSSE)
+				})
 
-				var notices []RetryNotice
+				var notices int
 				result, err := m.GenerateContent(context.Background(),
 					WithMessages(NewMessage(RoleUser, NewTextPart("hi"))),
 					fastBackoff,
-					WithRetryNotify(func(_ context.Context, n RetryNotice) {
-						notices = append(notices, n)
-					}),
+					WithRetryNotify(func(context.Context, RetryNotice) { notices++ }),
 				)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(result).To(Equal(TextResult{Text: "hi"}))
-				Expect(requests).To(Equal(int32(2)))
-				Expect(notices).To(HaveLen(1))
-				Expect(notices[0].StatusCode).To(BeZero())
-				Expect(notices[0].Err).To(MatchError(ContainSubstring("unexpected end of JSON input")))
+				Expect(requests).To(Equal(int32(1)))
+				Expect(notices).To(BeZero())
 			})
+
+			It("reads past a keep-alive that comes after output", func() {
+				var requests int32
+				m := newModel(func(w http.ResponseWriter, r *http.Request) {
+					atomic.AddInt32(&requests, 1)
+					w.Header().Set("Content-Type", "text/event-stream")
+					w.WriteHeader(http.StatusOK)
+					writeSSE(w, created+delta+keepAlive+openaiSuccessSSE)
+				})
+
+				var streamed string
+				result, err := m.GenerateContent(context.Background(),
+					WithMessages(NewMessage(RoleUser, NewTextPart("hi"))),
+					WithStreamingFunc(func(_ context.Context, evt StreamingEvent) error {
+						if chunk, ok := evt.(StreamingEventTextChunk); ok {
+							streamed += chunk.Text
+						}
+						return nil
+					}),
+					fastBackoff,
+				)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(result).To(Equal(TextResult{Text: "hi"}))
+				Expect(streamed).To(Equal("hi"))
+				Expect(requests).To(Equal(int32(1)))
+			})
+		})
+
+		Context("events that cannot be decoded", func() {
+			// truncated is an event with data that is not complete JSON.
+			const truncated = "event: response.output_text.delta\n" +
+				"data: {\"type\":\"response.output_text.delta\",\"del\n\n"
 
 			It("retries an event with incomplete JSON that comes before any output", func() {
 				var requests int32
@@ -261,7 +292,7 @@ var _ = Describe("OpenAI retries", func() {
 
 			It("reports a retryable error when the damaged events continue", func() {
 				var requests int32
-				m := newModel(sendFirst(&requests, 100, created+keepAlive))
+				m := newModel(sendFirst(&requests, 100, created+truncated))
 
 				_, err := m.GenerateContent(context.Background(),
 					WithMessages(NewMessage(RoleUser, NewTextPart("hi"))),
@@ -276,12 +307,12 @@ var _ = Describe("OpenAI retries", func() {
 				Expect(ue.Attempts).To(Equal(2))
 				Expect(ue.StatusCode).To(BeZero())
 				Expect(ue.PartialOutput).To(BeFalse())
-				Expect(err).To(MatchError(ContainSubstring("unexpected end of JSON input")))
+				Expect(err).To(MatchError(ContainSubstring("could not decode stream event")))
 			})
 
 			It("does not retry a damaged event that comes after output", func() {
 				var requests int32
-				m := newModel(sendFirst(&requests, 100, created+delta+keepAlive))
+				m := newModel(sendFirst(&requests, 100, created+delta+truncated))
 
 				var streamed string
 				_, err := m.GenerateContent(context.Background(),

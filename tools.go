@@ -51,8 +51,8 @@ func (r ToolResult) WithBinary(mediaType string, data []byte) ToolResult {
 // part naming the tool call, followed by the attachments themselves. It is a
 // no-op when the call produced no attachments.
 //
-// Providers without native in-result attachment support (OpenAI, Google,
-// OpenRouter) deliver tool-result attachments in a trailing user message. The
+// Providers without native in-result attachment support (Google, OpenRouter)
+// deliver tool-result attachments in a trailing user message. The
 // label gives the model an explicit back-reference so each attachment is
 // attributed to its tool call rather than read as fresh user input — which
 // matters when several tool calls in one batch each return attachments.
