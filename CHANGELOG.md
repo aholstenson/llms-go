@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.12.0](https://github.com/aholstenson/llms-go/compare/v0.11.0...v0.12.0) (2026-11-05)
+
+
+### Features
+
+* Let agent loops continue after a provider blocks a turn for content policy ([76d1985](https://github.com/aholstenson/llms-go/commit/76d19858a8e8fec7e02f507373215225a5050fbb))
+* Update Anthropic library to v2 ([de71928](https://github.com/aholstenson/llms-go/commit/de719285b67175131bbf3d989086a42e833ebba6))
+* Update go-openrouter library to v1.8.0 ([10db24e](https://github.com/aholstenson/llms-go/commit/10db24ed74c1a616cca0c8f75d1aced4e44cfa8c))
+* Update Google GenAI library to v1.77.0 ([0c73711](https://github.com/aholstenson/llms-go/commit/0c737114c94f492c0bd3b1c4bc8ce553f1be8127))
+* Update OpenAI library to v3 ([f7ebd2b](https://github.com/aholstenson/llms-go/commit/f7ebd2b93bff4271efd8e8899da90572d0ab047f))
+
+
+### Bug Fixes
+
+* Retry requests that fail with certain 5xx errors ([f3f58bf](https://github.com/aholstenson/llms-go/commit/f3f58bf512668082d66f651ed9a33ee26ed9361d))
+
 ## [0.11.0](https://github.com/aholstenson/llms-go/compare/v0.10.1...v0.11.0) (2026-10-13)
 
 
