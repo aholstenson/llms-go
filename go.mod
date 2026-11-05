@@ -9,7 +9,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.28.1
 	github.com/onsi/gomega v1.39.1
 	github.com/openai/openai-go/v3 v3.95.0
-	github.com/revrost/go-openrouter v1.6.0
+	github.com/revrost/go-openrouter v1.8.0
 	go.opentelemetry.io/otel v1.42.0
 	go.opentelemetry.io/otel/metric v1.42.0
 	google.golang.org/genai v1.77.0
