@@ -221,12 +221,26 @@ func IsRetryable(err error) bool {
 }
 
 // isUnavailableStatusCode returns true for HTTP status codes that indicate
-// the provider is temporarily unavailable:
+// the provider is temporarily unavailable. The same request can succeed on
+// a later attempt, so the retry loop tries it again:
+//   - 408: Request Timeout
 //   - 429: Too Many Requests / rate limited
+//   - 500: Internal Server Error
+//   - 502: Bad Gateway
 //   - 503: Service Unavailable / overloaded
+//   - 504: Gateway Timeout
+//   - 520-524: Cloudflare errors between Cloudflare and the provider, such
+//     as 524 when the provider does not answer in time
 //   - 529: Overloaded (Anthropic-specific)
+//
+// Other 5xx codes, such as 501 Not Implemented or the Cloudflare TLS
+// errors 525 and 526, fail the same way each time and are not retried.
 func isUnavailableStatusCode(code int) bool {
-	return code == 429 || code == 503 || code == 529
+	switch code {
+	case 408, 429, 500, 502, 503, 504, 520, 521, 522, 523, 524, 529:
+		return true
+	}
+	return false
 }
 
 // parseRetryAfterHeaders extracts a retry hint from an HTTP response header

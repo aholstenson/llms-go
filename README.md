@@ -208,8 +208,11 @@ require approval or run out of process. See
 
 ## Retries
 
-A request that fails with a rate limit (429), a service that is unavailable
-(503), or an overload (529) is retried automatically. The library owns the
+A request that fails with a temporary error is retried automatically. This
+includes a rate limit (429), an overload (529), a timeout (408, 504), a
+server or gateway error (500, 502, 503), and a Cloudflare error between
+Cloudflare and the provider (520–524, for example 524 when the provider does
+not answer in time). The library owns the
 retry loop for all four providers, so the same options apply everywhere:
 
 ```go

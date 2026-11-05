@@ -96,6 +96,36 @@ var _ = Describe("OpenAI retries", func() {
 		Expect(errors.Is(err, ErrStreamingPartialOutput)).To(BeFalse())
 	})
 
+	It("retries a Cloudflare timeout and reports it as unavailable", func() {
+		var requests int32
+		m := newModel(func(w http.ResponseWriter, r *http.Request) {
+			atomic.AddInt32(&requests, 1)
+			w.WriteHeader(524)
+		})
+
+		var notices []RetryNotice
+		_, err := m.GenerateContent(context.Background(),
+			WithMessages(NewMessage(RoleUser, NewTextPart("hi"))),
+			WithMaxRetries(1),
+			WithRetryBackoff(BackoffFunc(func(int, time.Duration, bool) time.Duration {
+				return time.Millisecond
+			})),
+			WithRetryNotify(func(_ context.Context, n RetryNotice) {
+				notices = append(notices, n)
+			}),
+		)
+		Expect(err).To(HaveOccurred())
+		Expect(requests).To(Equal(int32(2)))
+		Expect(notices).To(HaveLen(1))
+		Expect(notices[0].StatusCode).To(Equal(524))
+
+		var ue *UnavailableError
+		Expect(errors.As(err, &ue)).To(BeTrue())
+		Expect(ue.StatusCode).To(Equal(524))
+		Expect(ue.Attempts).To(Equal(2))
+		Expect(IsRetryable(err)).To(BeTrue())
+	})
+
 	It("makes a single request when retries are disabled", func() {
 		var requests int32
 		m := newModel(func(w http.ResponseWriter, r *http.Request) {

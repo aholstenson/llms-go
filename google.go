@@ -29,7 +29,7 @@ func (m *googleModel) lastCapturedHeaders() http.Header {
 // googleErrorDetails inspects an error from the genai SDK and reports
 // (retryAfter, retryable, statusCode). retryAfter is the duration parsed
 // from the SDK error (Details), if any. retryable is true when the status
-// is one of the unavailable codes (429/503/529). statusCode is 0 when no
+// is one of the codes that isUnavailableStatusCode accepts. statusCode is 0 when no
 // APIError is found in the chain.
 func googleErrorDetails(err error) (time.Duration, bool, int) {
 	if err == nil {
