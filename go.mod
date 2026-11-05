@@ -12,7 +12,7 @@ require (
 	github.com/revrost/go-openrouter v1.6.0
 	go.opentelemetry.io/otel v1.42.0
 	go.opentelemetry.io/otel/metric v1.42.0
-	google.golang.org/genai v1.51.0
+	google.golang.org/genai v1.77.0
 )
 
 require (
