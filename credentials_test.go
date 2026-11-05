@@ -11,7 +11,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/anthropics/anthropic-sdk-go/option"
+	"github.com/anthropics/anthropic-sdk-go/v2/option"
 )
 
 var _ = Describe("Credentials", func() {
@@ -112,7 +112,7 @@ var _ = Describe("Credentials", func() {
 				header   string
 				want     string
 			}{
-				{"anthropic", applyAnthropicCredential, "X-Api-Key", "k"},
+				{"anthropic", applyAnthropicCredential, "Authorization", "Bearer k"},
 				{"openai", applyBearerCredential, "Authorization", "Bearer k"},
 				{"openrouter", applyBearerCredential, "Authorization", "Bearer k"},
 				{"google", applyGoogleCredential, "X-Goog-Api-Key", "k"},
@@ -145,7 +145,7 @@ var _ = Describe("Credentials", func() {
 				resp, err := client.Get(srv.URL)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(resp.Body.Close()).To(Succeed())
-				Expect(seen.Load().Get("X-Api-Key")).To(Equal(want))
+				Expect(seen.Load().Get("Authorization")).To(Equal("Bearer " + want))
 			}
 		})
 
@@ -165,7 +165,7 @@ var _ = Describe("Credentials", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resp.Body.Close()).To(Succeed())
 
-			Expect(seen.Load().Get("X-Api-Key")).To(Equal("k"))
+			Expect(seen.Load().Get("Authorization")).To(Equal("Bearer k"))
 			Expect(seen.Load().Get("X-Tenant")).To(Equal("acme"))
 		})
 
@@ -184,6 +184,27 @@ var _ = Describe("Credentials", func() {
 
 			Expect(seen.Load().Get("Authorization")).To(Equal("Bearer gateway"))
 			Expect(seen.Load().Get("X-Api-Key")).To(BeEmpty())
+		})
+
+		It("drops the SDK placeholder when the headers carry the authentication", func() {
+			var seen atomic.Pointer[http.Header]
+			srv := newCapturingServer(&seen)
+
+			source := CredentialFunc(func(context.Context, string) (Credential, error) {
+				return Credential{Headers: http.Header{"X-Api-Key": []string{"gateway"}}}, nil
+			})
+
+			req, err := http.NewRequest(http.MethodGet, srv.URL, nil)
+			Expect(err).NotTo(HaveOccurred())
+			req.Header.Set("Authorization", "Bearer "+credentialPlaceholder)
+
+			client := newAuthHTTPClient(nil, source, "anthropic", applyAnthropicCredential)
+			resp, err := client.Do(req)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(resp.Body.Close()).To(Succeed())
+
+			Expect(seen.Load().Get("X-Api-Key")).To(Equal("gateway"))
+			Expect(seen.Load().Get("Authorization")).To(BeEmpty())
 		})
 
 		It("surfaces a credential failure without issuing the request", func() {
@@ -223,7 +244,7 @@ var _ = Describe("Credentials", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resp.Body.Close()).To(Succeed())
 
-			Expect(seen.Load().Get("X-Api-Key")).To(Equal("key-for-acme"))
+			Expect(seen.Load().Get("Authorization")).To(Equal("Bearer key-for-acme"))
 		})
 	})
 
@@ -264,8 +285,9 @@ var _ = Describe("Credentials", func() {
 				WithMessages(NewMessage(RoleUser, NewTextPart("hi"))))
 			Expect(err).NotTo(HaveOccurred())
 
-			Expect(seen.Load().Get("X-Api-Key")).To(Equal("real-key"))
-			Expect(seen.Load().Get("X-Api-Key")).NotTo(Equal(credentialPlaceholder))
+			Expect(seen.Load().Get("Authorization")).To(Equal("Bearer real-key"))
+			Expect(seen.Load().Values("Authorization")).To(HaveLen(1))
+			Expect(seen.Load().Get("X-Api-Key")).To(BeEmpty())
 		})
 	})
 

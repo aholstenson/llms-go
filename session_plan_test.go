@@ -449,11 +449,11 @@ var _ = Describe("Session plan/observe", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			assistant := out[1]
-			Expect(assistant.Content[0].OfThinking).NotTo(BeNil())
-			Expect(assistant.Content[0].OfThinking.Signature).To(Equal("sig-xyz"))
-			Expect(assistant.Content[0].OfThinking.Thinking).To(Equal("reason"))
-			Expect(assistant.Content[1].OfText).NotTo(BeNil())
-			Expect(assistant.Content[2].OfToolUse).NotTo(BeNil())
+			Expect(betaMessageContent(assistant)[0].OfThinking).NotTo(BeNil())
+			Expect(betaMessageContent(assistant)[0].OfThinking.Signature).To(Equal("sig-xyz"))
+			Expect(betaMessageContent(assistant)[0].OfThinking.Thinking).To(Equal("reason"))
+			Expect(betaMessageContent(assistant)[1].OfText).NotTo(BeNil())
+			Expect(betaMessageContent(assistant)[2].OfToolUse).NotTo(BeNil())
 		})
 	})
 })

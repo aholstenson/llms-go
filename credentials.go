@@ -20,8 +20,8 @@ var ErrNoCredentials = errors.New("no credentials available")
 // request.
 //
 // APIKey is placed in the provider's native authentication header
-// (`X-Api-Key` for Anthropic, `Authorization: Bearer` for OpenAI and
-// OpenRouter, `x-goog-api-key` for Google). Headers are applied on top and
+// (`Authorization: Bearer` for Anthropic, OpenAI and OpenRouter,
+// `x-goog-api-key` for Google). Headers are applied on top and
 // can carry anything else the endpoint needs, such as a gateway token or a
 // tenant identifier. A Credential with an empty APIKey and non-empty Headers
 // is valid: it means authentication is carried entirely by those headers.
@@ -143,8 +143,12 @@ const credentialPlaceholder = "resolved-per-request-by-credential-source"
 // header a given provider expects.
 type credentialApplier func(req *http.Request, cred Credential)
 
+// applyAnthropicCredential sends the API key as a bearer token, as the
+// Anthropic SDK does. It removes X-Api-Key, because the Anthropic API rejects
+// a request that has more than one credential.
 func applyAnthropicCredential(req *http.Request, cred Credential) {
-	req.Header.Set("X-Api-Key", cred.APIKey)
+	req.Header.Del("X-Api-Key")
+	req.Header.Set("Authorization", "Bearer "+cred.APIKey)
 }
 
 func applyBearerCredential(req *http.Request, cred Credential) {
@@ -182,6 +186,11 @@ func (t *authTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	// RoundTrip must not mutate the request it is handed.
 	r := req.Clone(req.Context())
+	// The SDK sends the placeholder key as a bearer token. Remove it, so that
+	// a credential that has only Headers does not send it.
+	if r.Header.Get("Authorization") == "Bearer "+credentialPlaceholder {
+		r.Header.Del("Authorization")
+	}
 	if cred.APIKey != "" {
 		t.apply(r, cred)
 	}

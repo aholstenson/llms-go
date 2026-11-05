@@ -8,8 +8,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/anthropics/anthropic-sdk-go"
-	"github.com/anthropics/anthropic-sdk-go/option"
+	"github.com/anthropics/anthropic-sdk-go/v2"
+	"github.com/anthropics/anthropic-sdk-go/v2/option"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -41,7 +41,7 @@ func countCacheControl(p anthropic.BetaMessageNewParams) int {
 		}
 	}
 	for _, msg := range p.Messages {
-		for _, b := range msg.Content {
+		for _, b := range betaMessageContent(msg) {
 			if b.OfText != nil && string(b.OfText.CacheControl.Type) != "" {
 				n++
 			}
@@ -121,8 +121,8 @@ var _ = Describe("anthropicTurn tool-result attachments", func() {
 
 		// The last message is the tool-result user message.
 		last := turn.params.Messages[len(turn.params.Messages)-1]
-		Expect(last.Content).To(HaveLen(1))
-		tr := last.Content[0].OfToolResult
+		Expect(betaMessageContent(last)).To(HaveLen(1))
+		tr := betaMessageContent(last)[0].OfToolResult
 		Expect(tr).NotTo(BeNil())
 		Expect(tr.Content).To(HaveLen(2))
 		Expect(tr.Content[0].OfText).NotTo(BeNil())
@@ -145,7 +145,7 @@ var _ = Describe("anthropicTurn tool-result attachments", func() {
 		}
 		out, _, err := m.convertMessages("", msgs)
 		Expect(err).NotTo(HaveOccurred())
-		tr := out[0].Content[0].OfToolResult
+		tr := betaMessageContent(out[0])[0].OfToolResult
 		Expect(tr).NotTo(BeNil())
 		Expect(tr.Content).To(HaveLen(2))
 		Expect(tr.Content[1].OfImage).NotTo(BeNil())
@@ -216,12 +216,12 @@ var _ = Describe("anthropicTurn.Observe cache-control", func() {
 		Expect(msgs).To(HaveLen(3))
 
 		// The prior tool_result block must have had its cache-control cleared.
-		prior := msgs[0].Content[0].OfToolResult
+		prior := betaMessageContent(msgs[0])[0].OfToolResult
 		Expect(prior).NotTo(BeNil())
 		Expect(string(prior.CacheControl.Type)).To(Equal(""))
 
 		// The newly appended tool-results message: only the last block cached.
-		newBlocks := msgs[2].Content
+		newBlocks := betaMessageContent(msgs[2])
 		Expect(newBlocks).To(HaveLen(3))
 		Expect(string(newBlocks[0].OfToolResult.CacheControl.Type)).To(Equal(""))
 		Expect(string(newBlocks[1].OfToolResult.CacheControl.Type)).To(Equal(""))

@@ -7,8 +7,8 @@ import (
 	"net/http/httptest"
 	"sync/atomic"
 
-	"github.com/anthropics/anthropic-sdk-go"
-	anthropicoption "github.com/anthropics/anthropic-sdk-go/option"
+	"github.com/anthropics/anthropic-sdk-go/v2"
+	anthropicoption "github.com/anthropics/anthropic-sdk-go/v2/option"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/openai/openai-go/v3"

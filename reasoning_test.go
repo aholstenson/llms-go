@@ -3,13 +3,14 @@ package llms
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"io"
 	"log/slog"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/anthropics/anthropic-sdk-go"
+	"github.com/anthropics/anthropic-sdk-go/v2"
 	"github.com/openai/openai-go/v3/shared"
 	"google.golang.org/genai"
 )
@@ -58,6 +59,17 @@ func anthropicTurnFor(info ModelInfo, opts ...GenerateOption) *anthropicTurn {
 	s, err := m.newSession(context.Background(), append(base, opts...)...)
 	Expect(err).NotTo(HaveOccurred())
 	return s.turn.(*anthropicTurn)
+}
+
+// anthropicParamsJSON returns the top-level keys of the request body that the
+// turn sends.
+func anthropicParamsJSON(turn *anthropicTurn) map[string]json.RawMessage {
+	GinkgoHelper()
+	body, err := json.Marshal(turn.params)
+	Expect(err).NotTo(HaveOccurred())
+	var keys map[string]json.RawMessage
+	Expect(json.Unmarshal(body, &keys)).To(Succeed())
+	return keys
 }
 
 func googleTurnFor(info ModelInfo, opts ...GenerateOption) *googleTurn {
@@ -318,7 +330,7 @@ var _ = Describe("Anthropic reasoning request", func() {
 		Expect(turn.params.Thinking.OfEnabled).NotTo(BeNil())
 		Expect(turn.params.Thinking.OfEnabled.BudgetTokens).To(Equal(int64(5000)))
 		Expect(turn.params.OutputConfig.Effort).To(Equal(anthropic.BetaOutputConfigEffortMedium))
-		Expect(turn.params.Temperature.Or(0)).To(Equal(1.0))
+		Expect(anthropicParamsJSON(turn)).NotTo(HaveKey("temperature"))
 	})
 
 	It("sends only a budget on budget-only models", func() {
@@ -327,11 +339,16 @@ var _ = Describe("Anthropic reasoning request", func() {
 		Expect(turn.params.OutputConfig.Effort).To(BeEmpty())
 	})
 
-	It("uses an explicit budget with temperature 1.0 on budget models", func() {
+	It("uses an explicit budget without a temperature on budget models", func() {
 		turn := anthropicTurnFor(budgetOnlyModel, WithMaxThinkingTokens(3000))
 		Expect(turn.params.Thinking.OfEnabled).NotTo(BeNil())
 		Expect(turn.params.Thinking.OfEnabled.BudgetTokens).To(Equal(int64(3000)))
-		Expect(turn.params.Temperature.Or(0)).To(Equal(1.0))
+		Expect(anthropicParamsJSON(turn)).NotTo(HaveKey("temperature"))
+	})
+
+	It("does not send a temperature that the caller sets", func() {
+		turn := anthropicTurnFor(budgetOnlyModel, WithTemperature(0.2))
+		Expect(anthropicParamsJSON(turn)).NotTo(HaveKey("temperature"))
 	})
 
 	It("emits no reasoning params by default", func() {

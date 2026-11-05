@@ -12,10 +12,10 @@ import (
 	"time"
 
 	"github.com/aholstenson/llms-go/jsonstream"
-	"github.com/anthropics/anthropic-sdk-go"
-	"github.com/anthropics/anthropic-sdk-go/option"
-	"github.com/anthropics/anthropic-sdk-go/packages/ssestream"
-	"github.com/anthropics/anthropic-sdk-go/shared/constant"
+	"github.com/anthropics/anthropic-sdk-go/v2"
+	"github.com/anthropics/anthropic-sdk-go/v2/option"
+	"github.com/anthropics/anthropic-sdk-go/v2/packages/ssestream"
+	"github.com/anthropics/anthropic-sdk-go/v2/shared/constant"
 	"github.com/invopop/jsonschema"
 )
 
@@ -56,16 +56,23 @@ func (e *anthropicStreamError) unavailable() bool {
 }
 
 // anthropicStreamErrorPrefix starts the text of the error that the SDK
-// makes from an "error" event in the stream.
+// makes from an "error" event in the stream when it cannot make an
+// *anthropic.Error from it.
 const anthropicStreamErrorPrefix = "received error while streaming: "
 
 // asAnthropicStreamError changes an SDK stream error into an
-// *anthropicStreamError when the SDK made it from an "error" event. The SDK
-// keeps only the JSON text of the event, so it is parsed here. Other errors
-// are returned unchanged.
+// *anthropicStreamError when the SDK made it from an "error" event. Call it
+// only for an error from a stream that opened. The SDK gives the event as an
+// *anthropic.Error with the status of the open stream (usually 200). When it
+// cannot do that, it keeps only the JSON text of the event, which is parsed
+// here. Other errors are returned unchanged.
 func asAnthropicStreamError(err error) error {
 	if err == nil {
 		return nil
+	}
+	var ae *anthropic.Error
+	if errors.As(err, &ae) && ae != nil && ae.Type() != "" {
+		return &anthropicStreamError{Type: string(ae.Type()), Message: ae.Message, err: err}
 	}
 	body, ok := strings.CutPrefix(err.Error(), anthropicStreamErrorPrefix)
 	if !ok {
@@ -87,13 +94,15 @@ func asAnthropicStreamError(err error) error {
 // limited or overloaded. status is the HTTP status, or 0 when the error
 // came inside an open stream.
 func anthropicUnavailable(err error) (status int, ok bool) {
-	var ae *anthropic.Error
-	if errors.As(err, &ae) {
-		return ae.StatusCode, isUnavailableStatusCode(ae.StatusCode)
-	}
+	// Check the stream error first: it can wrap an *anthropic.Error that has
+	// the status of the open stream, not of the failure.
 	var se *anthropicStreamError
 	if errors.As(err, &se) {
 		return 0, se.unavailable()
+	}
+	var ae *anthropic.Error
+	if errors.As(err, &ae) {
+		return ae.StatusCode, isUnavailableStatusCode(ae.StatusCode)
 	}
 	return 0, false
 }
@@ -122,7 +131,7 @@ type anthropicModel struct {
 func newAnthropicModel(logger *slog.Logger, metrics *Metrics, creds CredentialSource, model string, registry map[string]SubParserConfig, info modelInfoRef, opts ...option.RequestOption) Model {
 	// Prepend the auth options so they can be overridden by caller options.
 	// The placeholder key satisfies the SDK; the transport replaces the
-	// X-Api-Key header per request.
+	// Authorization header per request.
 	httpClient := newAuthHTTPClient(nil, creds, "anthropic", applyAnthropicCredential)
 	allOpts := append([]option.RequestOption{
 		option.WithAPIKey(credentialPlaceholder),
@@ -141,18 +150,29 @@ func newAnthropicModel(logger *slog.Logger, metrics *Metrics, creds CredentialSo
 	}
 }
 
-// Beta message helper functions since SDK may not have beta message constructors
 func newBetaUserMessage(content ...anthropic.BetaContentBlockParamUnion) anthropic.BetaMessageParam {
-	return anthropic.BetaMessageParam{
-		Role:    anthropic.BetaMessageParamRoleUser,
+	return anthropic.BetaMessageParam{OfUser: &anthropic.BetaUserMessageParam{
 		Content: content,
-	}
+	}}
 }
 
 func newBetaAssistantMessage(content ...anthropic.BetaContentBlockParamUnion) anthropic.BetaMessageParam {
-	return anthropic.BetaMessageParam{
-		Role:    anthropic.BetaMessageParamRoleAssistant,
+	return anthropic.BetaMessageParam{OfAssistant: &anthropic.BetaAssistantMessageParam{
 		Content: content,
+	}}
+}
+
+// betaMessageContent returns the content blocks of a user or assistant
+// message. It returns nil for a system message, which holds no content
+// blocks of this type.
+func betaMessageContent(msg anthropic.BetaMessageParam) []anthropic.BetaContentBlockParamUnion {
+	switch {
+	case msg.OfUser != nil:
+		return msg.OfUser.Content
+	case msg.OfAssistant != nil:
+		return msg.OfAssistant.Content
+	default:
+		return nil
 	}
 }
 
@@ -183,10 +203,8 @@ func betaMessageToParam(msg *anthropic.BetaMessage) anthropic.BetaMessageParam {
 			}
 		}
 	}
-	return anthropic.BetaMessageParam{
-		Role:    anthropic.BetaMessageParamRole(msg.Role),
-		Content: content,
-	}
+	// A response always has the role "assistant".
+	return newBetaAssistantMessage(content...)
 }
 
 func (m *anthropicModel) GenerateContent(ctx context.Context, options ...GenerateOption) (Result, error) {
@@ -240,8 +258,10 @@ func (m *anthropicModel) newSession(ctx context.Context, options ...GenerateOpti
 		}
 	}
 
-	if opts.Temperature != 0 && info.allowsTemperature() {
-		params.Temperature = anthropic.Float(opts.Temperature)
+	// The Anthropic API version that the SDK sends (2026-10-21) has no
+	// sampling parameters. Every request samples with temperature 1.0.
+	if opts.Temperature != 0 {
+		m.logger.Warn("Anthropic does not accept a custom temperature; using the model default")
 	}
 
 	// Anthropic requires max_tokens. Default to the model's declared output
@@ -264,10 +284,6 @@ func (m *anthropicModel) newSession(ctx context.Context, options ...GenerateOpti
 	case reasoningKindBudget:
 		params.Thinking = anthropic.BetaThinkingConfigParamOfEnabled(int64(route.Budget))
 		maxOutput += route.Budget
-		// Budget-style thinking requires temperature 1.0.
-		if info.allowsTemperature() {
-			params.Temperature = anthropic.Float(1.0)
-		}
 	case reasoningKindEffort:
 		switch {
 		case adaptive:
@@ -278,9 +294,6 @@ func (m *anthropicModel) newSession(ctx context.Context, options ...GenerateOpti
 			budget := effortToBudget(route.Effort, info)
 			params.Thinking = anthropic.BetaThinkingConfigParamOfEnabled(int64(budget))
 			maxOutput += budget
-			if info.allowsTemperature() {
-				params.Temperature = anthropic.Float(1.0)
-			}
 		}
 		// A model with an effort but neither thinking form gets the effort
 		// alone, which still controls how many tokens it spends.
@@ -941,9 +954,8 @@ func (t *anthropicTurn) Observe(ctx context.Context, _ TurnOutput, outcomes []To
 // assistant message is already present (rebuilt by convertMessages).
 func (t *anthropicTurn) ObserveToolResults(_ context.Context, _ []ToolCall, outcomes []ToolOutcome) error {
 	// Clear cache control values on old tool call messages
-	for i := 0; i < len(t.params.Messages); i++ {
-		content := t.params.Messages[i].Content
-		for _, contentBlock := range content {
+	for _, msg := range t.params.Messages {
+		for _, contentBlock := range betaMessageContent(msg) {
 			if contentBlock.OfToolResult != nil {
 				// Clear cache control by setting to zero value
 				contentBlock.OfToolResult.CacheControl = anthropic.BetaCacheControlEphemeralParam{}
@@ -1214,7 +1226,7 @@ func (t *anthropicTurn) Next(ctx context.Context) (TurnOutput, error) {
 // cache_control breakpoint (Anthropic permits at most 4).
 func clearAnthropicCacheControl(msgs []anthropic.BetaMessageParam) {
 	for _, msg := range msgs {
-		for _, block := range msg.Content {
+		for _, block := range betaMessageContent(msg) {
 			if block.OfText != nil {
 				block.OfText.CacheControl = anthropic.BetaCacheControlEphemeralParam{}
 			}

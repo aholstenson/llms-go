@@ -9,8 +9,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/anthropics/anthropic-sdk-go"
-	"github.com/anthropics/anthropic-sdk-go/option"
+	"github.com/anthropics/anthropic-sdk-go/v2"
+	"github.com/anthropics/anthropic-sdk-go/v2/option"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
