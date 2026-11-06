@@ -172,7 +172,7 @@ type authTransport struct {
 
 func newAuthTransport(inner http.RoundTripper, source CredentialSource, provider string, apply credentialApplier) *authTransport {
 	if inner == nil {
-		inner = http.DefaultTransport
+		inner = sharedTransport()
 	}
 	return &authTransport{inner: inner, source: source, provider: provider, apply: apply}
 }
@@ -201,13 +201,21 @@ func (t *authTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 // newAuthHTTPClient builds an http.Client that authenticates every request
-// from source and fails a silent request with a *StallError. No client-level
+// from source and fails a silent request with a *StallError. A nil inner uses
+// the shared transport, whose HTTP/2 health check closes a dead connection;
+// that failure is also reported as a *StallError. No client-level
 // timeout is set: a whole-request deadline would cut off legitimately slow
 // generations, so liveness is enforced per request from the context (see
 // WithStallTimeout) and the provider SDKs drive the rest from the request
 // context.
 func newAuthHTTPClient(inner http.RoundTripper, source CredentialSource, provider string, apply credentialApplier) *http.Client {
+	if inner == nil {
+		inner = sharedTransport()
+	}
 	return &http.Client{
-		Transport: newStallTransport(newAuthTransport(inner, source, provider, apply), provider),
+		Transport: newStallTransport(
+			newConnLossTransport(newAuthTransport(inner, source, provider, apply), provider),
+			provider,
+		),
 	}
 }

@@ -85,7 +85,7 @@ type googleModel struct {
 // info supplies model metadata used to gate request parameters; an unknown
 // model is treated permissively.
 func newGoogleModel(ctx context.Context, logger *slog.Logger, metrics *Metrics, creds CredentialSource, model string, registry map[string]SubParserConfig, info modelInfoRef) (Model, error) {
-	transport := newHeaderCapturingTransport(http.DefaultTransport)
+	transport := newHeaderCapturingTransport(sharedTransport())
 	// Auth wraps the header capture so x-goog-api-key is set per request. The
 	// SDK rejects an empty APIKey, so it gets the placeholder — which also
 	// keeps the real key out of genai errors that dump the whole config.

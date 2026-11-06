@@ -92,7 +92,7 @@ func newOpenRouterModel(logger *slog.Logger, metrics *Metrics, creds CredentialS
 			return nil, err
 		}
 	}
-	transport := newHeaderCapturingTransport(http.DefaultTransport)
+	transport := newHeaderCapturingTransport(sharedTransport())
 	m.headerCapture = transport
 	// Auth wraps the header capture so the Authorization header is set per
 	// request; the placeholder key handed to the SDK is never sent.

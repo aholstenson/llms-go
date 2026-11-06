@@ -277,6 +277,26 @@ run out. Detect it with `errors.Is(err, llms.ErrStall)`.
 `WithRequestTimeout` bounds the other half — how long an attempt may wait for
 the provider to start responding at all. Both default to off.
 
+Dead HTTP/2 connections are found even without these options. After 15
+seconds with no frame, the client sends a ping. If the ping gets no answer in
+15 more seconds, the client closes the connection and removes it from the
+pool. The model does not answer the ping, so a model that reasons for a long
+time does not cause it to fail. The failed attempt is reported as a
+`*StallError`, so it is retried like any other stall, and the next attempt
+opens a new connection.
+
+Pings are answered by the nearest HTTP/2 server. For most providers this is a
+CDN or a load balancer, and in some networks it is a proxy. Pings thus find a
+dead network path, such as a Wi-Fi change, a NAT timeout or a laptop that
+slept, but not a stuck provider behind a healthy front end. Use
+`WithStallTimeout` for that.
+
+Each new model uses a copy of `http.DefaultTransport` with the pings turned
+on. To use your own settings, set `http.DefaultTransport` before you create
+the model. Changes to the fields of the same value after that are not seen.
+When `http.DefaultTransport` is not an `*http.Transport`, for example a test
+mock, the library uses it as it is, without pings.
+
 To tell whether the model is thinking or the connection is dead while a
 turn produces no tokens, register `WithLivenessNotify`. It fires whenever data
 arrives after a quiet second, and stops the moment the provider goes silent:

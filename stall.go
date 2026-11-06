@@ -41,6 +41,13 @@ const (
 // The budgets come from WithStallTimeout (quiet time inside a response) and
 // WithRequestTimeout (time to the first byte of a response). Both are off
 // unless set.
+//
+// A StallError is also reported, without any option set, when an HTTP/2
+// connection to the provider stops answering health check pings. The
+// connection is then closed after about 30 seconds of silence, and Timeout is
+// that health check window. Pings are answered by the nearest HTTP/2 server,
+// which is often a CDN or a proxy, so they find a dead network path but not a
+// stuck provider behind a healthy front end. WithStallTimeout finds both.
 type StallError struct {
 	// Provider is the GenAI system that went silent, e.g. "anthropic".
 	Provider string
@@ -167,7 +174,7 @@ type stallTransport struct {
 
 func newStallTransport(inner http.RoundTripper, provider string) *stallTransport {
 	if inner == nil {
-		inner = http.DefaultTransport
+		inner = sharedTransport()
 	}
 	return &stallTransport{inner: inner, provider: provider}
 }

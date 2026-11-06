@@ -128,7 +128,7 @@ type headerCapturingTransport struct {
 
 func newHeaderCapturingTransport(inner http.RoundTripper) *headerCapturingTransport {
 	if inner == nil {
-		inner = http.DefaultTransport
+		inner = sharedTransport()
 	}
 	return &headerCapturingTransport{inner: inner}
 }
