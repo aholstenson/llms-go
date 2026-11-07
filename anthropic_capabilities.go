@@ -44,6 +44,26 @@ func (m *anthropicModel) modelInfo(ctx context.Context) ModelInfo {
 	return info
 }
 
+// gateInfo returns the model's ModelInfo with the Models API capabilities
+// applied when an earlier request already got them. It makes no network call.
+func (m *anthropicModel) gateInfo() (string, ModelInfo) {
+	info := m.info.get()
+	if m.capabilities == nil || m.info.registered() {
+		return m.statsModel, info
+	}
+	if api := m.capabilities.cached(); api != nil {
+		info = applyAnthropicCapabilities(info, m.model, api)
+	}
+	return m.statsModel, info
+}
+
+// cached returns the Models API answer when a lookup already got it, or nil.
+func (c *anthropicCapabilities) cached() *anthropic.ModelInfo {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.info
+}
+
 // get returns the cached Models API answer, asking the API on first use and
 // again after anthropicCapabilityRetry when a lookup failed. Concurrent
 // callers wait for one lookup instead of starting their own.
@@ -105,6 +125,8 @@ func applyAnthropicCapabilities(info ModelInfo, id string, api *anthropic.ModelI
 	if api.MaxTokens > 0 {
 		info.Limits.Output = int(api.MaxTokens)
 	}
+	// The image count and PDF page limits depend on the context window.
+	info.Limits.Image, info.Limits.PDF = defaultInputLimits("anthropic", info.Limits.Context)
 
 	if wasUnknown {
 		// The Models API does not report these. Every current Claude model

@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"mime"
 	"net/http"
 	"strings"
 	"time"
@@ -203,6 +202,12 @@ func (m *openaiModel) GenerateContent(ctx context.Context, options ...GenerateOp
 		return nil, err
 	}
 	return runSession(ctx, s)
+}
+
+// gateInfo returns the qualified model name and the ModelInfo that gates
+// requests. It makes no network call.
+func (m *openaiModel) gateInfo() (string, ModelInfo) {
+	return m.statsModel, m.info.get()
 }
 
 func (m *openaiModel) newSession(ctx context.Context, options ...GenerateOption) (*Session, error) {
@@ -439,19 +444,11 @@ func (m *openaiModel) convertMessages(messages []*Message) (responses.ResponseIn
 	return result, nil
 }
 
-// filenameForMediaType returns a synthetic filename for an input_file part.
-// The Responses API requires a filename alongside file_data, but BinaryPart
-// carries only a media type, so we pick an extension from the mime registry
-// and fall back to ".bin" for unknown types.
-func filenameForMediaType(mediaType string) string {
-	exts, _ := mime.ExtensionsByType(mediaType)
-	if len(exts) > 0 {
-		return "file" + exts[0]
-	}
-	return "file.bin"
-}
-
+// convertUserParts converts the parts of a user message. Text files become
+// input_text parts and other files become input_file parts with Name as the
+// file name (see expandFileParts).
 func convertUserParts(parts []MessagePart) (responses.ResponseInputMessageContentListParam, error) {
+	parts = expandFileParts(parts, true)
 	out := make(responses.ResponseInputMessageContentListParam, 0, len(parts))
 	for _, part := range parts {
 		switch content := part.(type) {
@@ -468,7 +465,7 @@ func convertUserParts(parts []MessagePart) (responses.ResponseInputMessageConten
 			})
 		case *BinaryPart:
 			b64 := base64.StdEncoding.EncodeToString(content.Data)
-			if strings.HasPrefix(content.MediaType, "image/") {
+			if partModality(content) == "image" {
 				dataURL := fmt.Sprintf("data:%s;base64,%s", content.MediaType, b64)
 				out = append(out, responses.ResponseInputContentUnionParam{
 					OfInputImage: &responses.ResponseInputImageParam{
@@ -481,7 +478,7 @@ func convertUserParts(parts []MessagePart) (responses.ResponseInputMessageConten
 				out = append(out, responses.ResponseInputContentUnionParam{
 					OfInputFile: &responses.ResponseInputFileParam{
 						FileData: openai.String(dataURL),
-						Filename: openai.String(filenameForMediaType(content.MediaType)),
+						Filename: openai.String(partFilename(content)),
 					},
 				})
 			}
@@ -502,6 +499,7 @@ func openaiFunctionCallOutput(callID, text string, attachments []MessagePart) (r
 	if len(attachments) == 0 {
 		output.OfString = openai.String(text)
 	} else {
+		attachments = expandFileParts(attachments, true)
 		items := make(responses.ResponseFunctionCallOutputItemListParam, 0, len(attachments)+1)
 		if text != "" {
 			items = append(items, responses.ResponseFunctionCallOutputItemUnionParam{
@@ -543,7 +541,7 @@ func openaiFunctionCallOutputItem(part MessagePart) (responses.ResponseFunctionC
 		}, nil
 	case *BinaryPart:
 		dataURL := fmt.Sprintf("data:%s;base64,%s", content.MediaType, base64.StdEncoding.EncodeToString(content.Data))
-		if strings.HasPrefix(content.MediaType, "image/") {
+		if partModality(content) == "image" {
 			return responses.ResponseFunctionCallOutputItemUnionParam{
 				OfInputImage: &responses.ResponseInputImageContentParam{
 					ImageURL: openai.String(dataURL),
@@ -554,7 +552,7 @@ func openaiFunctionCallOutputItem(part MessagePart) (responses.ResponseFunctionC
 		return responses.ResponseFunctionCallOutputItemUnionParam{
 			OfInputFile: &responses.ResponseInputFileContentParam{
 				FileData: openai.String(dataURL),
-				Filename: openai.String(filenameForMediaType(content.MediaType)),
+				Filename: openai.String(partFilename(content)),
 			},
 		}, nil
 	default:

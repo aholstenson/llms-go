@@ -63,6 +63,7 @@ func convertModelsDevModel(provider, id string, m modelsdev.RawModel) ModelInfo 
 	if m.Reasoning {
 		applyReasoningOptions(provider, id, m.ReasoningOptions, &mi.Caps)
 	}
+	mi.Limits.Image, mi.Limits.PDF = defaultInputLimits(provider, mi.Limits.Context)
 	return mi
 }
 

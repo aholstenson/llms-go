@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/aholstenson/llms-go/jsonstream"
 	"github.com/anthropics/anthropic-sdk-go/v2"
@@ -702,30 +703,106 @@ func (m *anthropicModel) extractUsage(msg *anthropic.BetaMessage) *TurnUsage {
 	}
 }
 
-// betaImageBlock converts a neutral *ImagePart / *BinaryPart into an
-// Anthropic image block param. It is shared by user-message conversion and
-// tool-result attachment passthrough.
-func betaImageBlock(part MessagePart) (*anthropic.BetaImageBlockParam, error) {
+// anthropicAttachment is one converted image or file part. Label is set
+// for a named image, which has no name field; exactly one of Image and
+// Document is set.
+type anthropicAttachment struct {
+	Label    *anthropic.BetaTextBlockParam
+	Image    *anthropic.BetaImageBlockParam
+	Document *anthropic.BetaRequestDocumentBlockParam
+}
+
+// convertAnthropicAttachment converts a neutral *ImagePart or *BinaryPart.
+// Images become image blocks. PDFs become base64 document blocks and text
+// files become plain-text document blocks, both with Name as the title. It
+// is shared by user-message conversion and tool-result attachments.
+func convertAnthropicAttachment(part MessagePart) (anthropicAttachment, error) {
 	switch content := part.(type) {
 	case *ImagePart:
-		return &anthropic.BetaImageBlockParam{
+		return anthropicAttachment{Image: &anthropic.BetaImageBlockParam{
 			Source: anthropic.BetaImageBlockParamSourceUnion{
 				OfURL: &anthropic.BetaURLImageSourceParam{URL: content.URL},
 			},
-		}, nil
+		}}, nil
 	case *BinaryPart:
-		data := base64.StdEncoding.EncodeToString(content.Data)
-		return &anthropic.BetaImageBlockParam{
-			Source: anthropic.BetaImageBlockParamSourceUnion{
-				OfBase64: &anthropic.BetaBase64ImageSourceParam{
-					MediaType: anthropic.BetaBase64ImageSourceMediaType(content.MediaType),
-					Data:      data,
+		var doc anthropic.BetaRequestDocumentBlockParam
+		if content.Name != "" {
+			doc.Title = anthropic.String(anthropicDocumentTitle(content.Name))
+		}
+		switch modality := partModality(content); modality {
+		case "image":
+			out := anthropicAttachment{Image: &anthropic.BetaImageBlockParam{
+				Source: anthropic.BetaImageBlockParamSourceUnion{
+					OfBase64: &anthropic.BetaBase64ImageSourceParam{
+						MediaType: anthropic.BetaBase64ImageSourceMediaType(baseMediaType(content.MediaType)),
+						Data:      base64.StdEncoding.EncodeToString(content.Data),
+					},
 				},
-			},
-		}, nil
+			}}
+			if content.Name != "" {
+				out.Label = &anthropic.BetaTextBlockParam{Text: fileLabel(content.Name).Text}
+			}
+			return out, nil
+		case "pdf":
+			doc.Source = anthropic.BetaRequestDocumentBlockSourceUnionParam{
+				OfBase64: &anthropic.BetaBase64PDFSourceParam{
+					Data: base64.StdEncoding.EncodeToString(content.Data),
+				},
+			}
+			return anthropicAttachment{Document: &doc}, nil
+		case "text":
+			doc.Source = anthropic.BetaRequestDocumentBlockSourceUnionParam{
+				OfText: &anthropic.BetaPlainTextSourceParam{Data: string(content.Data)},
+			}
+			return anthropicAttachment{Document: &doc}, nil
+		default:
+			return anthropicAttachment{}, fmt.Errorf("%w for Anthropic: %s", ErrUnsupportedMediaType, content.MediaType)
+		}
 	default:
-		return nil, fmt.Errorf("unsupported attachment type for Anthropic: %T", part)
+		return anthropicAttachment{}, fmt.Errorf("unsupported attachment type for Anthropic: %T", part)
 	}
+}
+
+// anthropicMaxTitle is the largest document title, in characters, that the
+// Anthropic API accepts.
+const anthropicMaxTitle = 500
+
+// anthropicDocumentTitle returns name cut to anthropicMaxTitle characters.
+func anthropicDocumentTitle(name string) string {
+	if utf8.RuneCountInString(name) <= anthropicMaxTitle {
+		return name
+	}
+	return string([]rune(name)[:anthropicMaxTitle])
+}
+
+// contentBlocks returns the attachment as user-message content blocks.
+func (a anthropicAttachment) contentBlocks() []anthropic.BetaContentBlockParamUnion {
+	var out []anthropic.BetaContentBlockParamUnion
+	if a.Label != nil {
+		out = append(out, anthropic.BetaContentBlockParamUnion{OfText: a.Label})
+	}
+	if a.Image != nil {
+		out = append(out, anthropic.BetaContentBlockParamUnion{OfImage: a.Image})
+	}
+	if a.Document != nil {
+		out = append(out, anthropic.BetaContentBlockParamUnion{OfDocument: a.Document})
+	}
+	return out
+}
+
+// toolResultBlocks returns the attachment as tool-result content blocks.
+func (a anthropicAttachment) toolResultBlocks() []anthropic.BetaToolResultBlockParamContentUnion {
+	var out []anthropic.BetaToolResultBlockParamContentUnion
+	if a.Label != nil {
+		out = append(out, anthropic.BetaToolResultBlockParamContentUnion{OfText: a.Label})
+	}
+	if a.Image != nil {
+		out = append(out, anthropic.BetaToolResultBlockParamContentUnion{OfImage: a.Image})
+	}
+	if a.Document != nil {
+		out = append(out, anthropic.BetaToolResultBlockParamContentUnion{OfDocument: a.Document})
+	}
+	return out
 }
 
 func (m *anthropicModel) convertMessages(systemPrompt string, messages []*Message) ([]anthropic.BetaMessageParam, string, error) {
@@ -767,11 +844,11 @@ func (m *anthropicModel) convertMessages(systemPrompt string, messages []*Messag
 						},
 					})
 				case *ImagePart, *BinaryPart:
-					img, err := betaImageBlock(part)
+					att, err := convertAnthropicAttachment(part)
 					if err != nil {
 						return nil, "", err
 					}
-					contentParts = append(contentParts, anthropic.BetaContentBlockParamUnion{OfImage: img})
+					contentParts = append(contentParts, att.contentBlocks()...)
 				case *ToolResultPart:
 					// Replayed tool result. The live cache breakpoint on the
 					// latest tool_result is owned by anthropicTurn.Observe; do
@@ -785,12 +862,12 @@ func (m *anthropicModel) convertMessages(systemPrompt string, messages []*Messag
 					}
 					// Attachments only accompany a successful result.
 					if content.Error == "" {
-						for _, att := range content.Attachments {
-							img, err := betaImageBlock(att)
+						for _, part := range content.Attachments {
+							att, err := convertAnthropicAttachment(part)
 							if err != nil {
 								return nil, "", err
 							}
-							resultContent = append(resultContent, anthropic.BetaToolResultBlockParamContentUnion{OfImage: img})
+							resultContent = append(resultContent, att.toolResultBlocks()...)
 						}
 					}
 					contentParts = append(contentParts, anthropic.BetaContentBlockParamUnion{
@@ -981,12 +1058,12 @@ func (t *anthropicTurn) ObserveToolResults(_ context.Context, _ []ToolCall, outc
 		}
 		// Attachments only accompany a successful result.
 		if o.Error == nil {
-			for _, att := range o.Attachments {
-				img, err := betaImageBlock(att)
+			for _, part := range o.Attachments {
+				att, err := convertAnthropicAttachment(part)
 				if err != nil {
 					return err
 				}
-				resultContent = append(resultContent, anthropic.BetaToolResultBlockParamContentUnion{OfImage: img})
+				resultContent = append(resultContent, att.toolResultBlocks()...)
 			}
 		}
 

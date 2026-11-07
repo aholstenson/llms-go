@@ -118,6 +118,12 @@ func (m *openrouterModel) GenerateContent(ctx context.Context, options ...Genera
 	return runSession(ctx, s)
 }
 
+// gateInfo returns the qualified model name and the ModelInfo that gates
+// requests. It makes no network call.
+func (m *openrouterModel) gateInfo() (string, ModelInfo) {
+	return m.statsModel, m.info.get()
+}
+
 func (m *openrouterModel) newSession(ctx context.Context, options ...GenerateOption) (*Session, error) {
 	opts, err := resolveGenerateContentOptions(m.subParserRegistry, options...)
 	if err != nil {
@@ -243,9 +249,12 @@ func (r rawJSONSchema) MarshalJSON() ([]byte, error) {
 
 // openrouterUserParts converts neutral message parts into OpenRouter
 // multi-part content. It is shared by user-message conversion and tool-result
-// attachment fallback. Non-image binary is rejected: OpenRouter has no portable
+// attachment fallback. Images become image_url parts, PDFs become file parts
+// with Name as the file name, and text files become text parts (see
+// expandFileParts). Other binary is rejected: OpenRouter has no portable
 // carrier for it.
 func openrouterUserParts(parts []MessagePart) ([]openrouter.ChatMessagePart, error) {
+	parts = expandFileParts(parts, true)
 	out := make([]openrouter.ChatMessagePart, 0, len(parts))
 	for _, part := range parts {
 		switch p := part.(type) {
@@ -262,16 +271,20 @@ func openrouterUserParts(parts []MessagePart) ([]openrouter.ChatMessagePart, err
 				},
 			})
 		case *BinaryPart:
-			if strings.HasPrefix(p.MediaType, "image/") {
-				dataURL := fmt.Sprintf("data:%s;base64,%s", p.MediaType, base64.StdEncoding.EncodeToString(p.Data))
+			dataURL := fmt.Sprintf("data:%s;base64,%s", p.MediaType, base64.StdEncoding.EncodeToString(p.Data))
+			switch partModality(p) {
+			case "image":
 				out = append(out, openrouter.ChatMessagePart{
-					Type: openrouter.ChatMessagePartTypeImageURL,
-					ImageURL: &openrouter.ChatMessageImageURL{
-						URL: dataURL,
-					},
+					Type:     openrouter.ChatMessagePartTypeImageURL,
+					ImageURL: &openrouter.ChatMessageImageURL{URL: dataURL},
 				})
-			} else {
-				return nil, fmt.Errorf("unsupported binary media type for OpenRouter: %s", p.MediaType)
+			case "pdf":
+				out = append(out, openrouter.ChatMessagePart{
+					Type: openrouter.ChatMessagePartTypeFile,
+					File: &openrouter.FileContent{Filename: partFilename(p), FileData: dataURL},
+				})
+			default:
+				return nil, fmt.Errorf("%w for OpenRouter: %s", ErrUnsupportedMediaType, p.MediaType)
 			}
 		default:
 			return nil, fmt.Errorf("unsupported part type for OpenRouter: %T", part)

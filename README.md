@@ -124,6 +124,70 @@ per million tokens.
 
 To update the embedded data, run `go generate ./...`.
 
+## Attachments
+
+Send images, PDFs and text files as `BinaryPart`s. Give a part a name so the
+model can refer to the file:
+
+```go
+msg := llms.NewMessage(llms.RoleUser,
+	llms.NewTextPart("Compare the spec with the report."),
+	llms.NewBinaryPart("text/markdown", spec).WithName("spec.md"),
+	llms.NewBinaryPart("application/pdf", report).WithName("report.pdf"),
+)
+```
+
+Check the input before you start a long run. `CheckMessages` runs the same
+check that `GenerateContent` runs before it sends a request, and it makes no
+network call:
+
+```go
+if err := llms.CheckMessages(model, []*llms.Message{msg}); err != nil {
+	var ie *llms.InputError
+	if errors.As(err, &ie) {
+		// ie.Message and ie.Part tell which part failed.
+	}
+	if errors.Is(err, llms.ErrUnsupportedModality) { /* the model cannot read this kind of file */ }
+	if errors.Is(err, llms.ErrAttachmentTooLarge) { /* send a list of files instead */ }
+}
+```
+
+The errors are `ErrUnsupportedModality`, `ErrUnsupportedMediaType`,
+`ErrAttachmentTooLarge` and `ErrInvalidAttachment` (for example a text file
+that is not UTF-8). They are configuration errors, so `IsRetryable` is false.
+
+`ModelInfoOf(model).Limits.Image` and `.Limits.PDF` give the provider limits:
+the largest image in bytes and pixels, the image formats, the number of
+images, and the largest PDF in bytes and pages. A zero value means the limit
+is not known. The check does not count PDF pages, so compare `MaxPages` with
+your own page count. Byte limits count the bytes in `BinaryPart.Data`, before
+base64 encoding.
+
+| Provider   | Images                         | PDFs                              | Limits                                   |
+|------------|--------------------------------|-----------------------------------|------------------------------------------|
+| Anthropic  | image block, name in a label   | document block, name as the title | 7.5 MB, 8000 px, 100 or 600 images and pages |
+| OpenAI     | `input_image`, name in a label | `input_file`, name as the file name | 1500 images, 50 MB per file            |
+| Google     | inline data, name in a label   | inline data, name in a label      | 3600 images, 50 MB and 1000 pages per PDF |
+| OpenRouter | `image_url`, name in a label   | `file` part, name as the file name | not documented                          |
+
+A label is a text part such as `File "chart.png":` just before the file.
+
+Text files (`text/*`, JSON, XML and YAML) are sent as text. Anthropic gets a
+plain-text document block with the name as its title. The other providers get
+a text part with the content in a `<file>` element:
+
+```text
+<file name="spec.md" media_type="text/markdown">
+...
+</file>
+```
+
+Anthropic models with a context window under 1M tokens take 100 images and
+100 PDF pages; other Claude models take 600. With more than 20 images, each
+image must be 2000 px or smaller. Gemini documents its inline request limit
+as 20 MB on one page and 100 MB on another, so no image byte limit is set for
+Google. Correct a limit with `RegisterModelInfo`.
+
 ## Credentials
 
 A `Manager` gets its API keys from a `CredentialSource`. The default is

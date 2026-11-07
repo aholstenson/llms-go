@@ -51,13 +51,34 @@ func NewImagePart(url string) *ImagePart {
 
 func (ImagePart) isPart() {}
 
+// BinaryPart is inline file content: an image, a PDF, a text file, or other
+// data the provider accepts.
+//
+// Name is optional. It is the file name (for example "spec.md") that lets the
+// model refer to the file. Providers that have a document title or file name
+// field get it there. For other providers, the part is sent with a short text
+// label that holds the name. See README "Attachments" for the behavior of
+// each provider.
+//
+// Parts with a text media type (text/*, application/json, application/xml,
+// application/yaml, and +json, +xml or +yaml types) are sent as text. Anthropic
+// gets a plain-text document block with Name as its title. The other
+// providers get a text part with the content in a <file> element that holds
+// the name.
 type BinaryPart struct {
 	MediaType string
 	Data      []byte
+	Name      string `json:",omitempty"`
 }
 
 func NewBinaryPart(mediaType string, data []byte) *BinaryPart {
 	return &BinaryPart{MediaType: mediaType, Data: data}
+}
+
+// WithName sets the file name of the part and returns the part.
+func (p *BinaryPart) WithName(name string) *BinaryPart {
+	p.Name = name
+	return p
 }
 
 func (BinaryPart) isPart() {}

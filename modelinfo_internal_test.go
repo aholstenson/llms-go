@@ -2,6 +2,7 @@ package llms
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"maps"
@@ -98,6 +99,9 @@ func TestPartModality(t *testing.T) {
 		{"binary audio", NewBinaryPart("audio/mpeg", []byte{1}), "audio"},
 		{"binary video", NewBinaryPart("video/mp4", []byte{1}), "video"},
 		{"binary pdf", NewBinaryPart("application/pdf", []byte{1}), "pdf"},
+		{"binary text", NewBinaryPart("text/markdown", []byte{1}), "text"},
+		{"binary json", NewBinaryPart("application/json", []byte{1}), "text"},
+		{"binary with params", NewBinaryPart("Text/Plain; charset=utf-8", []byte{1}), "text"},
 		{"binary unknown", NewBinaryPart("application/octet-stream", []byte{1}), ""},
 	}
 	for _, tc := range cases {
@@ -107,31 +111,52 @@ func TestPartModality(t *testing.T) {
 	}
 }
 
-func TestFirstUnsupportedModality(t *testing.T) {
+func TestCheckMessagesModality(t *testing.T) {
 	imageOnly := knownInfo(Capabilities{}, "text", "image")
 	pdfOnly := knownInfo(Capabilities{}, "text", "pdf")
 
+	// unsupported returns the modality that checkMessages rejects, or "".
+	unsupported := func(msgs []*Message, info ModelInfo) string {
+		t.Helper()
+		err := checkMessages("test/m", info, msgs)
+		if err == nil {
+			return ""
+		}
+		var ie *InputError
+		if !errors.As(err, &ie) || !errors.Is(err, ErrUnsupportedModality) {
+			t.Fatalf("expected an InputError for an unsupported modality, got %v", err)
+		}
+		return ie.Modality
+	}
+
 	textMsgs := []*Message{NewMessage(RoleUser, NewTextPart("hi"))}
-	if got := firstUnsupportedModality(textMsgs, imageOnly); got != "" {
+	if got := unsupported(textMsgs, imageOnly); got != "" {
 		t.Errorf("text-only on image-capable model should be ok, got %q", got)
 	}
 
 	// A PDF binary on an image-only model must not be falsely accepted as
 	// image, nor rejected as image — it should be rejected as pdf.
 	pdfMsgs := []*Message{NewMessage(RoleUser, NewBinaryPart("application/pdf", []byte{1}))}
-	if got := firstUnsupportedModality(pdfMsgs, imageOnly); got != "pdf" {
+	if got := unsupported(pdfMsgs, imageOnly); got != "pdf" {
 		t.Errorf("PDF on image-only model should report pdf, got %q", got)
 	}
 
 	// An image binary on a PDF-only model should report image (not pdf).
 	imageMsgs := []*Message{NewMessage(RoleUser, NewBinaryPart("image/png", []byte{1}))}
-	if got := firstUnsupportedModality(imageMsgs, pdfOnly); got != "image" {
+	if got := unsupported(imageMsgs, pdfOnly); got != "image" {
 		t.Errorf("image on pdf-only model should report image, got %q", got)
 	}
 
 	// PDF on a PDF-capable model is fine.
-	if got := firstUnsupportedModality(pdfMsgs, pdfOnly); got != "" {
+	if got := unsupported(pdfMsgs, pdfOnly); got != "" {
 		t.Errorf("PDF on pdf-capable model should be ok, got %q", got)
+	}
+
+	// A text file is sent as text, so a text-only model accepts it.
+	textOnly := knownInfo(Capabilities{}, "text")
+	textFile := []*Message{NewMessage(RoleUser, NewBinaryPart("text/markdown", []byte("# hi")))}
+	if got := unsupported(textFile, textOnly); got != "" {
+		t.Errorf("text file on text-only model should be ok, got %q", got)
 	}
 }
 

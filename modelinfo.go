@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"reflect"
 	"slices"
-	"strings"
 )
 
 //go:generate go run ./cmd/genmodelinfo
@@ -94,12 +93,63 @@ func (c *Cost) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// Limits describes the token limits for a model.
+// Limits describes the token and attachment limits for a model.
 type Limits struct {
 	Context int `json:"context,omitempty"`
 	// Input is the maximum prompt size when it is lower than Context.
 	Input  int `json:"input,omitempty"`
 	Output int `json:"output,omitempty"`
+	// Image is the provider's limits for image input.
+	Image ImageLimits `json:"image,omitzero"`
+	// PDF is the provider's limits for PDF input.
+	PDF PDFLimits `json:"pdf,omitzero"`
+}
+
+// ImageLimits are the documented provider limits for image input. They are
+// not in models.dev data; this package sets them for each provider (see
+// README "Attachments"). A zero field means no limit is known. CheckMessages
+// and GenerateContent reject an image that goes above a limit with
+// ErrAttachmentTooLarge or ErrUnsupportedMediaType.
+type ImageLimits struct {
+	// MediaTypes lists the image media types the provider accepts, for
+	// example "image/png". Empty means not known.
+	MediaTypes []string `json:"media_types,omitempty"`
+	// MaxBytes is the largest image, in bytes of BinaryPart.Data (before
+	// base64 encoding).
+	MaxBytes int64 `json:"max_bytes,omitempty"`
+	// MaxWidth and MaxHeight are the largest image size in pixels that the
+	// provider accepts. Larger images are rejected, not scaled down.
+	MaxWidth  int `json:"max_width,omitempty"`
+	MaxHeight int `json:"max_height,omitempty"`
+	// MaxCount is the largest number of images in one request.
+	MaxCount int `json:"max_count,omitempty"`
+	// ManyImages is the number of images in one request above which the
+	// lower ManyMaxWidth and ManyMaxHeight apply. Zero means no such rule.
+	ManyImages   int `json:"many_images,omitempty"`
+	ManyMaxWidth int `json:"many_max_width,omitempty"`
+	// ManyMaxHeight is the pixel height limit when ManyImages applies.
+	ManyMaxHeight int `json:"many_max_height,omitempty"`
+}
+
+// maxDimensions returns the pixel limits for a request with the given
+// number of images.
+func (l ImageLimits) maxDimensions(images int) (width, height int) {
+	if l.ManyImages > 0 && images > l.ManyImages {
+		return l.ManyMaxWidth, l.ManyMaxHeight
+	}
+	return l.MaxWidth, l.MaxHeight
+}
+
+// PDFLimits are the documented provider limits for PDF input. A zero field
+// means no limit is known. CheckMessages and GenerateContent reject a PDF
+// above MaxBytes with ErrAttachmentTooLarge. They do not count pages, so
+// check MaxPages yourself when you know the page count.
+type PDFLimits struct {
+	// MaxBytes is the largest PDF, in bytes of BinaryPart.Data (before
+	// base64 encoding).
+	MaxBytes int64 `json:"max_bytes,omitempty"`
+	// MaxPages is the largest number of pages in one request.
+	MaxPages int `json:"max_pages,omitempty"`
 }
 
 // TokenRange is an inclusive token count range. A zero Max means no upper
@@ -227,55 +277,15 @@ func (mi ModelInfo) resolveMaxOutputTokens(requested, fallback int) int {
 	return fallback
 }
 
-// partModality returns the models.dev input modality required by a part
-// ("image", "audio", "pdf", "video"), or "" for parts that don't gate on
-// modality (text, tool calls, thinking, etc.).
-func partModality(part MessagePart) string {
-	switch p := part.(type) {
-	case *ImagePart:
-		return "image"
-	case *BinaryPart:
-		switch {
-		case strings.HasPrefix(p.MediaType, "image/"):
-			return "image"
-		case strings.HasPrefix(p.MediaType, "audio/"):
-			return "audio"
-		case strings.HasPrefix(p.MediaType, "video/"):
-			return "video"
-		case p.MediaType == "application/pdf":
-			return "pdf"
-		}
-	}
-	return ""
-}
-
-// firstUnsupportedModality scans messages for the first part whose required
-// input modality is not allowed by the model. It returns "" if every part is
-// acceptable.
-func firstUnsupportedModality(messages []*Message, info ModelInfo) string {
-	for _, msg := range messages {
-		for _, part := range msg.Parts {
-			modality := partModality(part)
-			if modality == "" {
-				continue
-			}
-			if !info.allowsModality(modality) {
-				return modality
-			}
-		}
-	}
-	return ""
-}
-
 // checkRequestCapabilities rejects a request that uses a capability the model
-// is known not to have (tools, an input modality, or a response schema), so it
-// fails before any network call.
+// is known not to have (tools, an input modality or attachment limit, or a
+// response schema), so it fails before any network call.
 func checkRequestCapabilities(statsModel string, info ModelInfo, opts *generateContentOptions) error {
 	if len(opts.Tools) > 0 && !info.allowsToolCall() {
 		return fmt.Errorf("model %s does not support tool calling", statsModel)
 	}
-	if modality := firstUnsupportedModality(opts.Messages, info); modality != "" {
-		return fmt.Errorf("model %s does not support %s input", statsModel, modality)
+	if err := checkMessages(statsModel, info, opts.Messages); err != nil {
+		return err
 	}
 	if opts.ResponseSchema != nil && !info.allowsStructuredOutput() {
 		return fmt.Errorf("model %s does not support structured output", statsModel)

@@ -118,6 +118,12 @@ func (m *googleModel) GenerateContent(ctx context.Context, options ...GenerateOp
 	return runSession(ctx, s)
 }
 
+// gateInfo returns the qualified model name and the ModelInfo that gates
+// requests. It makes no network call.
+func (m *googleModel) gateInfo() (string, ModelInfo) {
+	return m.statsModel, m.info.get()
+}
+
 func (m *googleModel) newSession(ctx context.Context, options ...GenerateOption) (*Session, error) {
 	opts, err := resolveGenerateContentOptions(m.subParserRegistry, options...)
 	if err != nil {
@@ -487,6 +493,7 @@ func (m *googleModel) googleTrailingContent(trailing []MessagePart) (*genai.Cont
 	if len(trailing) == 0 {
 		return nil, nil
 	}
+	trailing = expandFileParts(trailing, false)
 	parts := make([]*genai.Part, 0, len(trailing))
 	for _, t := range trailing {
 		p, err := googleTrailingPart(t)
@@ -508,7 +515,9 @@ func (m *googleModel) convertMessages(messages []*Message) ([]*genai.Content, er
 	for _, message := range messages {
 		var trailing []MessagePart
 		parts := make([]*genai.Part, 0, len(message.Parts))
-		for _, part := range message.Parts {
+		// Gemini has no name field for inline data and no text document,
+		// so files get labels and text files become text parts.
+		for _, part := range expandFileParts(message.Parts, false) {
 			var p *genai.Part
 			switch part := part.(type) {
 			case *ThinkingPart:
