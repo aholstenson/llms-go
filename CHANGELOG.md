@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.13.0](https://github.com/aholstenson/llms-go/compare/v0.12.0...v0.13.0) (2026-11-07)
+
+
+### Features
+
+* Check attachments before sending and support passing file names ([3d9aa93](https://github.com/aholstenson/llms-go/commit/3d9aa93f924963ce39f112056448bc4df976a494))
+* Detect dead HTTP/2 connections to providers and retry them ([0de2163](https://github.com/aholstenson/llms-go/commit/0de216346ae9716a661dd9436a596aff4d130716))
+* Update model metadata ([fc98978](https://github.com/aholstenson/llms-go/commit/fc989785293376f38af1e14dd5048e4424f1bf09))
+
 ## [0.12.0](https://github.com/aholstenson/llms-go/compare/v0.11.0...v0.12.0) (2026-11-05)
 
 
