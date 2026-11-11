@@ -341,6 +341,31 @@ run out. Detect it with `errors.Is(err, llms.ErrStall)`.
 `WithRequestTimeout` bounds the other half — how long an attempt may wait for
 the provider to start responding at all. Both default to off.
 
+## Streams that end early
+
+A proxy or a load balancer can close a response stream before the provider
+sends its final event. The connection closes without an error, so the stream
+looks complete but the response is missing. The library finds this for each
+provider:
+
+| Provider | Final event |
+| --- | --- |
+| OpenAI | `response.completed`, `response.failed` or `response.incomplete` |
+| Anthropic | `message_stop` |
+| Google | A chunk with a finish reason, or a blocked prompt |
+| OpenRouter | A chunk with a finish reason |
+
+A stream that ends early is a transient failure, like a stall. It is reported
+through `WithRetryNotify`, retried while nothing has reached your callbacks,
+and surfaces as an `*UnavailableError` when the attempts run out. Detect it
+with `errors.Is(err, llms.ErrStreamEnded)`. The error message gives the number
+of events received, the type of the last event and the response ID, if the
+provider sent one:
+
+```text
+stream ended after 214 events without a final response (last event: response.reasoning_summary_text.delta, response ID: resp_123)
+```
+
 Dead HTTP/2 connections are found even without these options. After 15
 seconds with no frame, the client sends a ping. If the ping gets no answer in
 15 more seconds, the client closes the connection and removes it from the
@@ -397,6 +422,22 @@ for {
 `Step` returns `done == false` alongside such an error, and `Session.Retryable`
 reports the same thing. A retried turn does not consume step budget, and emits
 a fresh `StreamingEventMessageStart`.
+
+The session also stays usable after a transient failure that comes after some
+output already reached your streaming callback, for example a stream that was
+cut after some reasoning deltas. `IsRetryable` and `Session.Retryable` are
+false for it, because another attempt streams the turn again from the start.
+The error also wraps `ErrStreamingPartialOutput`. Use `IsUnavailable` to find
+all transient failures, with and without partial output:
+
+```go
+if llms.IsUnavailable(err) {
+    if errors.Is(err, llms.ErrStreamingPartialOutput) {
+        ui.DiscardCurrentTurn() // the next attempt streams the turn again
+    }
+    continue // same session, same transcript, one more model call
+}
+```
 
 ### Content policy blocks
 

@@ -705,9 +705,9 @@ func (t *openrouterTurn) runStream(
 			return false, status, 0, false
 		}
 
-		// A stall is a transient failure like any other, except the provider
-		// never got as far as telling us so.
-		if isStallError(err) {
+		// A stall or a stream that ended early is a transient failure like
+		// any other, except the provider never got as far as telling us so.
+		if isStallError(err) || isStreamEnded(err) {
 			return true, 0, 0, false
 		}
 
@@ -774,6 +774,9 @@ func (t *openrouterTurn) streamAttempt(
 	var structuredStreamErr error
 	var textContent strings.Builder
 	var reasoningText strings.Builder
+	// ended describes the stream for the error when it ends before a chunk
+	// with a finish reason.
+	var ended streamEndedError
 
 	for {
 		chunk, recvErr := stream.Recv()
@@ -783,6 +786,12 @@ func (t *openrouterTurn) streamAttempt(
 		if recvErr != nil {
 			err = recvErr
 			break
+		}
+
+		ended.events++
+		ended.lastEvent = openrouterChunkKind(chunk)
+		if chunk.ID != "" {
+			ended.responseID = chunk.ID
 		}
 
 		if chunk.Usage != nil {
@@ -879,6 +888,24 @@ func (t *openrouterTurn) streamAttempt(
 			}
 			acc.Arguments.WriteString(tc.Function.Arguments)
 		}
+	}
+
+	// The stream ended before a chunk with a finish reason, so it was cut.
+	// go-openrouter reports every read or decode error as the end of the
+	// stream, so a missing finish reason is the only sign of a cut. A failed
+	// streaming callback is the turn's answer, so it is reported instead.
+	// The structured output is not complete, so it is not flushed: the
+	// parser error would hide the transient failure.
+	if err == nil && out.finishReason == "" && !out.handling {
+		if cerr := ctx.Err(); cerr != nil {
+			err = cerr
+		} else {
+			err = &ended
+		}
+		out.text = textContent.String()
+		out.reasoning = reasoningText.String()
+		out.parseErr = structuredStreamErr
+		return out, err
 	}
 
 	if structuredStreamErr == nil && t.jsParser != nil && t.opts.StructuredStreamingFunc != nil {
@@ -1096,7 +1123,7 @@ func (t *openrouterTurn) reportError(ctx context.Context, err error, start time.
 	// already reached the caller. Report it in the same shape so callers see
 	// one error type for "try again later".
 	status, hasStatus := openrouter.HTTPStatusCode(err)
-	if isStallError(err) || (hasStatus && isUnavailableStatusCode(status)) {
+	if isStallError(err) || isStreamEnded(err) || (hasStatus && isUnavailableStatusCode(status)) {
 		m.metrics.RecordCallDuration(ctx, GenAISystemOpenRouter, GenAIOperationChat, GenAIModel(m.model), time.Since(start), transientErrorType(err))
 		var ra time.Duration
 		var hasRA bool
@@ -1126,6 +1153,27 @@ func (t *openrouterTurn) reportError(ctx context.Context, err error, start time.
 	}
 	m.metrics.RecordCallDuration(ctx, GenAISystemOpenRouter, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeInternal)
 	return TurnOutput{}, fmt.Errorf("error from OpenRouter (model %s): %w", m.model, err)
+}
+
+// openrouterChunkKind names the content of a stream chunk for diagnostics.
+// OpenRouter chunks have no event type, so the name comes from the delta.
+func openrouterChunkKind(chunk openrouter.ChatCompletionStreamResponse) string {
+	if len(chunk.Choices) == 0 {
+		if chunk.Usage != nil {
+			return "usage"
+		}
+		return "empty"
+	}
+	delta := chunk.Choices[0].Delta
+	switch {
+	case len(delta.ToolCalls) > 0:
+		return "tool_calls"
+	case delta.Content != "":
+		return "content"
+	case (delta.Reasoning != nil && *delta.Reasoning != "") || delta.ReasoningContent != "" || len(delta.ReasoningDetails) > 0:
+		return "reasoning"
+	}
+	return "delta"
 }
 
 // extractUsage converts an openrouter.Usage to TurnUsage, or returns nil

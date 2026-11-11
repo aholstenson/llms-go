@@ -277,6 +277,11 @@ func (m *googleModel) handleStreaming(
 ) (*genai.GenerateContentResponse, error) {
 	var lastResponse *genai.GenerateContentResponse
 	var structuredStreamErr error
+	// ended describes the stream for the error when it ends before its final
+	// chunk. sawFinal is true when a chunk with a finish reason or a prompt
+	// block arrived.
+	var ended streamEndedError
+	sawFinal := false
 
 	for resp, err := range m.client.Models.GenerateContentStream(ctx, m.model, messages, config) {
 		if err != nil {
@@ -285,6 +290,15 @@ func (m *googleModel) handleStreaming(
 			// UnavailableError.PartialUsage). lastResponse may still be nil
 			// if the stream errored before yielding any chunk.
 			return lastResponse, err
+		}
+
+		ended.events++
+		ended.lastEvent = googleChunkKind(resp)
+		if resp.ResponseID != "" {
+			ended.responseID = resp.ResponseID
+		}
+		if googleFinalChunk(resp) {
+			sawFinal = true
 		}
 
 		if len(resp.Candidates) > 0 && resp.Candidates[0].Content != nil {
@@ -384,6 +398,16 @@ func (m *googleModel) handleStreaming(
 		}
 	}
 
+	// The stream ended without an error but before a chunk with a finish
+	// reason, so it was cut. The structured output is not complete, so it is
+	// not flushed: the parser error would hide the transient failure.
+	if !sawFinal {
+		if err := ctx.Err(); err != nil {
+			return lastResponse, err
+		}
+		return lastResponse, fmt.Errorf("streaming error from Google: %w", &ended)
+	}
+
 	// Flush jsonstream parser
 	if structuredStreamErr == nil && structuredStreamingFunc != nil && jsParser != nil {
 		events, err := jsParser.Flush()
@@ -414,6 +438,51 @@ func (m *googleModel) handleStreaming(
 	}
 
 	return lastResponse, nil
+}
+
+// googleFinalChunk reports whether a stream chunk ends the response: it has a
+// finish reason, or the prompt was blocked. Gemini sends the finish reason in
+// the last chunk of a complete response.
+func googleFinalChunk(resp *genai.GenerateContentResponse) bool {
+	if pf := resp.PromptFeedback; pf != nil && pf.BlockReason != "" && pf.BlockReason != genai.BlockedReasonUnspecified {
+		return true
+	}
+	if len(resp.Candidates) == 0 || resp.Candidates[0] == nil {
+		return false
+	}
+	reason := resp.Candidates[0].FinishReason
+	return reason != "" && reason != genai.FinishReasonUnspecified
+}
+
+// googleChunkKind names the content of a stream chunk for diagnostics.
+// Gemini chunks have no event type, so the name comes from the last part of
+// the first candidate.
+func googleChunkKind(resp *genai.GenerateContentResponse) string {
+	if len(resp.Candidates) == 0 || resp.Candidates[0] == nil {
+		switch {
+		case resp.PromptFeedback != nil:
+			return "prompt_feedback"
+		case resp.UsageMetadata != nil:
+			return "usage"
+		}
+		return "empty"
+	}
+	c := resp.Candidates[0]
+	if c.Content == nil || len(c.Content.Parts) == 0 {
+		return "candidate"
+	}
+	p := c.Content.Parts[len(c.Content.Parts)-1]
+	switch {
+	case p == nil:
+		return "candidate"
+	case p.FunctionCall != nil:
+		return "function_call"
+	case p.Thought:
+		return "thought"
+	case p.Text != "":
+		return "text"
+	}
+	return "part"
 }
 
 // extractUsage converts a genai response's usage metadata into TurnUsage,
@@ -753,9 +822,9 @@ func (m *googleModel) runStream(
 			return false, status, 0, false
 		}
 
-		// A stall is a transient failure like any other, except the provider
-		// never got as far as telling us so.
-		if isStallError(err) {
+		// A stall or a stream that ended early is a transient failure like
+		// any other, except the provider never got as far as telling us so.
+		if isStallError(err) || isStreamEnded(err) {
 			return true, 0, 0, false
 		}
 
@@ -922,7 +991,7 @@ func (t *googleTurn) Next(ctx context.Context) (TurnOutput, error) {
 		// output had already reached the caller. Report it in the same shape
 		// so callers see one error type for "try again later".
 		_, retryable, status := googleErrorDetails(err)
-		if isStallError(err) || retryable {
+		if isStallError(err) || isStreamEnded(err) || retryable {
 			var ra time.Duration
 			var hasRA bool
 			if retryable {

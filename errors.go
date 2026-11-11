@@ -5,16 +5,71 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 )
 
 // ErrStreamingPartialOutput sentinels an error returned from a streaming
 // generation where at least one content event had already been dispatched
 // to the caller's StreamingFunc or StructuredStreamingFunc before the
-// underlying stream errored. Callers should use errors.Is to detect this
-// case and avoid blind retries that would replay tokens already shown to
-// the user.
+// underlying stream errored. Callers use errors.Is to detect this case.
+//
+// The library does not retry such a call by itself, because a new attempt
+// sends the output again from the start. The failed call does not change the
+// conversation, so the caller can still try the turn again. When the error
+// is also an UnavailableError (see IsUnavailable), a Session stays usable:
+// the caller discards the output it received for the failed turn and calls
+// Session.StepPlan (or Step) again.
 var ErrStreamingPartialOutput = errors.New("streaming output was partially delivered before error")
+
+// ErrStreamEnded is the sentinel for a response stream that ended before the
+// provider sent its final event, for example an OpenAI stream without
+// "response.completed" or an Anthropic stream without "message_stop". The
+// connection closed without an error, so the cause is usually a proxy or a
+// load balancer that cut the stream. Another attempt can succeed.
+//
+// The retry loop retries this failure while no output has reached the
+// caller. When the attempts run out, or when output already reached the
+// caller, the error is returned in an UnavailableError. Use errors.Is to
+// find it:
+//
+//	if errors.Is(err, llms.ErrStreamEnded) { ... }
+var ErrStreamEnded = errors.New("stream ended without a final response")
+
+// streamEndedError is a stream that ended before its final event. It holds
+// the diagnostics that help to find where the stream was cut.
+type streamEndedError struct {
+	// events is the number of events received before the stream ended.
+	events int
+	// lastEvent is the type of the last event received, or "" when no event
+	// arrived.
+	lastEvent string
+	// responseID is the ID of the response, or "" when the provider did not
+	// send one before the stream ended.
+	responseID string
+}
+
+func (e *streamEndedError) Error() string {
+	msg := fmt.Sprintf("stream ended after %d events without a final response", e.events)
+	var details []string
+	if e.lastEvent != "" {
+		details = append(details, "last event: "+e.lastEvent)
+	}
+	if e.responseID != "" {
+		details = append(details, "response ID: "+e.responseID)
+	}
+	if len(details) > 0 {
+		msg += " (" + strings.Join(details, ", ") + ")"
+	}
+	return msg
+}
+
+func (e *streamEndedError) Unwrap() error { return ErrStreamEnded }
+
+// isStreamEnded reports whether err is, or wraps, ErrStreamEnded.
+func isStreamEnded(err error) bool {
+	return errors.Is(err, ErrStreamEnded)
+}
 
 // ErrStructuredStreamParse sentinels an error returned when the jsonstream
 // parser rejects mid-stream content during structured streaming. The parser
@@ -181,12 +236,13 @@ func IsContentPolicy(err error) bool {
 }
 
 // IsRetryable reports whether a failed model call can be attempted again
-// against the same conversation. It is true for a transient provider failure —
-// a rate limit, an overload, a stream event that could not be decoded, or a
-// stall (see WithStallTimeout) — that the
-// library's own retries could not clear, and false once any of the turn's
-// output has reached a streaming callback, because a fresh attempt would
-// replay tokens the user has already seen.
+// against the same conversation without replaying output. It is true for a
+// transient provider failure — a rate limit, an overload, a stream event that
+// could not be decoded, a stream that ended before its final event (see
+// ErrStreamEnded), or a stall (see WithStallTimeout) — that the library's own
+// retries could not clear. It is false once any of the turn's output has
+// reached a streaming callback, because a fresh attempt replays tokens the
+// user has already seen.
 //
 // A retry is safe because a failed turn leaves the conversation untouched: the
 // provider-native history only grows when a turn succeeds and its tool results
@@ -201,6 +257,10 @@ func IsContentPolicy(err error) bool {
 //	}
 //
 // A Session tracks this for its own last failure; see Session.Retryable.
+//
+// A transient failure after partial output is not retryable in this sense,
+// but the Session stays usable after it. The caller discards the partial
+// output and decides whether to try again. See IsUnavailable.
 //
 // A *ContentPolicyError is not retryable in this sense: the failure is not
 // transient. The Session stays usable after it, but the caller must decide
@@ -217,7 +277,27 @@ func IsRetryable(err error) bool {
 	if errors.As(err, &ue) {
 		return !ue.PartialOutput
 	}
-	return errors.Is(err, ErrStall)
+	return errors.Is(err, ErrStall) || errors.Is(err, ErrStreamEnded)
+}
+
+// IsUnavailable reports whether err contains an *UnavailableError: a model
+// call failed with a transient condition, such as a rate limit, an overload,
+// a stall or a stream that ended before its final event. It is true with and
+// without partial output.
+//
+// A Session stays usable after such an error (Step returns done == false),
+// because a failed turn does not change the conversation. Calling
+// Session.StepPlan (or Step) again tries the turn again against the same
+// transcript:
+//   - Without partial output, IsRetryable is also true. The caller can try
+//     again at once.
+//   - With partial output (the error also wraps ErrStreamingPartialOutput),
+//     IsRetryable is false. Some output of the failed turn already reached the
+//     streaming callback. The caller must discard that output before it tries
+//     again, because the next attempt streams the turn from the start.
+func IsUnavailable(err error) bool {
+	var ue *UnavailableError
+	return errors.As(err, &ue)
 }
 
 // isUnavailableStatusCode returns true for HTTP status codes that indicate

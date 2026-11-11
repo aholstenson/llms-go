@@ -87,11 +87,15 @@ func isStallError(err error) bool {
 }
 
 // transientErrorType picks the metric error type for a failure the library
-// treats as "try again later": a stall is reported as a timeout so it can be
-// told apart from a provider that answered with a rate limit or an overload.
+// treats as "try again later": a stall is reported as a timeout and a stream
+// that ended before its final event as stream_ended, so both can be told
+// apart from a provider that answered with a rate limit or an overload.
 func transientErrorType(err error) GenAIErrorType {
 	if isStallError(err) {
 		return GenAIErrorTypeTimeout
+	}
+	if isStreamEnded(err) {
+		return GenAIErrorTypeStreamEnded
 	}
 	return GenAIErrorTypeUnavailable
 }

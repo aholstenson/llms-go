@@ -219,8 +219,10 @@ func NewSession(ctx context.Context, m Model, options ...GenerateOption) (*Sessi
 //
 // An error with done=false is a model failure the session survived: the
 // turn can be attempted again by calling Step once more. This is a transient
-// failure (see Session.Retryable and IsRetryable) or a content policy block
-// (see IsContentPolicy).
+// failure (see IsUnavailable, IsRetryable and Session.Retryable) or a content
+// policy block (see IsContentPolicy). When the error wraps
+// ErrStreamingPartialOutput, some output of the failed turn already reached
+// the streaming callback; the caller discards it before it tries again.
 func (s *Session) Step(ctx context.Context) (StepInfo, bool, error) {
 	plan, done, err := s.StepPlan(ctx)
 	if err != nil {
@@ -294,6 +296,21 @@ func (s *Session) StepPlan(ctx context.Context) (PlanInfo, bool, error) {
 			s.tracker.DecrementStep()
 			s.lastErr = err
 			s.retryable = true
+			return PlanInfo{Step: s.step, Exec: s.tracker}, false, err
+		}
+		if IsUnavailable(err) {
+			// A transient failure after output already reached the caller,
+			// for example a stream that was cut after some deltas. As above,
+			// the turn left no trace in the history, so the session stays
+			// usable and the step is given back. The session does not report
+			// it as retryable, because another attempt streams the turn from
+			// the start: the caller discards the partial output and decides
+			// whether to try again. The error also wraps
+			// ErrStreamingPartialOutput.
+			s.step--
+			s.tracker.DecrementStep()
+			s.lastErr = err
+			s.retryable = false
 			return PlanInfo{Step: s.step, Exec: s.tracker}, false, err
 		}
 		if IsContentPolicy(err) {
@@ -513,17 +530,22 @@ func toolOutcomeMessage(outcomes []ToolOutcome) *Message {
 	return NewMessage(RoleUser, parts...)
 }
 
-// Retryable reports whether the session's last failure left the session usable:
-// the model turn failed transiently before any of its output reached the
-// caller, so calling StepPlan (or Step) again retries that turn against the
-// same transcript. It is false on a clean session and after a failure that
-// ended the run.
+// Retryable reports whether the session's last failure can be retried
+// without replaying output: the model turn failed transiently before any of
+// its output reached the caller, so calling StepPlan (or Step) again retries
+// that turn against the same transcript. It is false on a clean session and
+// after a failure that ended the run.
 //
 // A retried turn starts a fresh model call, so a caller watching the stream
 // sees another StreamingEventMessageStart for it.
 //
-// It is false after a content policy block, although the session stays
-// usable after one too. See IsContentPolicy.
+// The session also stays usable after two failures for which Retryable is
+// false. Step returns done == false for them:
+//   - A transient failure after some output of the turn already reached the
+//     streaming callback (IsUnavailable is true and the error wraps
+//     ErrStreamingPartialOutput). The caller discards that output and calls
+//     StepPlan (or Step) again to try the turn from the start.
+//   - A content policy block. See IsContentPolicy.
 func (s *Session) Retryable() bool {
 	return s.retryable
 }

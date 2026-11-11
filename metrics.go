@@ -46,6 +46,9 @@ const (
 	// GenAIErrorTypeContentPolicy is a request or a response that a
 	// provider safety system blocked. See ContentPolicyError.
 	GenAIErrorTypeContentPolicy GenAIErrorType = "content_policy"
+	// GenAIErrorTypeStreamEnded is a response stream that ended before the
+	// provider sent its final event. See ErrStreamEnded.
+	GenAIErrorTypeStreamEnded GenAIErrorType = "stream_ended"
 )
 
 // Metrics provides standardized GenAI metrics for the LLM implementations.

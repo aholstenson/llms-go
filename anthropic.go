@@ -400,9 +400,9 @@ func (m *anthropicModel) runStream(
 			return false, status, 0, false
 		}
 
-		// A stall is a transient failure like any other, except the provider
-		// never got as far as telling us so.
-		if isStallError(err) {
+		// A stall or a stream that ended early is a transient failure like
+		// any other, except the provider never got as far as telling us so.
+		if isStallError(err) || isStreamEnded(err) {
 			return true, 0, 0, false
 		}
 
@@ -476,16 +476,25 @@ func (m *anthropicModel) handleStreaming(
 	partialJSON := ""
 	citations := []StreamingEventCitation{}
 	var structuredStreamErr error
+	// ended describes the stream for the error when it ends before
+	// message_stop. sawStop is true when message_stop arrived.
+	var ended streamEndedError
+	sawStop := false
 
 	for stream.Next() {
 		event := stream.Current()
+		ended.events++
+		ended.lastEvent = string(event.Type)
 		err := message.Accumulate(event)
 		if err != nil {
 			return nil, err
 		}
+		ended.responseID = message.ID
 
 		// Handle different event types for streaming
 		switch eventVariant := event.AsAny().(type) {
+		case anthropic.BetaRawMessageStopEvent:
+			sawStop = true
 		case anthropic.BetaRawContentBlockStartEvent:
 			currentTool = ""
 			partialJSON = ""
@@ -643,6 +652,18 @@ func (m *anthropicModel) handleStreaming(
 				}
 			}
 		}
+	}
+
+	// The stream ended without an error but before message_stop, so it was
+	// cut. The accumulated message is returned so the caller can recover the
+	// usage reported before the cut. The structured output is not complete,
+	// so it is not flushed: the parser error would hide the transient
+	// failure.
+	if stream.Err() == nil && !sawStop {
+		if err := ctx.Err(); err != nil {
+			return &message, err
+		}
+		return &message, fmt.Errorf("streaming error from Anthropic: %w", &ended)
 	}
 
 	// Flush jsonstream parser
@@ -1165,7 +1186,7 @@ func (t *anthropicTurn) Next(ctx context.Context) (TurnOutput, error) {
 		// output had already reached the caller. Report it in the same shape
 		// so callers see one error type for "try again later".
 		status, unavailable := anthropicUnavailable(err)
-		if isStallError(err) || unavailable {
+		if isStallError(err) || isStreamEnded(err) || unavailable {
 			m.metrics.RecordCallDuration(ctx, GenAISystemAnthropic, GenAIOperationChat, GenAIModel(m.model), time.Since(start), transientErrorType(err))
 			var ra time.Duration
 			var hasRA bool

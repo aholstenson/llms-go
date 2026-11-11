@@ -699,9 +699,9 @@ func (t *openaiTurn) runStream(
 			return false, status, 0, false
 		}
 
-		// A stall is a transient failure like any other, except the provider
-		// never got as far as telling us so.
-		if isStallError(err) {
+		// A stall or a stream that ended early is a transient failure like
+		// any other, except the provider never got as far as telling us so.
+		if isStallError(err) || isStreamEnded(err) {
 			return true, 0, 0, false
 		}
 
@@ -776,12 +776,25 @@ func (t *openaiTurn) drainStream(
 	// reported with its code: another attempt can succeed after a rate limit
 	// or an overload, and the caller decides what to do after a block.
 	var inBandErr error
+	// ended describes the stream for the error when it ends before its
+	// final event.
+	var ended streamEndedError
 
 events:
 	for stream.Next() {
 		event := stream.Current()
+		ended.events++
+		ended.lastEvent = event.Type
 
 		switch ev := event.AsAny().(type) {
+		case responses.ResponseCreatedEvent:
+			ended.responseID = ev.Response.ID
+
+		case responses.ResponseInProgressEvent:
+			if ended.responseID == "" {
+				ended.responseID = ev.Response.ID
+			}
+
 		case responses.ResponseTextDeltaEvent:
 			if out.handling {
 				continue
@@ -851,6 +864,20 @@ events:
 
 	if err := stream.Close(); err != nil {
 		m.logger.Warn("Error closing OpenAI stream", slog.Any("error", err))
+	}
+
+	// The stream ended without an error but before its final event, so it
+	// was cut. A failed streaming callback is the turn's answer, so it is
+	// reported instead.
+	cutOff := stream.Err() == nil && inBandErr == nil && out.response == nil && !out.handling
+	if cutOff {
+		out.parseErr = structuredStreamErr
+		if err := ctx.Err(); err != nil {
+			return out, err
+		}
+		// The structured output is not complete, so it is not flushed: the
+		// parser error would hide the transient failure.
+		return out, &ended
 	}
 
 	if structuredStreamErr == nil && t.jsParser != nil && t.opts.StructuredStreamingFunc != nil {
@@ -969,7 +996,7 @@ func (t *openaiTurn) Next(ctx context.Context) (TurnOutput, error) {
 		// output had already reached the caller. Report it in the same shape
 		// so callers see one error type for "try again later".
 		status, unavailable := openaiUnavailable(err)
-		if isStallError(err) || unavailable {
+		if isStallError(err) || isStreamEnded(err) || unavailable {
 			m.metrics.RecordCallDuration(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start), transientErrorType(err))
 			var ra time.Duration
 			var hasRA bool
@@ -1038,6 +1065,8 @@ func (t *openaiTurn) Next(ctx context.Context) (TurnOutput, error) {
 	}
 
 	if finalResponse == nil {
+		// drainStream reports a stream without a final event as a transport
+		// error, so this is a defensive check only.
 		if metrics := GetMetrics(ctx); metrics != nil {
 			metrics.RecordFailure(m.statsModel, collector)
 		}
