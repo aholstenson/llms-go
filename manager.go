@@ -16,6 +16,7 @@ type Manager struct {
 	mu          sync.Mutex
 	logger      *slog.Logger
 	metrics     *Metrics
+	recorder    MetricsRecorder
 	credentials CredentialSource
 	models      map[string]Model
 	aliases     map[string]string
@@ -40,6 +41,29 @@ func WithManagerLogger(logger *slog.Logger) ManagerOption {
 func WithManagerMetrics(metrics *Metrics) ManagerOption {
 	return func(m *Manager) error {
 		m.metrics = metrics
+		return nil
+	}
+}
+
+// WithManagerMetricsRecorder sets a MetricsRecorder that receives the statistics of
+// every call made through the models this Manager creates. Use it to keep a
+// total, for example of token usage and cost, that does not depend on the
+// context of each call.
+//
+// A recorder set with WithMetrics on a context also receives the calls made
+// with that context. The statistics of such a call go to the two recorders,
+// so the context recorder holds a subset of the Manager recorder. Do not add
+// the two together. If the same recorder instance is set in the two places,
+// it receives each call one time.
+//
+// The recorder is called from many goroutines and must be safe for
+// concurrent use. No recorder is set by default.
+func WithManagerMetricsRecorder(recorder MetricsRecorder) ManagerOption {
+	return func(m *Manager) error {
+		if recorder == nil {
+			return errors.New("metrics recorder must not be nil")
+		}
+		m.recorder = recorder
 		return nil
 	}
 }
@@ -171,6 +195,7 @@ func (m *Manager) GetModel(ctx context.Context, name string) (Model, error) {
 	registry := m.subParserRegistrySnapshot()
 	logger := m.logger
 	metrics := m.metrics
+	recorder := m.recorder
 	credentials := m.credentials
 	m.mu.Unlock()
 
@@ -220,6 +245,9 @@ func (m *Manager) GetModel(ctx context.Context, name string) (Model, error) {
 		model = &testModel{name: modelName}
 	default:
 		return nil, fmt.Errorf("unknown model provider: %s", modelProvider)
+	}
+	if setter, ok := model.(recorderSetter); ok && recorder != nil {
+		setter.setRecorder(recorder)
 	}
 
 	m.mu.Lock()

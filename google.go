@@ -72,6 +72,7 @@ func googleRetryDelayFromError(err error) (time.Duration, bool) {
 type googleModel struct {
 	logger            *slog.Logger
 	metrics           *Metrics
+	recorder          MetricsRecorder
 	client            *genai.Client
 	statsModel        string
 	model             string
@@ -936,9 +937,7 @@ func (t *googleTurn) Next(ctx context.Context) (TurnOutput, error) {
 	}
 
 	if err != nil {
-		if metrics := GetMetrics(ctx); metrics != nil {
-			metrics.RecordFailure(m.statsModel, collector)
-		}
+		recordFailure(ctx, m.recorder, m.statsModel, collector)
 
 		// On a mid-stream failure the streaming loop may have accumulated
 		// usage before erroring; record it so cost accounting is not lost.
@@ -1089,9 +1088,7 @@ func (t *googleTurn) Next(ctx context.Context) (TurnOutput, error) {
 		m.logger.Warn("Google API returned a non-stop finish reason", slog.String("finish_reason", string(finishReason)))
 	}
 
-	if metrics := GetMetrics(ctx); metrics != nil {
-		metrics.RecordSuccess(m.statsModel, collector)
-	}
+	recordSuccess(ctx, m.recorder, m.statsModel, collector)
 	m.metrics.RecordCallDuration(ctx, GenAISystemGoogle, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeNoError)
 
 	return TurnOutput{
@@ -1223,4 +1220,8 @@ func googleStopReason(reason genai.FinishReason, hasToolCalls bool) StopReason {
 	default:
 		return StopReasonEndTurn
 	}
+}
+
+func (m *googleModel) setRecorder(recorder MetricsRecorder) {
+	m.recorder = recorder
 }

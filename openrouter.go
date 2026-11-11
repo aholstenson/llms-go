@@ -54,6 +54,7 @@ func withOpenRouterXTitle(title string) openRouterOption {
 type openrouterModel struct {
 	logger            *slog.Logger
 	metrics           *Metrics
+	recorder          MetricsRecorder
 	client            *openrouter.Client
 	clientOpts        []openrouter.Option
 	statsModel        string
@@ -564,9 +565,7 @@ func (t *openrouterTurn) nextNonStreaming(ctx context.Context, start time.Time, 
 	}
 
 	if len(response.Choices) == 0 {
-		if metrics := GetMetrics(ctx); metrics != nil {
-			metrics.RecordFailure(m.statsModel, collector)
-		}
+		recordFailure(ctx, m.recorder, m.statsModel, collector)
 		m.metrics.RecordCallDuration(ctx, GenAISystemOpenRouter, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeEmptyResponse)
 		return TurnOutput{}, fmt.Errorf("no completion choices returned from OpenRouter (model %s)", m.model)
 	}
@@ -631,9 +630,7 @@ func (t *openrouterTurn) nextNonStreaming(ctx context.Context, start time.Time, 
 	}
 	t.finalText = content
 
-	if metrics := GetMetrics(ctx); metrics != nil {
-		metrics.RecordSuccess(m.statsModel, collector)
-	}
+	recordSuccess(ctx, m.recorder, m.statsModel, collector)
 	m.metrics.RecordCallDuration(ctx, GenAISystemOpenRouter, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeNoError)
 
 	return TurnOutput{
@@ -944,9 +941,7 @@ func (t *openrouterTurn) nextStreaming(ctx context.Context, start time.Time, col
 	result, attempts, err := t.runStream(withLiveness(ctx, m.model, t.opts), params, start, &hasRecordedFirstToken, &streamingEmitted)
 
 	if result.parseErr != nil {
-		if metrics := GetMetrics(ctx); metrics != nil {
-			metrics.RecordFailure(m.statsModel, collector)
-		}
+		recordFailure(ctx, m.recorder, m.statsModel, collector)
 		m.metrics.RecordCallDuration(ctx, GenAISystemOpenRouter, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeStreamProcessing)
 		if streamingEmitted {
 			return TurnOutput{}, errors.Join(ErrStreamingPartialOutput, result.parseErr)
@@ -955,9 +950,7 @@ func (t *openrouterTurn) nextStreaming(ctx context.Context, start time.Time, col
 	}
 
 	if result.handling {
-		if metrics := GetMetrics(ctx); metrics != nil {
-			metrics.RecordFailure(m.statsModel, collector)
-		}
+		recordFailure(ctx, m.recorder, m.statsModel, collector)
 		m.metrics.RecordCallDuration(ctx, GenAISystemOpenRouter, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeStreamProcessing)
 		return TurnOutput{}, fmt.Errorf("stream handling failed for OpenRouter (model %s)", m.model)
 	}
@@ -1055,9 +1048,7 @@ func (t *openrouterTurn) nextStreaming(ctx context.Context, start time.Time, col
 	}
 	t.finalText = content
 
-	if metrics := GetMetrics(ctx); metrics != nil {
-		metrics.RecordSuccess(m.statsModel, collector)
-	}
+	recordSuccess(ctx, m.recorder, m.statsModel, collector)
 	m.metrics.RecordCallDuration(ctx, GenAISystemOpenRouter, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeNoError)
 
 	return TurnOutput{
@@ -1071,9 +1062,7 @@ func (t *openrouterTurn) nextStreaming(ctx context.Context, start time.Time, col
 
 func (t *openrouterTurn) reportError(ctx context.Context, err error, start time.Time, collector Collector, streaming bool, partialEmitted bool, partialUsage *TurnUsage, attempts int) (TurnOutput, error) {
 	m := t.m
-	if metrics := GetMetrics(ctx); metrics != nil {
-		metrics.RecordFailure(m.statsModel, collector)
-	}
+	recordFailure(ctx, m.recorder, m.statsModel, collector)
 
 	// On a mid-stream failure the chunked stream may already have surfaced
 	// a usage block (IncludeUsage is set on every streaming request);
@@ -1327,4 +1316,8 @@ func openrouterStopReason(reason openrouter.FinishReason, hasToolCalls bool) Sto
 	default:
 		return StopReasonEndTurn
 	}
+}
+
+func (m *openrouterModel) setRecorder(recorder MetricsRecorder) {
+	m.recorder = recorder
 }

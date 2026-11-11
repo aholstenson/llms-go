@@ -3,6 +3,7 @@ package llms
 import (
 	"context"
 	"math"
+	"reflect"
 	"sync"
 )
 
@@ -210,4 +211,48 @@ func GetMetrics(ctx context.Context) MetricsRecorder {
 		return recorder
 	}
 	return nil
+}
+
+// recorderSetter is implemented by the models that report statistics to a
+// Manager-level MetricsRecorder.
+type recorderSetter interface {
+	setRecorder(recorder MetricsRecorder)
+}
+
+// recordSuccess reports a successful call to the recorder in ctx and to the
+// Manager-level recorder. See WithManagerMetricsRecorder.
+func recordSuccess(ctx context.Context, manager MetricsRecorder, serviceName string, collector Collector) {
+	scoped := GetMetrics(ctx)
+	if scoped != nil {
+		scoped.RecordSuccess(serviceName, collector)
+	}
+	if manager != nil && !sameRecorder(scoped, manager) {
+		manager.RecordSuccess(serviceName, collector)
+	}
+}
+
+// recordFailure reports a failed call to the recorder in ctx and to the
+// Manager-level recorder. See WithManagerMetricsRecorder.
+func recordFailure(ctx context.Context, manager MetricsRecorder, serviceName string, collector Collector) {
+	scoped := GetMetrics(ctx)
+	if scoped != nil {
+		scoped.RecordFailure(serviceName, collector)
+	}
+	if manager != nil && !sameRecorder(scoped, manager) {
+		manager.RecordFailure(serviceName, collector)
+	}
+}
+
+// sameRecorder reports whether a and b are the same recorder instance. A call
+// must not be counted two times when one recorder is set on the Manager and
+// in the context.
+func sameRecorder(a, b MetricsRecorder) bool {
+	if a == nil || b == nil {
+		return false
+	}
+	va, vb := reflect.ValueOf(a), reflect.ValueOf(b)
+	if va.Type() != vb.Type() || !va.Comparable() {
+		return false
+	}
+	return a == b
 }

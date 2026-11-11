@@ -111,6 +111,7 @@ func anthropicUnavailable(err error) (status int, ok bool) {
 type anthropicModel struct {
 	logger            *slog.Logger
 	metrics           *Metrics
+	recorder          MetricsRecorder
 	client            anthropic.Client
 	model             string
 	statsModel        string
@@ -1147,9 +1148,7 @@ func (t *anthropicTurn) Next(ctx context.Context) (TurnOutput, error) {
 		err = errAnthropicRefusal
 	}
 	if err != nil {
-		if metrics := GetMetrics(ctx); metrics != nil {
-			metrics.RecordFailure(m.statsModel, collector)
-		}
+		recordFailure(ctx, m.recorder, m.statsModel, collector)
 
 		// A stream that failed part-way may already have surfaced
 		// message_start usage; preserve it so cost accounting is not lost.
@@ -1300,9 +1299,7 @@ func (t *anthropicTurn) Next(ctx context.Context) (TurnOutput, error) {
 	}
 	t.finalText = content
 
-	if metrics := GetMetrics(ctx); metrics != nil {
-		metrics.RecordSuccess(m.statsModel, collector)
-	}
+	recordSuccess(ctx, m.recorder, m.statsModel, collector)
 	m.metrics.RecordCallDuration(ctx, GenAISystemAnthropic, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeNoError)
 
 	return TurnOutput{
@@ -1374,4 +1371,8 @@ func anthropicStopReason(reason string, hasToolCalls bool) StopReason {
 	default:
 		return StopReasonEndTurn
 	}
+}
+
+func (m *anthropicModel) setRecorder(recorder MetricsRecorder) {
+	m.recorder = recorder
 }

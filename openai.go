@@ -163,6 +163,7 @@ func openaiUnavailable(err error) (status int, ok bool) {
 type openaiModel struct {
 	logger            *slog.Logger
 	metrics           *Metrics
+	recorder          MetricsRecorder
 	client            openai.Client
 	statsModel        string
 	model             string
@@ -957,9 +958,7 @@ func (t *openaiTurn) Next(ctx context.Context) (TurnOutput, error) {
 	// silent request instead of hanging on it.
 	result, attempts, err := t.runStream(withLiveness(ctx, m.model, t.opts), start, &hasRecordedFirstToken, &streamingEmitted)
 	if err != nil {
-		if metrics := GetMetrics(ctx); metrics != nil {
-			metrics.RecordFailure(m.statsModel, collector)
-		}
+		recordFailure(ctx, m.recorder, m.statsModel, collector)
 
 		// If a ResponseIncomplete/Failed event landed before the transport
 		// errored, the partial result already carries usage — preserve it so
@@ -1046,9 +1045,7 @@ func (t *openaiTurn) Next(ctx context.Context) (TurnOutput, error) {
 	finalResponse := result.response
 
 	if result.parseErr != nil {
-		if metrics := GetMetrics(ctx); metrics != nil {
-			metrics.RecordFailure(m.statsModel, collector)
-		}
+		recordFailure(ctx, m.recorder, m.statsModel, collector)
 		m.metrics.RecordCallDuration(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeStreamProcessing)
 		if streamingEmitted {
 			return TurnOutput{}, errors.Join(ErrStreamingPartialOutput, result.parseErr)
@@ -1057,9 +1054,7 @@ func (t *openaiTurn) Next(ctx context.Context) (TurnOutput, error) {
 	}
 
 	if result.handling {
-		if metrics := GetMetrics(ctx); metrics != nil {
-			metrics.RecordFailure(m.statsModel, collector)
-		}
+		recordFailure(ctx, m.recorder, m.statsModel, collector)
 		m.metrics.RecordCallDuration(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeStreamProcessing)
 		return TurnOutput{}, fmt.Errorf("stream handling failed for OpenAI (model %s)", m.model)
 	}
@@ -1067,17 +1062,13 @@ func (t *openaiTurn) Next(ctx context.Context) (TurnOutput, error) {
 	if finalResponse == nil {
 		// drainStream reports a stream without a final event as a transport
 		// error, so this is a defensive check only.
-		if metrics := GetMetrics(ctx); metrics != nil {
-			metrics.RecordFailure(m.statsModel, collector)
-		}
+		recordFailure(ctx, m.recorder, m.statsModel, collector)
 		m.metrics.RecordCallDuration(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeEmptyResponse)
 		return TurnOutput{}, fmt.Errorf("no completed response from OpenAI (model %s)", m.model)
 	}
 
 	if finalResponse.Status == responses.ResponseStatusFailed {
-		if metrics := GetMetrics(ctx); metrics != nil {
-			metrics.RecordFailure(m.statsModel, collector)
-		}
+		recordFailure(ctx, m.recorder, m.statsModel, collector)
 
 		// A ResponseStatusFailed event carries final usage (the model
 		// generated tokens before the server-side failure), so preserve it.
@@ -1192,9 +1183,7 @@ func (t *openaiTurn) Next(ctx context.Context) (TurnOutput, error) {
 	}
 	t.finalText = content
 
-	if metrics := GetMetrics(ctx); metrics != nil {
-		metrics.RecordSuccess(m.statsModel, collector)
-	}
+	recordSuccess(ctx, m.recorder, m.statsModel, collector)
 	m.metrics.RecordCallDuration(ctx, GenAISystemOpenAI, GenAIOperationChat, GenAIModel(m.model), time.Since(start), GenAIErrorTypeNoError)
 
 	return TurnOutput{
@@ -1246,4 +1235,8 @@ func openaiStopReason(r *responses.Response, hasToolCalls, hasRefusal bool) Stop
 		return StopReasonMaxTokens
 	}
 	return StopReasonEndTurn
+}
+
+func (m *openaiModel) setRecorder(recorder MetricsRecorder) {
+	m.recorder = recorder
 }

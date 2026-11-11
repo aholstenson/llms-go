@@ -490,6 +490,33 @@ A block on a long agentic run is often caused by tool output in the
 transcript, not by the prompt. Log the latest tool results when you get this
 error to find the cause.
 
+## Usage and cost
+
+A `MetricsRecorder` collects the token counters of each call. Set one on the
+Manager to get the total for every call that the Manager's models make:
+
+```go
+total := llms.NewMetricsRecorder()
+manager, err := llms.NewManager(llms.WithManagerMetricsRecorder(total))
+
+// Later: the cost in USD for each model.
+pricing := llms.NewPricingManager(slog.Default())
+costs := pricing.CalculateCosts(total.GetStats())
+```
+
+To get the usage of one request, user, or job, put a second recorder in the
+context of those calls:
+
+```go
+scoped := llms.NewMetricsRecorder()
+result, err := model.GenerateContent(llms.WithMetrics(ctx, scoped), opts...)
+```
+
+A call with a context recorder goes to the two recorders. The context
+recorder holds a subset of the Manager recorder, so do not add the two
+together. The difference between the Manager total and the sum of your
+context recorders is the usage that no context recorder counted.
+
 ## Examples
 
 Runnable programs live in [`examples/`](./examples):
