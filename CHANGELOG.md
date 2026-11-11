@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.0](https://github.com/aholstenson/llms-go/compare/v0.13.0...v0.14.0) (2026-11-11)
+
+
+### Features
+
+* Retry streams that end without a final response ([193ada9](https://github.com/aholstenson/llms-go/commit/193ada959ef80c5cd44f56bbce4e21cf2d1b198f))
+
 ## [0.13.0](https://github.com/aholstenson/llms-go/compare/v0.12.0...v0.13.0) (2026-11-07)
 
 
