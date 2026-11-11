@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.0](https://github.com/aholstenson/llms-go/compare/v0.14.0...v0.15.0) (2026-11-11)
+
+
+### Features
+
+* Record metrics for every call with one Manager option ([9c7ea10](https://github.com/aholstenson/llms-go/commit/9c7ea10ed9a932fd787369bc4ce2d3e5de08e2de))
+
 ## [0.14.0](https://github.com/aholstenson/llms-go/compare/v0.13.0...v0.14.0) (2026-11-11)
 
 
